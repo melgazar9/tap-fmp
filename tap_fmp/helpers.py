@@ -36,7 +36,7 @@ rate_limiter = RateLimitManager()
 
 class TickerFetcher:
     """
-    Fetch and caches Yahoo tickers in memory for the duration of a Meltano tap run.
+    Fetch and caches FMP tickers in memory for the duration of a Meltano tap run.
     ENSURES no duplicates and stops pagination when tickers repeat.
     """
 
@@ -104,7 +104,7 @@ def fmp_api_retry(func):
             logging.info(f"🔄 Network error for {ticker} - will retry: {e}")
             raise RequestException(f"Network error for {ticker}: {e}")
         except Exception as e:
-            # Check if it's a rate limit error from yahooquery
+            # Check if it's a rate limit error from FMP
             error_str = str(e).lower()
             if any(
                 phrase in error_str
@@ -176,3 +176,12 @@ def clean_strings(lst):
         re.sub(r"_+", "_", s).strip("_").lower() for s in cleaned_list
     ]  # clean leading and trailing underscores
     return cleaned_list
+
+def clean_json_keys(data: list[dict]) -> list[dict]:
+    return [
+        {
+            new_key: value
+            for new_key, value in zip(clean_strings(d.keys()), d.values())
+        }
+        for d in data
+    ]

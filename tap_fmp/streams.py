@@ -1,4 +1,4 @@
-"""Stream type classes for tap-yahooquery."""
+"""Stream type classes for tap-fmp."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from singer_sdk.helpers.types import Context
 from tap_fmp.client import FMPStream, TickerFetcher
 
 
-class TickerStream(FMPStream):
+class TickersStream(FMPStream):
     """Stream for pulling all tickers."""
 
     name = "symbols"
@@ -66,7 +66,7 @@ class HistoricalRatingsStream(FMPStream):
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType, required=True),
         th.Property("rating", th.StringType),
-        th.Property("overall_score", th.StringType),
+        th.Property("overall_score", th.NumberType),
         th.Property("discounted_cash_flow_score", th.NumberType),
         th.Property("return_on_equity_score", th.NumberType),
         th.Property("return_on_assets_score", th.NumberType),
@@ -77,6 +77,6 @@ class HistoricalRatingsStream(FMPStream):
 
     def get_url(self, context: Context) -> str:
         return (
-            f"https://financialmodelingprep.com/stable/ratings-historical?symbol="
-            f"{context.get('symbol')}&apikey={self.config.get('api_key')}"
+            f"{self.url_base}/stable/ratings-historical?symbol="
+            f"{context.get('ticker')}&apikey={self.config.get('api_key')}"
         )

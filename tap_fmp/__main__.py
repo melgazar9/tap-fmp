@@ -1,4 +1,4 @@
-"""YahooQuery entry point."""
+"""FMP entry point."""
 
 from __future__ import annotations
 

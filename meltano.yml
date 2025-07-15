@@ -18,11 +18,25 @@ plugins:
     - about
     - stream-maps
 
+    settings:
+    - name: api_key
+      kind: password
+      label: Polygon API Key
+      description: Polygon.io API Key
+      sensitive: true
+
+    - name: start_date
+      kind: date_iso8601
+      label: Start Date
+      description: Initial date to start extracting data from
+
     select:
-      - tickers.*
+      - historical_ratings.*
 
     config:
       start_date: '2010-01-01T00:00:00Z'
+      api_key: ${FMP_API_KEY}
+      base_url: https://financialmodelingprep.com
 
       tickers:
         select_tickers:

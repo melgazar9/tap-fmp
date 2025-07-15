@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC
 from singer_sdk.helpers.types import Context
-from tap_fmp.helpers import TickerFetcher
+from tap_fmp.helpers import TickerFetcher, clean_json_keys
 from typing import Union
 from singer_sdk.streams import Stream
 from singer_sdk import Tap
@@ -57,6 +57,9 @@ class FMPStream(Stream, ABC):
         ticker_list = self.config.get("ticker_list") or self.config.get(
             "tickers", {}
         ).get("select_tickers")
+
+        if isinstance(ticker_list, str):
+            ticker_list = [ticker_list]
 
         if ticker_list and ticker_list not in ("*", ["*"]):
             ticker_records = ticker_fetcher.fetch_specific_tickers(ticker_list)
@@ -141,22 +144,27 @@ class FMPStream(Stream, ABC):
             return None
         return ticker
 
+    @property
+    def url_base(self) -> str:
+        return self.config.get("base_url", "https://financialmodelingprep.com")
+
     def get_url(self, context: Context) -> str:
         raise NotImplementedError(
             "Method get_url must be overridden in the stream class."
         )
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        url = self.get_url()
+        url = self.get_url(context)
         try:
             response = requests.get(url)
             response.raise_for_status()
             records = response.json()
+            records = clean_json_keys(records)
         except Exception as e:
             self.logger.warning(f"Request failed: {e}")
             return []
-        yield from records
-
+        for r in records:
+            yield r
 
 class CachedTickerProvider:
     """Provider for cached tickers (matching tap-polygon pattern)."""
