@@ -1,19 +1,18 @@
-"""REST client handling, including FMP base class."""
+"""REST client handling, including FmpRestStream base class."""
 
 from __future__ import annotations
-
 from abc import ABC
 from singer_sdk.helpers.types import Context
-from tap_fmp.helpers import TickerFetcher, clean_json_keys
 from typing import Union
 from singer_sdk.streams import Stream
 from singer_sdk import Tap
+from tap_fmp.helpers import fmp_api_retry, TickerFetcher, clean_json_keys
+import typing as t
 import logging
 import requests
-import typing as t
 
 
-class FMPStream(Stream, ABC):
+class FmpRestStream(Stream, ABC):
     """FMP stream class with ticker partitioning support."""
 
     _use_cached_tickers_default = True
@@ -58,9 +57,6 @@ class FMPStream(Stream, ABC):
             "tickers", {}
         ).get("select_tickers")
 
-        if isinstance(ticker_list, str):
-            ticker_list = [ticker_list]
-
         if ticker_list and ticker_list not in ("*", ["*"]):
             ticker_records = ticker_fetcher.fetch_specific_tickers(ticker_list)
             self.logger.info(
@@ -80,6 +76,10 @@ class FMPStream(Stream, ABC):
 
         self.logger.info(f"Created {len(partitions)} ticker partitions for {self.name}")
         return partitions
+
+    @property
+    def url_base(self) -> str:
+        return self.config.get("base_url", "https://financialmodelingprep.com")
 
     def _filter_tickers_by_segments(
         self, tickers: list[dict], allowed_segments: list[str] | None = None
@@ -103,7 +103,7 @@ class FMPStream(Stream, ABC):
         )
 
         excluded_tickers = [
-            f"{t['ticker']} ({t.get('segment', 'unknown')})"
+            f"{t['symbol']} ({t.get('segment', 'unknown')})"
             for t in tickers
             if t not in filtered_tickers
         ]
@@ -142,32 +142,28 @@ class FMPStream(Stream, ABC):
                 f"Skipping {ticker} - not valid for {self.name} stream based on segment rules"
             )
             return None
+
         return ticker
 
-    @property
-    def url_base(self) -> str:
-        return self.config.get("base_url", "https://financialmodelingprep.com")
-
-    def get_url(self, context: Context) -> str:
-        raise NotImplementedError(
-            "Method get_url must be overridden in the stream class."
-        )
+    @fmp_api_retry
+    def _fetch_with_retry(
+        self, url, query_params=None
+    ) -> dict:
+        """Centralized API call with retry logic."""
+        query_params = {} if query_params is None else query_params
+        response = requests.get(url, params=query_params)
+        response.raise_for_status()
+        records = response.json()
+        records = clean_json_keys(records)
+        return records
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        url = self.get_url(context)
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            records = response.json()
-            records = clean_json_keys(records)
-        except Exception as e:
-            self.logger.warning(f"Request failed: {e}")
-            return []
-        for r in records:
-            yield r
+        records = self._fetch_with_retry(self.get_url(context), context.get("query_params"))
+        for record in records:
+            yield record
 
 class CachedTickerProvider:
-    """Provider for cached tickers (matching tap-polygon pattern)."""
+    """Provider for cached tickers (matching tap-fmp pattern)."""
 
     def __init__(self, tap):
         self.tap = tap

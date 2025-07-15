@@ -9,6 +9,11 @@ import time
 from requests.exceptions import ConnectionError, RequestException
 from urllib3.exceptions import MaxRetryError, NewConnectionError
 
+import re
+
+
+def redact_api_key(msg):
+    return re.sub(r"(apikey=)[^&\s]+", r"\1<REDACTED>", msg)
 
 class RateLimitManager:
     def __init__(self):
@@ -37,18 +42,14 @@ rate_limiter = RateLimitManager()
 class TickerFetcher:
     """
     Fetch and caches FMP tickers in memory for the duration of a Meltano tap run.
-    ENSURES no duplicates and stops pagination when tickers repeat.
     """
 
     _memory_cache = {}
     _cache_lock = threading.Lock()
 
     def fetch_all_tickers(self) -> list[dict]:
-        # TODO: implement pagination
-        endpoint = (
-            f"https://financialmodelingprep.com/stable/ratings-historical?symbol=AAPL&apikey="
-            f"{self.config.get('api_key')}"
-        )
+        # TODO: implement pagination?
+        endpoint = f"{self.config.get('base_url')}stable/stock-list?apikey={self.config.get('api_key')}"
         response = requests.get(endpoint)
         response.raise_for_status()
         tickers = response.json()
@@ -58,36 +59,32 @@ class TickerFetcher:
         """
         Create ticker records for a specific list of tickers.
         """
+        if isinstance(ticker_list, str):
+            return [{"ticker": ticker_list.upper(), "company_name": None}]
         return [
             {
                 "ticker": ticker.upper(),
-                "name": None,
+                "company_name": None,
             }
             for ticker in ticker_list
         ]
 
-
 class EmptyDataException(Exception):
     """Raised when data is empty but likely should contain data - triggers retry."""
-
     pass
-
 
 def fmp_api_retry(func):
     """Enhanced backoff with proper error classification and rate limiting."""
 
     @functools.wraps(func)
     def wrapped_func(*args, **kwargs):
-        # Extract ticker for better logging
-        ticker = "unknown"
+        # Extract endpoint for better logging
         if len(args) >= 2:
-            ticker = args[1]  # args[0] is self, args[1] is ticker
+            endpoint = args[1]
+            endpoint_redacted_apikey = redact_api_key(endpoint)
 
         # Apply rate limiting
-        rate_limiter.wait_if_needed(f"{func.__name__}_{ticker}")
-
-        # Add small base delay to reduce API pressure
-        time.sleep(0.1)
+        rate_limiter.wait_if_needed(f"{func.__name__}_{endpoint}")
 
         try:
             result = func(*args, **kwargs)
@@ -101,8 +98,8 @@ def fmp_api_retry(func):
             MaxRetryError,
             NewConnectionError,
         ) as e:
-            logging.info(f"🔄 Network error for {ticker} - will retry: {e}")
-            raise RequestException(f"Network error for {ticker}: {e}")
+            logging.info(f"🔄 Network error for {endpoint_redacted_apikey} - will retry: {e}")
+            raise RequestException(f"Network error for {endpoint_redacted_apikey}: {e}")
         except Exception as e:
             # Check if it's a rate limit error from FMP
             error_str = str(e).lower()
@@ -110,12 +107,12 @@ def fmp_api_retry(func):
                 phrase in error_str
                 for phrase in ["rate limit", "429", "too many requests", "quota"]
             ):
-                logging.info(f"🔄 Rate limit detected for {ticker} - will retry")
-                raise RequestException(f"Rate limit for {ticker}: {e}")
+                logging.info(f"🔄 Rate limit detected for {endpoint_redacted_apikey} - will retry")
+                raise RequestException(f"Rate limit for {endpoint_redacted_apikey}: {e}")
             else:
                 # For other errors, still retry but with different exception type
-                logging.warning(f"🔄 Other error for {ticker} - will retry: {e}")
-                raise RequestException(f"Other error for {ticker}: {e}")
+                logging.warning(f"🔄 Other error for {endpoint_redacted_apikey} - will retry: {e}")
+                raise RequestException(f"Other error for {endpoint_redacted_apikey}: {e}")
 
     def backoff_handler(details):
         exception_str = str(details["exception"])
@@ -129,11 +126,11 @@ def fmp_api_retry(func):
 
     def giveup_handler(details):
         exception_str = str(details["exception"])
-        ticker_match = re.search(r"for (\w+)", exception_str)
-        ticker_info = f" [{ticker_match.group(1)}]" if ticker_match else ""
+        endpoint_match = re.search(r"for (\w+)", exception_str)
+        endpoint_info = f" [{endpoint_match.group(1)}]" if endpoint_match else ""
 
         logging.warning(
-            f"⚠️ Giving up on {details['target'].__name__}{ticker_info} after {details['tries']} attempts"
+            f"⚠️ Giving up on {details['target'].__name__}{endpoint_info} after {details['tries']} attempts"
         )
 
     @functools.wraps(func)
@@ -153,15 +150,13 @@ def fmp_api_retry(func):
                 base=3,
                 max_value=60,
                 jitter=backoff.full_jitter,
-                # Remove the giveup condition entirely
                 on_backoff=backoff_handler,
                 on_giveup=giveup_handler,
             )(wrapped_func)(*args, **kwargs)
         except Exception:
-            # Return empty DataFrame for any final failures
-            logging.info(f"📄 Returning empty DataFrame for {func.__name__}")
+            # Return an empty dict for any final failures
+            logging.info(f"📄 Returning empty dict for {func.__name__}")
             return {}
-
     return safe_wrapper
 
 

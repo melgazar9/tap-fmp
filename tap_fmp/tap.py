@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from singer_sdk import Tap
 from singer_sdk import typing as th
-
 import typing as t
-from tap_fmp.streams import (
+
+from tap_fmp.streams.directory_streams import (
     TickersStream,
+)
+
+from tap_fmp.streams.analyst_streams import (
     HistoricalRatingsStream,
 )
 
@@ -25,6 +28,17 @@ class TapFMP(Tap):
             "start_date",
             th.DateTimeType,
             description="Start date for data extraction",
+        ),
+        th.Property(
+            "tickers",
+            th.ObjectType(
+                th.Property(
+                    "select_tickers",
+                    th.OneOf(th.StringType, th.ArrayType(th.StringType)),
+                ),
+            ),
+            description="Ticker configuration including selection and query params",
+            required=True,
         ),
     ).to_dict()
 

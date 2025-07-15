@@ -21,8 +21,8 @@ plugins:
     settings:
     - name: api_key
       kind: password
-      label: Polygon API Key
-      description: Polygon.io API Key
+      label: FMP API Key
+      description: FMP API Key
       sensitive: true
 
     - name: start_date
@@ -31,6 +31,7 @@ plugins:
       description: Initial date to start extracting data from
 
     select:
+      - tickers.*
       - historical_ratings.*
 
     config:
@@ -41,6 +42,7 @@ plugins:
       tickers:
         select_tickers:
           - "AAPL"
+          - "NVDA"
 
   loaders:
   - name: target-jsonl
