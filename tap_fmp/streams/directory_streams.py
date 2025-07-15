@@ -4,6 +4,7 @@ from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpRestStream, TickerFetcher
 
+
 class TickersStream(FmpRestStream):
     """Stream for pulling all tickers."""
 
@@ -50,11 +51,13 @@ class TickersStream(FmpRestStream):
         for record in ticker_records:
             yield record
 
+
 class CompanySymbolsListStream(FmpRestStream):
     _use_cached_tickers_default = False
 
     def get_url(self, context: Context):
         return f"{self.url_base()}/stable/stock-list"
+
 
 class FinancialStatementSymbolsListStream(FmpRestStream):
     _use_cached_tickers_default = False
@@ -62,11 +65,13 @@ class FinancialStatementSymbolsListStream(FmpRestStream):
     def get_url(self, context: Context):
         return f"{self.url_base()}/stable/financial-statement-symbol-list"
 
+
 class CIKListStream(FmpRestStream):
     _use_cached_tickers_default = False
 
     def get_url(self, context: Context):
         return f"{self.url_base()}/stable/cik-list"
+
 
 class SymbolChangesListStream(FmpRestStream):
     _use_cached_tickers_default = False
@@ -74,11 +79,13 @@ class SymbolChangesListStream(FmpRestStream):
     def get_url(self, context: Context):
         return f"{self.url_base()}/stable/symbol-change"
 
+
 class ETFSymbolListStream(FmpRestStream):
     _use_cached_tickers_default = False
 
     def get_url(self, context: Context):
         return f"{self.url_base()}/stable/etf-list"
+
 
 class ActivelyTradingListStream(FmpRestStream):
     _use_cached_tickers_default = False
@@ -86,17 +93,20 @@ class ActivelyTradingListStream(FmpRestStream):
     def get_url(self, context: Context):
         return f"{self.url_base()}/stable/actively-trading-list"
 
+
 class EarningsTranscriptListStream(FmpRestStream):
     _use_cached_tickers_default = False
 
     def get_url(self, context: Context):
         return f"{self.url_base()}/stable/earnings-transcript-list"
 
+
 class AvailableExchangesStream(FmpRestStream):
     _use_cached_tickers_default = False
 
     def get_url(self, context: Context):
         return f"{self.url_base()}/stable/available-exchanges"
+
 
 class AvailableSectorsStream(FmpRestStream):
     _use_cached_tickers_default = False

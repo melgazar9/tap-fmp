@@ -146,9 +146,7 @@ class FmpRestStream(Stream, ABC):
         return ticker
 
     @fmp_api_retry
-    def _fetch_with_retry(
-        self, url, query_params=None
-    ) -> dict:
+    def _fetch_with_retry(self, url, query_params=None) -> dict:
         """Centralized API call with retry logic."""
         query_params = {} if query_params is None else query_params
         response = requests.get(url, params=query_params)
@@ -158,9 +156,12 @@ class FmpRestStream(Stream, ABC):
         return records
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        records = self._fetch_with_retry(self.get_url(context), context.get("query_params"))
+        records = self._fetch_with_retry(
+            self.get_url(context), context.get("query_params")
+        )
         for record in records:
             yield record
+
 
 class CachedTickerProvider:
     """Provider for cached tickers (matching tap-fmp pattern)."""

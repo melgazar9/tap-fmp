@@ -2,12 +2,15 @@ from tap_fmp.client import FmpRestStream
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
+
 class AnalystEstimatesStream(FmpRestStream):
     name = "analyst_estimates"
+
     def get_url(self, context: Context):
         url = f"{self.url_base()}/stable/analyst-estimates"
         # need to pass query params --> ?symbol=AAPL&period=annual&page=0&limit=10&apikey={self.config.get('api_key')"
         return url
+
 
 class HistoricalRatingsStream(FmpRestStream):
     """Stream for historical rating data."""

@@ -9,11 +9,10 @@ import time
 from requests.exceptions import ConnectionError, RequestException
 from urllib3.exceptions import MaxRetryError, NewConnectionError
 
-import re
-
 
 def redact_api_key(msg):
     return re.sub(r"(apikey=)[^&\s]+", r"\1<REDACTED>", msg)
+
 
 class RateLimitManager:
     def __init__(self):
@@ -69,9 +68,12 @@ class TickerFetcher:
             for ticker in ticker_list
         ]
 
+
 class EmptyDataException(Exception):
     """Raised when data is empty but likely should contain data - triggers retry."""
+
     pass
+
 
 def fmp_api_retry(func):
     """Enhanced backoff with proper error classification and rate limiting."""
@@ -98,7 +100,9 @@ def fmp_api_retry(func):
             MaxRetryError,
             NewConnectionError,
         ) as e:
-            logging.info(f"🔄 Network error for {endpoint_redacted_apikey} - will retry: {e}")
+            logging.info(
+                f"🔄 Network error for {endpoint_redacted_apikey} - will retry: {e}"
+            )
             raise RequestException(f"Network error for {endpoint_redacted_apikey}: {e}")
         except Exception as e:
             # Check if it's a rate limit error from FMP
@@ -107,12 +111,20 @@ def fmp_api_retry(func):
                 phrase in error_str
                 for phrase in ["rate limit", "429", "too many requests", "quota"]
             ):
-                logging.info(f"🔄 Rate limit detected for {endpoint_redacted_apikey} - will retry")
-                raise RequestException(f"Rate limit for {endpoint_redacted_apikey}: {e}")
+                logging.info(
+                    f"🔄 Rate limit detected for {endpoint_redacted_apikey} - will retry"
+                )
+                raise RequestException(
+                    f"Rate limit for {endpoint_redacted_apikey}: {e}"
+                )
             else:
                 # For other errors, still retry but with different exception type
-                logging.warning(f"🔄 Other error for {endpoint_redacted_apikey} - will retry: {e}")
-                raise RequestException(f"Other error for {endpoint_redacted_apikey}: {e}")
+                logging.warning(
+                    f"🔄 Other error for {endpoint_redacted_apikey} - will retry: {e}"
+                )
+                raise RequestException(
+                    f"Other error for {endpoint_redacted_apikey}: {e}"
+                )
 
     def backoff_handler(details):
         exception_str = str(details["exception"])
@@ -157,6 +169,7 @@ def fmp_api_retry(func):
             # Return an empty dict for any final failures
             logging.info(f"📄 Returning empty dict for {func.__name__}")
             return {}
+
     return safe_wrapper
 
 
@@ -172,11 +185,9 @@ def clean_strings(lst):
     ]  # clean leading and trailing underscores
     return cleaned_list
 
+
 def clean_json_keys(data: list[dict]) -> list[dict]:
     return [
-        {
-            new_key: value
-            for new_key, value in zip(clean_strings(d.keys()), d.values())
-        }
+        {new_key: value for new_key, value in zip(clean_strings(d.keys()), d.values())}
         for d in data
     ]
