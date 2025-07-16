@@ -1,4 +1,4 @@
-from tap_fmp.client import FmpRestStream
+from tap_fmp.client import FmpRestStream, SymbolPartitionedStream
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
@@ -7,16 +7,17 @@ class AnalystEstimatesStream(FmpRestStream):
     name = "analyst_estimates"
 
     def get_url(self, context: Context):
-        url = f"{self.url_base()}/stable/analyst-estimates"
-        # need to pass query params --> ?symbol=AAPL&period=annual&page=0&limit=10&apikey={self.config.get('api_key')"
+        url = f"{self.url_base}/stable/analyst-estimates"
         return url
 
 
-class HistoricalRatingsStream(FmpRestStream):
+class HistoricalRatingsStream(SymbolPartitionedStream):
     """Stream for historical rating data."""
 
     name = "historical_ratings"
     primary_keys = ["symbol", "date"]
+
+    _symbol_in_query_params = True
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
@@ -33,6 +34,5 @@ class HistoricalRatingsStream(FmpRestStream):
 
     def get_url(self, context: Context) -> str:
         return (
-            f"{self.url_base}/stable/ratings-historical?symbol="
-            f"{context.get('ticker')}&apikey={self.config.get('api_key')}"
+            f"{self.url_base}/stable/ratings-historical"
         )

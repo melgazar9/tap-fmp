@@ -60,7 +60,7 @@ class TapFMP(Tap):
         """Return a list of discovered streams."""
         return [
             SymbolsStream(self),
-            # HistoricalRatingsStream(self),
+            HistoricalRatingsStream(self),
         ]
 
 

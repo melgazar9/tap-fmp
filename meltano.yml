@@ -42,7 +42,12 @@ plugins:
 
       symbols:
         select_symbols:
-          - "*"
+          - "AAPL"
+          - "NVDA"
+
+      historical_ratings:
+        query_params:
+          limit: 10000
 
   loaders:
   - name: target-jsonl

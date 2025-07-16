@@ -1,41 +1,8 @@
 import re
 import requests
-from datetime import datetime
 import threading
-import logging
-import backoff
-import functools
-import time
-from requests.exceptions import ConnectionError, RequestException
-from urllib3.exceptions import MaxRetryError, NewConnectionError
 
-def redact_api_key(msg):
-    return re.sub(r"(apikey=)[^&\s]+", r"\1<REDACTED>", msg)
-
-
-class RateLimitManager:
-    def __init__(self):
-        self.last_request_time = {}
-        self.min_delay = 0.2
-
-    def wait_if_needed(self, endpoint_name):
-        """Wait if we need to respect rate limits"""
-        now = datetime.now()
-        last_time = self.last_request_time.get(endpoint_name)
-
-        if last_time:
-            time_since_last = (now - last_time).total_seconds()
-            if time_since_last < self.min_delay:
-                sleep_time = self.min_delay - time_since_last
-                logging.info(
-                    f"⏱️ Rate limiting: sleeping {sleep_time:.1f}s for {endpoint_name}"
-                )
-                time.sleep(sleep_time)
-        self.last_request_time[endpoint_name] = now
-
-
-rate_limiter = RateLimitManager()
-
+from types import MappingProxyType
 
 class SymbolFetcher:
     """
@@ -45,7 +12,7 @@ class SymbolFetcher:
     _memory_cache = {}
     _cache_lock = threading.Lock()
 
-    def __init__(self, config: dict):
+    def __init__(self, config: MappingProxyType):
         self.config = config
 
     def fetch_all_symbols(self) -> list[dict]:
@@ -56,7 +23,8 @@ class SymbolFetcher:
         symbols = clean_json_keys(symbols)
         return symbols
 
-    def fetch_specific_symbols(self, symbol_list: list[str]) -> list[dict]:
+    @staticmethod
+    def fetch_specific_symbols(symbol_list: list[str]) -> list[dict]:
         """
         Create symbol records for a specific list of symbols.
         """
@@ -69,111 +37,6 @@ class SymbolFetcher:
             }
             for symbol in symbol_list
         ]
-
-
-class EmptyDataException(Exception):
-    """Raised when data is empty but likely should contain data - triggers retry."""
-
-    pass
-
-
-def fmp_api_retry(func):
-    """Enhanced backoff with proper error classification and rate limiting."""
-
-    @functools.wraps(func)
-    def wrapped_func(*args, **kwargs):
-        # Extract endpoint for better logging
-        if len(args) >= 2:
-            endpoint = args[1]
-            endpoint_redacted_apikey = redact_api_key(endpoint)
-
-        # Apply rate limiting
-        rate_limiter.wait_if_needed(f"{func.__name__}_{endpoint}")
-
-        try:
-            result = func(*args, **kwargs)
-            return result
-
-        except EmptyDataException:
-            raise
-        except (
-            ConnectionError,
-            RequestException,
-            MaxRetryError,
-            NewConnectionError,
-        ) as e:
-            logging.info(
-                f"🔄 Network error for {endpoint_redacted_apikey} - will retry: {e}"
-            )
-            raise RequestException(f"Network error for {endpoint_redacted_apikey}: {e}")
-        except Exception as e:
-            # Check if it's a rate limit error from FMP
-            error_str = str(e).lower()
-            if any(
-                phrase in error_str
-                for phrase in ["rate limit", "429", "too many requests", "quota"]
-            ):
-                logging.info(
-                    f"🔄 Rate limit detected for {endpoint_redacted_apikey} - will retry"
-                )
-                raise RequestException(
-                    f"Rate limit for {endpoint_redacted_apikey}: {e}"
-                )
-            else:
-                # For other errors, still retry but with different exception type
-                logging.warning(
-                    f"🔄 Other error for {endpoint_redacted_apikey} - will retry: {e}"
-                )
-                raise RequestException(
-                    f"Other error for {endpoint_redacted_apikey}: {e}"
-                )
-
-    def backoff_handler(details):
-        exception_str = str(details["exception"])
-        symbol_match = re.search(r"for (\w+)", exception_str)
-        symbol_info = f" [{symbol_match.group(1)}]" if symbol_match else ""
-
-        logging.info(
-            f"🔄 Retrying {details['target'].__name__}{symbol_info} - "
-            f"attempt {details['tries']}/10, waiting {details['wait']:.1f}s"
-        )
-
-    def giveup_handler(details):
-        exception_str = str(details["exception"])
-        endpoint_match = re.search(r"for (\w+)", exception_str)
-        endpoint_info = f" [{endpoint_match.group(1)}]" if endpoint_match else ""
-
-        logging.warning(
-            f"⚠️ Giving up on {details['target'].__name__}{endpoint_info} after {details['tries']} attempts"
-        )
-
-    @functools.wraps(func)
-    def safe_wrapper(*args, **kwargs):
-        try:
-            return backoff.on_exception(
-                backoff.expo,
-                (
-                    RequestException,
-                    ConnectionError,
-                    MaxRetryError,
-                    NewConnectionError,
-                    EmptyDataException,
-                ),
-                max_tries=10,
-                max_time=600,
-                base=3,
-                max_value=60,
-                jitter=backoff.full_jitter,
-                on_backoff=backoff_handler,
-                on_giveup=giveup_handler,
-            )(wrapped_func)(*args, **kwargs)
-        except Exception:
-            # Return an empty dict for any final failures
-            logging.info(f"📄 Returning empty dict for {func.__name__}")
-            return {}
-
-    return safe_wrapper
-
 
 def clean_strings(lst):
     cleaned_list = [

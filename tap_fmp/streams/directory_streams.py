@@ -3,7 +3,7 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpRestStream
-from tap_fmp.helpers import SymbolFetcher, fmp_api_retry, clean_json_keys
+from tap_fmp.helpers import SymbolFetcher
 
 
 class SymbolsStream(FmpRestStream):
