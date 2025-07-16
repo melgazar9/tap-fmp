@@ -82,6 +82,20 @@ class FmpRestStream(Stream, ABC):
 
         self.query_params["apikey"] = self.config.get("api_key")
 
+    def _check_missing_fields(self, schema: dict, record: dict):
+        schema_fields = set(schema.get("properties", {}).keys())
+        record_keys = set(record.keys())
+        missing_in_record = schema_fields - record_keys
+        if missing_in_record:
+            logging.debug(
+                f"*** Missing fields in record that are present in schema: {missing_in_record} for tap {self.name} ***"
+            )
+        missing_in_schema = record_keys - schema_fields
+        if missing_in_schema:
+            logging.critical(
+                f"*** URGENT: Missing fields in schema that are present record: {missing_in_schema} ***"
+            )
+
     @backoff.on_exception(
         backoff.expo,
         (requests.exceptions.RequestException,),
@@ -114,16 +128,20 @@ class FmpRestStream(Stream, ABC):
                 records = self._fetch_with_retry(url, query_params, page)
                 if not records:
                     break
-                yield from records
+                for record in records:
+                    self._check_missing_fields(self.schema, record)
+                    yield record
                 page += 1
         else:
             records = self._fetch_with_retry(url, query_params)
-            yield from records
+            for record in records:
+                self._check_missing_fields(self.schema, record)
+                yield record
 
 
 class SymbolPartitionedStream(FmpRestStream):
-    _symbol_in_path_params = None
-    _symbol_in_query_params = None
+    _symbol_in_path_params = False
+    _symbol_in_query_params = True
 
     @property
     def partitions(self):
@@ -148,11 +166,15 @@ class SymbolPartitionedStream(FmpRestStream):
                 records = self._fetch_with_retry(url, query_params, page=page)
                 if not records:
                     break
-                yield from records
+                for record in records:
+                    self._check_missing_fields(self.schema, record)
+                    yield record
                 page += 1
         else:
             records = self._fetch_with_retry(url, query_params)
-            yield from records
+            for record in records:
+                self._check_missing_fields(self.schema, record)
+                yield record
 
 class CachedSymbolProvider:
     """Provider for cached symbols (matching tap-fmp pattern)."""

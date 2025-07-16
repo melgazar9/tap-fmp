@@ -4,14 +4,35 @@ from __future__ import annotations
 
 from singer_sdk import Tap
 from singer_sdk import typing as th
+
 import typing as t
 
+from tap_fmp.streams.search_streams import (
+    StockScreenerStream,
+    ExchangeVariantsStream,
+)
+
 from tap_fmp.streams.directory_streams import (
-    SymbolsStream,
+    CompanySymbolsStream,
+    FinancialStatementSymbolsStream,
+    CikListStream,
+    SymbolChangesStream,
+    ETFSymbolStream,
+    ActivelyTradingStream,
+    # EarningsTranscriptStream,
+    AvailableExchangesStream,
+    AvailableSectorsStream,
+    AvailableIndustriesStream,
+    AvailableCountriesStream,
 )
 
 from tap_fmp.streams.analyst_streams import (
+    AnalystEstimatesAnnualStream,
     HistoricalRatingsStream,
+)
+
+from tap_fmp.streams.calendar_streams import (
+    EarningsReportStream
 )
 
 
@@ -21,7 +42,7 @@ class TapFMP(Tap):
     name = "tap-fmp"
 
     _cached_symbols: t.List[dict] | None = None
-    _symbols_stream_instance: SymbolsStream | None = None
+    _symbols_stream_instance: CompanySymbolsStream | None = None
 
     config_jsonschema = th.PropertiesList(
         th.Property(
@@ -50,17 +71,36 @@ class TapFMP(Tap):
             self.logger.info(f"Cached {len(self._cached_symbols)} symbols.")
         return self._cached_symbols
 
-    def get_symbols_stream(self) -> SymbolsStream:
+    def get_symbols_stream(self) -> CompanySymbolsStream:
         if self._symbols_stream_instance is None:
             self.logger.info("Creating SymbolsStream instance...")
-            self._symbols_stream_instance = SymbolsStream(self)
+            self._symbols_stream_instance = CompanySymbolsStream(self)
         return self._symbols_stream_instance
 
     def discover_streams(self) -> list:
         """Return a list of discovered streams."""
         return [
-            SymbolsStream(self),
+            # Search Streams
+            StockScreenerStream(self),
+            ExchangeVariantsStream(self),
+
+            # Directory Streams
+            CompanySymbolsStream(self),
+            FinancialStatementSymbolsStream(self),
+            CikListStream(self),
+            SymbolChangesStream(self),
+            ETFSymbolStream(self),
+            ActivelyTradingStream(self),
+            # EarningsTranscriptStream(self),
+            AvailableExchangesStream(self),
+            AvailableSectorsStream(self),
+            AvailableIndustriesStream(self),
+            AvailableCountriesStream(self),
+
+            # Analyst Streams
+            AnalystEstimatesAnnualStream(self),
             HistoricalRatingsStream(self),
+            EarningsReportStream(self),
         ]
 
 
