@@ -9,7 +9,6 @@ import time
 from requests.exceptions import ConnectionError, RequestException
 from urllib3.exceptions import MaxRetryError, NewConnectionError
 
-
 def redact_api_key(msg):
     return re.sub(r"(apikey=)[^&\s]+", r"\1<REDACTED>", msg)
 
@@ -38,34 +37,37 @@ class RateLimitManager:
 rate_limiter = RateLimitManager()
 
 
-class TickerFetcher:
+class SymbolFetcher:
     """
-    Fetch and caches FMP tickers in memory for the duration of a Meltano tap run.
+    Fetch and caches FMP symbols in memory for the duration of a Meltano tap run.
     """
 
     _memory_cache = {}
     _cache_lock = threading.Lock()
 
-    def fetch_all_tickers(self) -> list[dict]:
-        # TODO: implement pagination?
-        endpoint = f"{self.config.get('base_url')}stable/stock-list?apikey={self.config.get('api_key')}"
+    def __init__(self, config: dict):
+        self.config = config
+
+    def fetch_all_symbols(self) -> list[dict]:
+        endpoint = f"{self.config.get('base_url')}/stable/stock-list?apikey={self.config.get('api_key')}"
         response = requests.get(endpoint)
         response.raise_for_status()
-        tickers = response.json()
-        return tickers
+        symbols = response.json()
+        symbols = clean_json_keys(symbols)
+        return symbols
 
-    def fetch_specific_tickers(self, ticker_list: list[str]) -> list[dict]:
+    def fetch_specific_symbols(self, symbol_list: list[str]) -> list[dict]:
         """
-        Create ticker records for a specific list of tickers.
+        Create symbol records for a specific list of symbols.
         """
-        if isinstance(ticker_list, str):
-            return [{"ticker": ticker_list.upper(), "company_name": None}]
+        if isinstance(symbol_list, str):
+            return [{"symbol": symbol_list.upper(), "company_name": None}]
         return [
             {
-                "ticker": ticker.upper(),
+                "symbol": symbol.upper(),
                 "company_name": None,
             }
-            for ticker in ticker_list
+            for symbol in symbol_list
         ]
 
 
@@ -128,11 +130,11 @@ def fmp_api_retry(func):
 
     def backoff_handler(details):
         exception_str = str(details["exception"])
-        ticker_match = re.search(r"for (\w+)", exception_str)
-        ticker_info = f" [{ticker_match.group(1)}]" if ticker_match else ""
+        symbol_match = re.search(r"for (\w+)", exception_str)
+        symbol_info = f" [{symbol_match.group(1)}]" if symbol_match else ""
 
         logging.info(
-            f"🔄 Retrying {details['target'].__name__}{ticker_info} - "
+            f"🔄 Retrying {details['target'].__name__}{symbol_info} - "
             f"attempt {details['tries']}/10, waiting {details['wait']:.1f}s"
         )
 

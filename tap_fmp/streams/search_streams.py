@@ -14,14 +14,14 @@ from tap_fmp.client import FmpRestStream
 
 
 class StockScreenerStream(FmpRestStream):
-    _use_cached_tickers_default = False
+    _use_cached_symbols_default = False
 
     def get_url(self, context: Context):
         return f"{self.url_base()}/stable/company-screener"
 
 
 class ExchangeVariantsStream(FmpRestStream):
-    _use_cached_tickers_default = False
+    _use_cached_symbols_default = False
 
     def get_url(self, context: Context):
         return f"{self.url_base()}/stable/search-exchange-variants"

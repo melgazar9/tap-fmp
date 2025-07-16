@@ -11,6 +11,7 @@ plugins:
   - name: "tap-fmp"
     namespace: "tap_fmp"
     pip_url: -e .
+    
     capabilities:
     - state
     - catalog
@@ -31,7 +32,7 @@ plugins:
       description: Initial date to start extracting data from
 
     select:
-      - tickers.*
+      - symbols.*
       - historical_ratings.*
 
     config:
@@ -39,10 +40,9 @@ plugins:
       api_key: ${FMP_API_KEY}
       base_url: https://financialmodelingprep.com
 
-      tickers:
-        select_tickers:
-          - "AAPL"
-          - "NVDA"
+      symbols:
+        select_symbols:
+          - "*"
 
   loaders:
   - name: target-jsonl
