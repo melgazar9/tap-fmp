@@ -6,6 +6,7 @@ from singer_sdk import Tap
 from singer_sdk import typing as th
 
 import typing as t
+import threading
 
 from tap_fmp.streams.search_streams import (
     StockScreenerStream,
@@ -43,6 +44,7 @@ class TapFMP(Tap):
 
     _cached_symbols: t.List[dict] | None = None
     _symbols_stream_instance: CompanySymbolsStream | None = None
+    _symbols_lock = threading.Lock()
 
     config_jsonschema = th.PropertiesList(
         th.Property(
@@ -64,11 +66,15 @@ class TapFMP(Tap):
     ).to_dict()
 
     def get_cached_symbols(self) -> t.List[dict]:
+        """Thread-safe symbol caching for parallel execution."""
         if self._cached_symbols is None:
-            self.logger.info("Fetching and caching symbols...")
-            symbols_stream = self.get_symbols_stream()
-            self._cached_symbols = list(symbols_stream.get_records(context=None))
-            self.logger.info(f"Cached {len(self._cached_symbols)} symbols.")
+            # prevent race conditions if running in parallel
+            with self._symbols_lock:
+                if self._cached_symbols is None:
+                    self.logger.info("Fetching and caching symbols...")
+                    symbols_stream = self.get_symbols_stream()
+                    self._cached_symbols = list(symbols_stream.get_records(context=None))
+                    self.logger.info(f"Cached {len(self._cached_symbols)} symbols.")
         return self._cached_symbols
 
     def get_symbols_stream(self) -> CompanySymbolsStream:

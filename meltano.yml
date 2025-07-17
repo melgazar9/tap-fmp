@@ -31,6 +31,7 @@ plugins:
       label: Start Date
       description: Initial date to start extracting data from
 
+
     select:
       # Search Streams
       - stock_screener.*

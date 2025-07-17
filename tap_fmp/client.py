@@ -34,10 +34,11 @@ class FmpRestStream(Stream, ABC):
 
         if "use_cached_symbols" in stream_config:
             use_cached_symbols = stream_config["use_cached_symbols"]
-            assert isinstance(use_cached_symbols, bool), (
-                f"Config for {self.name}.use_cached_symbols must be bool, "
-                f"got {type(use_cached_symbols)}"
-            )
+            if not isinstance(use_cached_symbols, bool):
+                raise ConfigValidationError(
+                    f"Config for {self.name}.use_cached_symbols must be bool, "
+                    f"got {type(use_cached_symbols)}"
+                )
             return use_cached_symbols
 
         if hasattr(type(self), "_use_cached_symbols_default"):
@@ -83,16 +84,19 @@ class FmpRestStream(Stream, ABC):
         self.query_params["apikey"] = self.config.get("api_key")
 
     def _check_missing_fields(self, schema: dict, record: dict):
+        """Validate record against schema and handle missing fields."""
         schema_fields = set(schema.get("properties", {}).keys())
         record_keys = set(record.keys())
         missing_in_record = schema_fields - record_keys
+        missing_in_schema = record_keys - schema_fields
+        
         if missing_in_record:
             logging.debug(
-                f"*** Missing fields in record that are present in schema: {missing_in_record} for tap {self.name} ***"
+                f"Missing fields in record that are present in schema: {missing_in_record} for stream {self.name}"
             )
-        missing_in_schema = record_keys - schema_fields
+
         if missing_in_schema:
-            logging.critical(
+            logging.warning(
                 f"*** URGENT: Missing fields in schema that are present record: {missing_in_schema} ***"
             )
 
@@ -118,20 +122,42 @@ class FmpRestStream(Stream, ABC):
         logging.info(f"Records returned: {len(records) if isinstance(records, list) else 'not a list'}")
         return records
 
+    def _handle_pagination(self, url: str, query_params: dict) -> t.Iterable[dict]:
+        page = 0
+        max_pages = 1000  # prevent infinite loops
+        consecutive_empty_pages = 0
+        max_consecutive_empty = 2
+        
+        while page < max_pages:
+            records = self._fetch_with_retry(url, query_params, page)
+            
+            if not isinstance(records, list):
+                self.logger.warning(f"Expected list response, got {type(records)}. Stopping pagination.")
+                break
+            
+            if not records:
+                consecutive_empty_pages += 1
+                if consecutive_empty_pages >= max_consecutive_empty:
+                    self.logger.info(f"Stopping pagination after {consecutive_empty_pages} consecutive empty pages")
+                    break
+            else:
+                consecutive_empty_pages = 0
+                
+            for record in records:
+                self._check_missing_fields(self.schema, record)
+                yield record
+                
+            page += 1
+            
+        if page >= max_pages:
+            self.logger.warning(f"Reached maximum pages ({max_pages}). Some data may be missing.")
+
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         url = self.get_url(context)
         query_params = self.query_params.copy()
 
         if self._paginate:
-            page = 0
-            while True:
-                records = self._fetch_with_retry(url, query_params, page)
-                if not records:
-                    break
-                for record in records:
-                    self._check_missing_fields(self.schema, record)
-                    yield record
-                page += 1
+            yield from self._handle_pagination(url, query_params)
         else:
             records = self._fetch_with_retry(url, query_params)
             for record in records:
@@ -161,30 +187,9 @@ class SymbolPartitionedStream(FmpRestStream):
         url = self.get_url(context)
 
         if self._paginate:
-            page = 0
-            while True:
-                records = self._fetch_with_retry(url, query_params, page=page)
-                if not records:
-                    break
-                for record in records:
-                    self._check_missing_fields(self.schema, record)
-                    yield record
-                page += 1
+            yield from self._handle_pagination(url, query_params)
         else:
             records = self._fetch_with_retry(url, query_params)
             for record in records:
                 self._check_missing_fields(self.schema, record)
                 yield record
-
-class CachedSymbolProvider:
-    """Provider for cached symbols (matching tap-fmp pattern)."""
-
-    def __init__(self, tap):
-        self.tap = tap
-        self._symbols = None
-
-    def get_symbols(self):
-        if self._symbols is None:
-            logging.info("Have not fetched symbols yet. Retrieving from tap cache...")
-            self._symbols = self.tap.get_cached_symbols()
-        return self._symbols

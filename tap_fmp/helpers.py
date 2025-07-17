@@ -1,16 +1,11 @@
 import re
 import requests
-import threading
-
 from types import MappingProxyType
 
 class SymbolFetcher:
     """
     Fetch and caches FMP symbols in memory for the duration of a Meltano tap run.
     """
-
-    _memory_cache = {}
-    _cache_lock = threading.Lock()
 
     def __init__(self, config: MappingProxyType):
         self.config = config
