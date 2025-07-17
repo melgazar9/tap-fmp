@@ -29,7 +29,18 @@ from tap_fmp.streams.directory_streams import (
 
 from tap_fmp.streams.analyst_streams import (
     AnalystEstimatesAnnualStream,
+    # AnalystEstimatesQuarterlyStream,
+    RatingSnapshotStream,
     HistoricalRatingsStream,
+    PriceTargetSummaryStream,
+    PriceTargetConsensusStream,
+    PriceTargetNewsStream,
+    PriceTargetLatestNewsStream,
+    StockGradesStream,
+    HistoricalStockGradesStream,
+    StockGradesConsensusStream,
+    StockGradeNewsStream,
+    StockGradeLatestNewsStream
 )
 
 from tap_fmp.streams.calendar_streams import (
@@ -105,7 +116,20 @@ class TapFMP(Tap):
 
             # Analyst Streams
             AnalystEstimatesAnnualStream(self),
+            # AnalystEstimatesQuarterlyStream(self),
+            RatingSnapshotStream(self),
             HistoricalRatingsStream(self),
+            PriceTargetSummaryStream(self),
+            PriceTargetConsensusStream(self),
+            PriceTargetNewsStream(self),
+            PriceTargetLatestNewsStream(self),
+            StockGradesStream(self),
+            HistoricalStockGradesStream(self),
+            StockGradesConsensusStream(self),
+            StockGradeNewsStream(self),
+            StockGradeLatestNewsStream(self),
+
+            # Calendar Streams
             EarningsReportStream(self),
         ]
 

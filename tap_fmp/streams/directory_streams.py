@@ -11,7 +11,6 @@ class CompanySymbolsStream(FmpRestStream):
 
     name = "company_symbols"
     primary_keys = ["symbol", "company_name"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
@@ -58,7 +57,6 @@ class CompanySymbolsStream(FmpRestStream):
 class FinancialStatementSymbolsStream(FmpRestStream):
     name = "financial_statement_symbols"
     primary_keys = ["symbol", "company_name"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
@@ -74,7 +72,6 @@ class FinancialStatementSymbolsStream(FmpRestStream):
 class CikListStream(FmpRestStream):
     name = "cik_list"
     primary_keys = ["cik", "company_name"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("cik", th.StringType, required=True),
@@ -88,7 +85,6 @@ class CikListStream(FmpRestStream):
 class SymbolChangesStream(FmpRestStream):
     name = "symbol_changes"
     primary_keys = ["date", "company_name", "old_symbol", "new_symbol"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("date", th.DateType, required=True),
@@ -103,7 +99,6 @@ class SymbolChangesStream(FmpRestStream):
 class ETFSymbolStream(FmpRestStream):
     name = "etf_symbols"
     primary_keys = ["symbol", "name"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
@@ -117,7 +112,6 @@ class ETFSymbolStream(FmpRestStream):
 class ActivelyTradingStream(FmpRestStream):
     name = "actively_trading"
     primary_keys = ["symbol", "name"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
@@ -131,7 +125,6 @@ class ActivelyTradingStream(FmpRestStream):
 class EarningsTranscriptStream(FmpRestStream):
     name = "earnings_transcript_list"
     primary_keys = ["symbol", "company_name", "no_of_transcripts"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
@@ -146,7 +139,6 @@ class EarningsTranscriptStream(FmpRestStream):
 class AvailableExchangesStream(FmpRestStream):
     name = "available_exchanges"
     primary_keys = ["exchange", "name"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("exchange", th.StringType, required=True),
@@ -164,7 +156,6 @@ class AvailableExchangesStream(FmpRestStream):
 class AvailableSectorsStream(FmpRestStream):
     name = "available_sectors"
     primary_keys = ["sectors"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("sector", th.StringType, required=True),
@@ -177,7 +168,6 @@ class AvailableSectorsStream(FmpRestStream):
 class AvailableIndustriesStream(FmpRestStream):
     name = "available_industries"
     primary_keys = ["industry"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("industry", th.StringType, required=True),
@@ -190,7 +180,6 @@ class AvailableIndustriesStream(FmpRestStream):
 class AvailableCountriesStream(FmpRestStream):
     name = "available_countries"
     primary_keys = ["country"]
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("country", th.StringType, required=True),

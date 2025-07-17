@@ -14,7 +14,6 @@ from tap_fmp.client import FmpRestStream, SymbolPartitionedStream
 
 class StockScreenerStream(FmpRestStream):
     name = "stock_screener"
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
@@ -79,5 +78,6 @@ class ExchangeVariantsStream(SymbolPartitionedStream):
         th.Property("is_adr", th.BooleanType),
         th.Property("is_fund", th.BooleanType),
     ).to_dict()
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/search-exchange-variants"

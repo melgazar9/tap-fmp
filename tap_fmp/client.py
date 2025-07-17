@@ -3,6 +3,7 @@
 from __future__ import annotations
 from abc import ABC
 import backoff
+from singer_sdk.helpers import types
 from singer_sdk.helpers.types import Context
 from singer_sdk.streams import Stream
 from singer_sdk import Tap
@@ -15,7 +16,7 @@ from singer_sdk.exceptions import ConfigValidationError
 class FmpRestStream(Stream, ABC):
     """FMP stream class with symbol partitioning support."""
 
-    _use_cached_symbols_default = True
+    _use_cached_symbols_default = False
     _paginate = False
 
     def __init__(self, tap: Tap) -> None:
@@ -124,7 +125,7 @@ class FmpRestStream(Stream, ABC):
 
     def _handle_pagination(self, url: str, query_params: dict) -> t.Iterable[dict]:
         page = 0
-        max_pages = 1000  # prevent infinite loops
+        max_pages = 10000  # prevent infinite loops
         consecutive_empty_pages = 0
         max_consecutive_empty = 2
         
@@ -144,6 +145,7 @@ class FmpRestStream(Stream, ABC):
                 consecutive_empty_pages = 0
                 
             for record in records:
+                record = self.post_process(record)
                 self._check_missing_fields(self.schema, record)
                 yield record
                 
@@ -161,11 +163,13 @@ class FmpRestStream(Stream, ABC):
         else:
             records = self._fetch_with_retry(url, query_params)
             for record in records:
+                record = self.post_process(record)
                 self._check_missing_fields(self.schema, record)
                 yield record
 
 
 class SymbolPartitionedStream(FmpRestStream):
+    _use_cached_symbols_default = True
     _symbol_in_path_params = False
     _symbol_in_query_params = True
 
@@ -191,5 +195,6 @@ class SymbolPartitionedStream(FmpRestStream):
         else:
             records = self._fetch_with_retry(url, query_params)
             for record in records:
+                record = self.post_process(record)
                 self._check_missing_fields(self.schema, record)
                 yield record

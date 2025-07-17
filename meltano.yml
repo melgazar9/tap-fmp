@@ -53,8 +53,18 @@ plugins:
       # Analyst Streams
       - analyst_estimates_annual.*
 #      - analyst_estimates_quarterly.*
+      - analyst_estimates_quarterly.*
+      - rating_snapshot.*
       - historical_ratings.*
-      - earnings_report.*
+      - price_target_summary.*
+      - price_target_consensus.*
+      - price_target_news.*
+      - price_target_latest_news.*
+      - stock_grades.*
+      - historical_stock_grades.*
+      - stock_grades_consensus.*
+      - stock_grades_news.*
+      - stock_grades_latest_news.*
 
 
 
@@ -90,6 +100,10 @@ plugins:
       historical_ratings:
         query_params:
           limit: 10000
+
+      price_target_news:
+        query_params:
+          limit: 100
 
   loaders:
   - name: target-jsonl

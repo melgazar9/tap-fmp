@@ -2,6 +2,8 @@ import re
 import requests
 from types import MappingProxyType
 
+import uuid
+
 class SymbolFetcher:
     """
     Fetch and caches FMP symbols in memory for the duration of a Meltano tap run.
@@ -51,3 +53,8 @@ def clean_json_keys(data: list[dict]) -> list[dict]:
         {new_key: value for new_key, value in zip(clean_strings(d.keys()), d.values())}
         for d in data
     ]
+
+def generate_surrogate_key(data: dict, namespace=uuid.NAMESPACE_DNS) -> str:
+    key_values = [str(data.get(field, "")) for field in data.keys()]
+    key_string = "|".join(key_values)
+    return str(uuid.uuid5(namespace, key_string))
