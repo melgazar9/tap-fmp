@@ -66,7 +66,8 @@ plugins:
       - stock_grades_news.*
       - stock_grades_latest_news.*
 
-
+      # Calendar Streams
+      - dividends_calendar.*
 
     config:
       start_date: '2010-01-01T00:00:00Z'
@@ -78,6 +79,15 @@ plugins:
           - "AAPL"
           - "NVDA"
 
+      ### Search Streams ###
+
+      stock_screener:
+        query_params:
+          volumeMoreThan: 1000000
+          limit: 1000
+
+      ### Directory Streams ###
+
       cik_list:
         query_params:
           limit: 10000
@@ -87,6 +97,8 @@ plugins:
           invalid: false
           limit: 10000
 
+      ### Analyst Streams ###
+
       analyst_estimates_annual:
         query_params:
           limit: 10
@@ -94,8 +106,12 @@ plugins:
 
       analyst_estimates_quarterly:
         query_params:
-          limit: 10
+          limit: 100
           period: quarterly
+
+      ratings_snapshot:
+        query_params:
+          limit: 10
 
       historical_ratings:
         query_params:
@@ -105,6 +121,14 @@ plugins:
         query_params:
           limit: 100
 
+      ### Calendar Streams ###
+
+      dividends_calendar:
+        query_params:
+          from: "2025-03-01"
+        other_params:
+          time_slice_days: 90
+          max_records: 4000
   loaders:
   - name: target-jsonl
     variant: andyh1203

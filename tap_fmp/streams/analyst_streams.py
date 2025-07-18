@@ -143,6 +143,7 @@ class PriceTargetNewsStream(SymbolPartitionedStream):
 
     name = "price_target_news"
     primary_keys = ["surrogate_key"]
+    _paginate = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -172,10 +173,10 @@ class PriceTargetLatestNewsStream(PriceTargetNewsStream):
     """Stream for price target latest news."""
 
     name = "price_target_latest_news"
-    primary_keys = ["surrogate_key"]
 
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/price-target-latest-news"
+
 
 class StockGradesStream(SymbolPartitionedStream):
     """Stream for stock grades."""
@@ -252,6 +253,7 @@ class StockGradeNewsStream(SymbolPartitionedStream):
 
     name = "stock_grades_news"
     primary_keys = ["surrogate_key"]
+    _paginate = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -279,7 +281,6 @@ class StockGradeLatestNewsStream(StockGradeNewsStream):
     """Stream for stock grade latest news."""
 
     name = "stock_grades_latest_news"
-    primary_keys = ["surrogate_key"]
 
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/grades-latest-news"

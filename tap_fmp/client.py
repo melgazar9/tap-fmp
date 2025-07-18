@@ -3,7 +3,7 @@
 from __future__ import annotations
 from abc import ABC
 import backoff
-from singer_sdk.helpers import types
+from datetime import datetime, timedelta
 from singer_sdk.helpers.types import Context
 from singer_sdk.streams import Stream
 from singer_sdk import Tap
@@ -90,7 +90,7 @@ class FmpRestStream(Stream, ABC):
         record_keys = set(record.keys())
         missing_in_record = schema_fields - record_keys
         missing_in_schema = record_keys - schema_fields
-        
+
         if missing_in_record:
             logging.debug(
                 f"Missing fields in record that are present in schema: {missing_in_record} for stream {self.name}"
@@ -128,14 +128,14 @@ class FmpRestStream(Stream, ABC):
         max_pages = 10000  # prevent infinite loops
         consecutive_empty_pages = 0
         max_consecutive_empty = 2
-        
+
         while page < max_pages:
             records = self._fetch_with_retry(url, query_params, page)
-            
+
             if not isinstance(records, list):
                 self.logger.warning(f"Expected list response, got {type(records)}. Stopping pagination.")
                 break
-            
+
             if not records:
                 consecutive_empty_pages += 1
                 if consecutive_empty_pages >= max_consecutive_empty:
@@ -143,14 +143,14 @@ class FmpRestStream(Stream, ABC):
                     break
             else:
                 consecutive_empty_pages = 0
-                
+
             for record in records:
                 record = self.post_process(record)
                 self._check_missing_fields(self.schema, record)
                 yield record
-                
+
             page += 1
-            
+
         if page >= max_pages:
             self.logger.warning(f"Reached maximum pages ({max_pages}). Some data may be missing.")
 
@@ -198,3 +198,88 @@ class SymbolPartitionedStream(FmpRestStream):
                 record = self.post_process(record)
                 self._check_missing_fields(self.schema, record)
                 yield record
+
+
+class SymbolPartitionTimeSliceStream(SymbolPartitionedStream):
+    def create_time_slice_chunks(self) -> list[tuple[str, str]]:
+        """Generate (from, to) date ranges for the API, as list of (start, end) ISO strings."""
+        stream_cfg = self.config.get(self.name, {})
+        tap_cfg = self.config
+
+        window_days = int(stream_cfg.get("time_slice_days", 90))
+        start_date = stream_cfg.get("query_params").get("from") or tap_cfg.get("start_date")
+        end_date = stream_cfg.get("query_params").get("to") or (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
+
+        if not start_date:
+            raise ConfigValidationError(f"Missing start_date for {self.name}")
+
+        start_dt = datetime.fromisoformat(start_date)
+        end_dt = datetime.fromisoformat(end_date)
+
+        if start_dt > start_dt:
+            raise ConfigValidationError(f"start_date {start_date} is after end_date {end_date} for {self.name}")
+
+        slices = []
+        current = start_dt
+        while current < end_dt:
+            slice_end = min(current + timedelta(days=window_days), end_dt)
+            slices.append((
+                current.strftime("%Y-%m-%d"),
+                slice_end.strftime("%Y-%m-%d")
+            ))
+            current = slice_end
+        return slices
+
+    def fetch_window(self, url, query_params, from_date, to_date, max_records):
+        """
+        Recursively fetch all records for a window, splitting if we hit the max_records limit.
+        """
+        query_params = query_params.copy()
+        query_params["from"] = from_date
+        query_params["to"] = to_date
+
+        records = self._fetch_with_retry(url, query_params)
+        if len(records) < max_records:
+            for record in records:
+                record = self.post_process(record)
+                self._check_missing_fields(self.schema, record)
+                yield record
+        else:
+            from_dt = datetime.fromisoformat(from_date)
+            to_dt = datetime.fromisoformat(to_date)
+            if (to_dt - from_dt).days <= 1:
+                # Can't split further, yield what we have but log a warning
+                logging.warning(f"Max records hit for {from_date} to {to_date} (symbol={query_params.get('symbol')}). Some data may be missing.")
+                for record in records:
+                    record = self.post_process(record)
+                    self._check_missing_fields(self.schema, record)
+                    yield record
+                return
+            mid_dt = from_dt + (to_dt - from_dt) // 2
+            mid_date = mid_dt.strftime("%Y-%m-%d")
+            # Fetch left half
+            yield from self.fetch_window(url, query_params, from_date, mid_date, max_records)
+            # Fetch right half
+            yield from self.fetch_window(url, query_params, mid_date, to_date, max_records)
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        assert self._symbol_in_path_params or self._symbol_in_query_params
+
+        query_params = self.query_params.copy()
+        path_params = self.path_params.copy()
+
+        if self._symbol_in_query_params:
+            query_params["symbol"] = context["symbol"]
+        if self._symbol_in_path_params:
+            path_params["symbol"] = context["symbol"]
+
+        url = self.get_url(context)
+        time_slices = self.create_time_slice_chunks()
+        max_records = self.config.get(self.name, {}).get("max_records_per_request", 4000)
+
+        for from_date, to_date in time_slices:
+            try:
+                yield from self.fetch_window(url, query_params, from_date, to_date, max_records)
+            except Exception as e:
+                logging.error(f"Failed to fetch records for symbol={context['symbol']} from={from_date} to={to_date}: {e}")
+                continue

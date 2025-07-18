@@ -44,7 +44,14 @@ from tap_fmp.streams.analyst_streams import (
 )
 
 from tap_fmp.streams.calendar_streams import (
-    EarningsReportStream
+    DividendsCompanyStream,
+    DividendsCalendarStream,
+    EarningsReportStream,
+    IPOsCalendarStream,
+    IPOsDisclosureStream,
+    IPOsProspectusStream,
+    StockSplitDetailsStream,
+    StockSplitsCalendarStream,
 )
 
 
@@ -71,7 +78,7 @@ class TapFMP(Tap):
                     th.OneOf(th.StringType, th.ArrayType(th.StringType)),
                 ),
             ),
-            description="Ticker configuration including selection and query params",
+            description="Symbol configuration including selection and query params",
             required=True,
         ),
     ).to_dict()
@@ -130,7 +137,15 @@ class TapFMP(Tap):
             StockGradeLatestNewsStream(self),
 
             # Calendar Streams
+            DividendsCompanyStream(self),
+            DividendsCalendarStream(self),
             EarningsReportStream(self),
+            IPOsCalendarStream(self),
+            IPOsDisclosureStream(self),
+            IPOsProspectusStream(self),
+            StockSplitDetailsStream(self),
+            StockSplitsCalendarStream(self),
+
         ]
 
 
