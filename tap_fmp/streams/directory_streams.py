@@ -96,6 +96,7 @@ class SymbolChangesStream(FmpRestStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/symbol-change"
 
+
 class ETFSymbolStream(FmpRestStream):
     name = "etf_symbols"
     primary_keys = ["symbol", "name"]

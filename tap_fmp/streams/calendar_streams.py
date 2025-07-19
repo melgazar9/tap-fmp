@@ -1,12 +1,34 @@
-from tap_fmp.client import FmpRestStream, SymbolPartitionedStream, SymbolPartitionTimeSliceStream
+from tap_fmp.client import SymbolPartitionedStream, TimeSlicePartitionStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
-class DividendsCompanyStream(SymbolPartitionedStream):
+from tap_fmp.helpers import generate_surrogate_key
+
+
+class CalendarStream(SymbolPartitionedStream):
+    primary_keys = ["surrogate_key"]
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        row["surrogate_key"] = generate_surrogate_key(row)
+        return row
+
+
+class TimeSliceCalendarStream(TimeSlicePartitionStream):
+    primary_keys = ["surrogate_key"]
+    replication_key = "date"
+    is_timestamp_replication_key = True
+    is_sorted = False  # cannot assume data is sorted across all pages
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        row["surrogate_key"] = generate_surrogate_key(row)
+        return row
+
+
+class DividendsCompanyStream(CalendarStream):
     name = "dividends_company"
-    primary_keys = ["symbol", "date"]
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("record_date", th.DateType),
@@ -15,18 +37,20 @@ class DividendsCompanyStream(SymbolPartitionedStream):
         th.Property("adj_dividend", th.NumberType),
         th.Property("dividend", th.NumberType),
         th.Property("yield", th.NumberType),
-        th.Property("frequency", th.StringType)
+        th.Property("frequency", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/dividends"
 
 
-class DividendsCalendarStream(SymbolPartitionTimeSliceStream):
+class DividendsCalendarStream(TimeSliceCalendarStream):
     name = "dividends_calendar"
-    primary_keys = ["symbol", "date"]
+    replication_key = "date"
+    replication_method = "INCREMENTAL"
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("record_date", th.StringType),
@@ -35,17 +59,18 @@ class DividendsCalendarStream(SymbolPartitionTimeSliceStream):
         th.Property("adj_dividend", th.NumberType),
         th.Property("dividend", th.NumberType),
         th.Property("yield", th.NumberType),
-        th.Property("frequency", th.StringType)
+        th.Property("frequency", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/dividends-calendar"
 
-class EarningsReportStream(SymbolPartitionedStream):
+
+class EarningsReportStream(CalendarStream):
     name = "earnings_report"
-    primary_keys = ["symbol", "company_name"]
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("eps_actual", th.NumberType),
@@ -58,11 +83,12 @@ class EarningsReportStream(SymbolPartitionedStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/earnings"
 
-class EarningsCalendarStream(FmpRestStream):
+
+class EarningsCalendarStream(TimeSliceCalendarStream):
     name = "earnings_calendar"
-    primary_keys = ["symbol", "date", "last_updated"]
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType, required=True),
         th.Property("eps_actual", th.NumberType),
@@ -75,11 +101,13 @@ class EarningsCalendarStream(FmpRestStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/earnings-calendar"
 
-class IPOsCalendarStream(SymbolPartitionedStream):
+
+class IPOsCalendarStream(TimeSliceCalendarStream):
     name = "ipos_calendar"
-    primary_keys = ["symbol", "date"]
+    replication_key = "filing_date"
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("daa", th.DateTimeType),
@@ -88,34 +116,38 @@ class IPOsCalendarStream(SymbolPartitionedStream):
         th.Property("actions", th.StringType),
         th.Property("shares", th.NumberType),
         th.Property("price_range", th.NumberType),
-        th.Property("market_cap", th.NumberType)
+        th.Property("market_cap", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ipos-calendar"
 
-class IPOsDisclosureStream(SymbolPartitionedStream):
+
+class IPOsDisclosureStream(TimeSliceCalendarStream):
     name = "ipos_disclosure"
-    primary_keys = ["symbol", "filing_date"]
+    replication_key = "filing_date"
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("filing_date", th.DateType),
         th.Property("accepted_date", th.DateType),
         th.Property("effectiveness_date", th.DateType),
         th.Property("cik", th.StringType),
         th.Property("form", th.StringType),
-        th.Property("url", th.StringType)
+        th.Property("url", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ipos-disclosure"
 
-class IPOsProspectusStream(SymbolPartitionedStream):
+
+class IPOsProspectusStream(TimeSliceCalendarStream):
     name = "ipos_prospectus"
-    primary_keys = ["symbol", "filing_date"]
+    replication_key = "filing_date"
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("accepted_date", th.DateType),
         th.Property("filing_date", th.DateType),
@@ -128,38 +160,38 @@ class IPOsProspectusStream(SymbolPartitionedStream):
         th.Property("proceeds_before_expenses_per_share", th.NumberType),
         th.Property("proceeds_before_expenses_total", th.NumberType),
         th.Property("form", th.StringType),
-        th.Property("url", th.StringType)
+        th.Property("url", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ipos-prospectus"
 
-class StockSplitDetailsStream(SymbolPartitionedStream):
+
+class StockSplitDetailsStream(CalendarStream):
     name = "stock_split_details"
-    primary_keys = ["symbol", "date"]
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("numerator", th.IntegerType),
-        th.Property("denominator", th.IntegerType)
+        th.Property("denominator", th.IntegerType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/splits"
 
-class StockSplitsCalendarStream(SymbolPartitionedStream):
+
+class StockSplitsCalendarStream(TimeSliceCalendarStream):
     name = "stock_splits_calendar"
-    primary_keys = ["symbol", "date"]
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("numerator", th.IntegerType),
-        th.Property("denominator", th.IntegerType)
+        th.Property("denominator", th.IntegerType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/splits-calendar"
-
-

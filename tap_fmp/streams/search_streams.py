@@ -12,6 +12,7 @@ from tap_fmp.client import FmpRestStream, SymbolPartitionedStream
 # CUSIP
 # ISIN
 
+
 class StockScreenerStream(FmpRestStream):
     name = "stock_screener"
 

@@ -40,7 +40,7 @@ from tap_fmp.streams.analyst_streams import (
     HistoricalStockGradesStream,
     StockGradesConsensusStream,
     StockGradeNewsStream,
-    StockGradeLatestNewsStream
+    StockGradeLatestNewsStream,
 )
 
 from tap_fmp.streams.calendar_streams import (
@@ -91,7 +91,9 @@ class TapFMP(Tap):
                 if self._cached_symbols is None:
                     self.logger.info("Fetching and caching symbols...")
                     symbols_stream = self.get_symbols_stream()
-                    self._cached_symbols = list(symbols_stream.get_records(context=None))
+                    self._cached_symbols = list(
+                        symbols_stream.get_records(context=None)
+                    )
                     self.logger.info(f"Cached {len(self._cached_symbols)} symbols.")
         return self._cached_symbols
 
@@ -104,10 +106,9 @@ class TapFMP(Tap):
     def discover_streams(self) -> list:
         """Return a list of discovered streams."""
         return [
-            # Search Streams
+            ### Search Streams ###
             StockScreenerStream(self),
             ExchangeVariantsStream(self),
-
             # Directory Streams
             CompanySymbolsStream(self),
             FinancialStatementSymbolsStream(self),
@@ -121,22 +122,22 @@ class TapFMP(Tap):
             AvailableIndustriesStream(self),
             AvailableCountriesStream(self),
 
-            # Analyst Streams
+            ### Analyst Streams ###
             AnalystEstimatesAnnualStream(self),
             # AnalystEstimatesQuarterlyStream(self),
             RatingSnapshotStream(self),
             HistoricalRatingsStream(self),
             PriceTargetSummaryStream(self),
             PriceTargetConsensusStream(self),
-            PriceTargetNewsStream(self),
-            PriceTargetLatestNewsStream(self),
+            # PriceTargetNewsStream(self),
+            # PriceTargetLatestNewsStream(self),
             StockGradesStream(self),
             HistoricalStockGradesStream(self),
             StockGradesConsensusStream(self),
             StockGradeNewsStream(self),
             StockGradeLatestNewsStream(self),
 
-            # Calendar Streams
+            ### Calendar Streams ###
             DividendsCompanyStream(self),
             DividendsCalendarStream(self),
             EarningsReportStream(self),
@@ -145,9 +146,7 @@ class TapFMP(Tap):
             IPOsProspectusStream(self),
             StockSplitDetailsStream(self),
             StockSplitsCalendarStream(self),
-
         ]
-
 
 if __name__ == "__main__":
     TapFMP.cli()

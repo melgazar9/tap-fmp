@@ -1,8 +1,9 @@
 from tap_fmp.client import SymbolPartitionedStream
-from singer_sdk import typing as th, Stream
+from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.helpers import generate_surrogate_key
+
 
 class AnalystEstimatesAnnualStream(SymbolPartitionedStream):
     """Stream for analyst estimates."""
@@ -39,9 +40,11 @@ class AnalystEstimatesAnnualStream(SymbolPartitionedStream):
         url = f"{self.url_base}/stable/analyst-estimates"
         return url
 
+
 class AnalystEstimatesQuarterlyStream(AnalystEstimatesAnnualStream):
     name = "analyst_estimates_quarterly"
     # Only need to change query_params in meltano.yml --> set period to quarterly for this stream.
+
 
 class RatingSnapshotStream(SymbolPartitionedStream):
     name = "rating_snapshot"
@@ -81,9 +84,8 @@ class HistoricalRatingsStream(SymbolPartitionedStream):
     ).to_dict()
 
     def get_url(self, context: Context) -> str:
-        return (
-            f"{self.url_base}/stable/ratings-historical"
-        )
+        return f"{self.url_base}/stable/ratings-historical"
+
 
 class PriceTargetSummaryStream(SymbolPartitionedStream):
     """Stream for price target summary."""
@@ -106,14 +108,13 @@ class PriceTargetSummaryStream(SymbolPartitionedStream):
     ).to_dict()
 
     def get_url(self, context: Context) -> str:
-        return (
-            f"{self.url_base}/stable/price-target-summary"
-        )
+        return f"{self.url_base}/stable/price-target-summary"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         row["publishers"] = str(row["publishers"])
         row["surrogate_key"] = generate_surrogate_key(row)
         return row
+
 
 class PriceTargetConsensusStream(SymbolPartitionedStream):
     """Stream for price target consensus."""
@@ -169,6 +170,7 @@ class PriceTargetNewsStream(SymbolPartitionedStream):
         row["news_base_url"] = row.pop("news_base_u_r_l")
         return row
 
+
 class PriceTargetLatestNewsStream(PriceTargetNewsStream):
     """Stream for price target latest news."""
 
@@ -201,6 +203,7 @@ class StockGradesStream(SymbolPartitionedStream):
         row["surrogate_key"] = generate_surrogate_key(row)
         return row
 
+
 class HistoricalStockGradesStream(SymbolPartitionedStream):
     """Stream for historical stock grades."""
 
@@ -211,6 +214,7 @@ class HistoricalStockGradesStream(SymbolPartitionedStream):
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
+        th.Property("analyst_ratings_strong_buy", th.NumberType),
         th.Property("analyst_ratings_buy", th.NumberType),
         th.Property("analyst_ratings_hold", th.NumberType),
         th.Property("analyst_ratings_sell", th.NumberType),
@@ -223,6 +227,7 @@ class HistoricalStockGradesStream(SymbolPartitionedStream):
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         row["surrogate_key"] = generate_surrogate_key(row)
         return row
+
 
 class StockGradesConsensusStream(SymbolPartitionedStream):
     """Stream for stock grades consensus."""
@@ -247,6 +252,7 @@ class StockGradesConsensusStream(SymbolPartitionedStream):
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         row["surrogate_key"] = generate_surrogate_key(row)
         return row
+
 
 class StockGradeNewsStream(SymbolPartitionedStream):
     """Stream for stock grade news."""
@@ -274,8 +280,11 @@ class StockGradeNewsStream(SymbolPartitionedStream):
         return f"{self.url_base}/stable/grades-news"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
+        row["news_base_url"] = row.pop("news_base_u_r_l")
+        row["news_url"] = row.pop("news_u_r_l")
         row["surrogate_key"] = generate_surrogate_key(row)
         return row
+
 
 class StockGradeLatestNewsStream(StockGradeNewsStream):
     """Stream for stock grade latest news."""
