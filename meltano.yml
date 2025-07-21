@@ -67,6 +67,14 @@ plugins:
 
       # Calendar Streams
       - dividends_calendar.*
+      - dividends_calendar.*
+      - earnings_report.*
+      - earnings_calendar.*
+      - ipos_calendar.*
+      - ipos_disclosure.*
+      - ipos_prospectus.*
+      - stock_split_details.*
+      - stock_splits_calendar.*
 
       # Company Streams
       - company_profile_by_symbol.*
@@ -158,6 +166,15 @@ plugins:
         other_params:
           time_slice_days: 90
           max_records: 4000
+
+      earnings_calendar:
+        query_params:
+          from: 2025-07-01
+          to: 2025-08-30
+        other_params:
+          time_slice_days: 90
+          max_records: 4000
+
 
       ### Company Streams ###
 

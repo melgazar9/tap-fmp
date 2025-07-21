@@ -1,4 +1,4 @@
-from tap_fmp.client import SymbolPartitionStream, TimeSlicePartitionStream
+from tap_fmp.client import SymbolPartitionStream, TimeSliceStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
@@ -13,7 +13,7 @@ class CalendarStream(SymbolPartitionStream):
         return row
 
 
-class TimeSliceCalendarStream(TimeSlicePartitionStream):
+class TimeSliceCalendarStream(TimeSliceStream):
     primary_keys = ["surrogate_key"]
     replication_key = "date"
     is_timestamp_replication_key = True

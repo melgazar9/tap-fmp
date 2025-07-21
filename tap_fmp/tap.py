@@ -47,6 +47,7 @@ from tap_fmp.streams.calendar_streams import (
     DividendsCompanyStream,
     DividendsCalendarStream,
     EarningsReportStream,
+    EarningsCalendarStream,
     IPOsCalendarStream,
     IPOsDisclosureStream,
     IPOsProspectusStream,
@@ -149,9 +150,12 @@ class TapFMP(Tap):
         """Return a list of discovered streams."""
         return [
             ### Search Streams ###
+
             StockScreenerStream(self),
             ExchangeVariantsStream(self),
-            # Directory Streams
+
+            ### Directory Streams ###
+
             CompanySymbolsStream(self),
             FinancialStatementSymbolsStream(self),
             CikListStream(self),
@@ -163,7 +167,9 @@ class TapFMP(Tap):
             AvailableSectorsStream(self),
             AvailableIndustriesStream(self),
             AvailableCountriesStream(self),
+
             ### Analyst Streams ###
+
             AnalystEstimatesAnnualStream(self),
             # AnalystEstimatesQuarterlyStream(self),
             RatingSnapshotStream(self),
@@ -177,15 +183,19 @@ class TapFMP(Tap):
             StockGradesConsensusStream(self),
             StockGradeNewsStream(self),
             StockGradeLatestNewsStream(self),
+
             ### Calendar Streams ###
+
             DividendsCompanyStream(self),
             DividendsCalendarStream(self),
             EarningsReportStream(self),
+            EarningsCalendarStream(self),
             IPOsCalendarStream(self),
             IPOsDisclosureStream(self),
             IPOsProspectusStream(self),
             StockSplitDetailsStream(self),
             StockSplitsCalendarStream(self),
+
             ### Company Streams ###
             CompanyProfileBySymbolStream(self),
             CikProfileStream(self),

@@ -251,7 +251,10 @@ class SymbolPartitionStream(FmpRestStream):
                 yield record
 
 
-class TimeSlicePartitionStream(FmpRestStream):
+class TimeSliceStream(FmpRestStream):
+    replication_key = "date"
+    replication_method = "INCREMENTAL"
+
     def create_time_slice_chunks(self, context: Context) -> list[tuple[str, str]]:
         """Generate (from, to) date ranges for the API, as list of (start, end) ISO strings."""
         stream_cfg = self.config.get(self.name, {})
@@ -359,7 +362,7 @@ class TimeSlicePartitionStream(FmpRestStream):
                 continue
 
 
-class SymbolPartitionTimeSliceStream(TimeSlicePartitionStream):
+class SymbolPartitionTimeSliceStream(TimeSliceStream):
     _use_cached_symbols_default = True
     _symbol_in_path_params = False
     _symbol_in_query_params = True
