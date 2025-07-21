@@ -1,11 +1,11 @@
-from tap_fmp.client import SymbolPartitionedStream, TimeSlicePartitionStream
+from tap_fmp.client import SymbolPartitionStream, TimeSlicePartitionStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
 from tap_fmp.helpers import generate_surrogate_key
 
 
-class CalendarStream(SymbolPartitionedStream):
+class CalendarStream(SymbolPartitionStream):
     primary_keys = ["surrogate_key"]
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:

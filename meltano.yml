@@ -53,7 +53,6 @@ plugins:
       # Analyst Streams
       - analyst_estimates_annual.*
 #      - analyst_estimates_quarterly.*
-      - analyst_estimates_quarterly.*
       - rating_snapshot.*
       - historical_ratings.*
       - price_target_summary.*
@@ -64,10 +63,29 @@ plugins:
       - historical_stock_grades.*
       - stock_grades_consensus.*
       - stock_grades_news.*
-      - stock_grades_latest_news.*
+#      - stock_grades_latest_news.*
 
       # Calendar Streams
       - dividends_calendar.*
+
+      # Company Streams
+      - company_profile_by_symbol.*
+      - company_profile_by_cik.*
+      - company_notes.*
+      - stock_peer_comparison.*
+#      - delisted_companies.*
+      - company_employee_count.*
+      - company_historical_employee_count.*
+      - company_market_cap.*
+      - company_batch_market_cap.*
+      - historical_market_cap.*
+      - company_share_and_liquidity_float.*
+      - all_shares_float.*
+      - latest_mergers_and_acquisitions.*
+#      - search_mergers_and_acquisitions.*
+      - company_executives.*
+      - executive_compensation.*
+#      - executive_compensation_benchmark.*
 
     config:
       start_date: '2010-01-01T00:00:00Z'
@@ -78,6 +96,12 @@ plugins:
         select_symbols:
           - "AAPL"
           - "NVDA"
+
+      ciks:
+        select_ciks:
+          - "0000320193"  # AAPL
+          - "0001045810"  # NVDA
+          - "0001326801"  # META
 
       ### Search Streams ###
 
@@ -121,6 +145,11 @@ plugins:
         query_params:
           limit: 100
 
+      stock_grades_news:
+        query_params:
+          from: "2025-03-01"
+          to: "2025-03-15"
+
       ### Calendar Streams ###
 
       dividends_calendar:
@@ -129,6 +158,16 @@ plugins:
         other_params:
           time_slice_days: 90
           max_records: 4000
+
+      ### Company Streams ###
+
+      historical_market_cap:
+        query_params:
+          from: "2025-03-01"
+        other_params:
+          time_slice_days: 90
+          max_records: 5000
+
   loaders:
   - name: target-jsonl
     variant: andyh1203

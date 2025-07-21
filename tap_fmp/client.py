@@ -159,7 +159,9 @@ class FmpRestStream(Stream, ABC):
                 else str(e)
             )
 
-            error_message = self.redact_api_key(error_message)  # This redacts any key in the message string
+            error_message = self.redact_api_key(
+                error_message
+            )  # This redacts any key in the message string
             raise requests.exceptions.HTTPError(
                 error_message,
                 response=e.response,
@@ -217,7 +219,7 @@ class FmpRestStream(Stream, ABC):
                 yield record
 
 
-class SymbolPartitionedStream(FmpRestStream):
+class SymbolPartitionStream(FmpRestStream):
     _use_cached_symbols_default = True
     _symbol_in_path_params = False
     _symbol_in_query_params = True
@@ -263,16 +265,16 @@ class TimeSlicePartitionStream(FmpRestStream):
 
         window_days = int(stream_cfg.get("time_slice_days", 90))
 
-        start_date_cfg = stream_cfg.get("query_params").get("from") or tap_cfg.get(
-            "start_date"
-        )
+        query_params = stream_cfg.get("query_params", {})
+        start_date_cfg = query_params.get("from") or tap_cfg.get("start_date")
 
-        end_date = stream_cfg.get("query_params").get("to") or (
+        end_date = query_params.get("to") or (
             datetime.now() + timedelta(days=90)
         ).strftime("%Y-%m-%d")
 
         start_date = (
-                (max(start_dt, datetime.fromisoformat(start_date_cfg).date())) - timedelta(days=1)
+            (max(start_dt, datetime.fromisoformat(start_date_cfg).date()))
+            - timedelta(days=1)
         ).strftime("%Y-%m-%d")
 
         if not start_date:
@@ -281,7 +283,7 @@ class TimeSlicePartitionStream(FmpRestStream):
         start_dt = datetime.fromisoformat(start_date)
         end_dt = datetime.fromisoformat(end_date)
 
-        if start_dt > start_dt:
+        if start_dt > end_dt:
             raise ConfigValidationError(
                 f"start_date {start_date} is after end_date {end_date} for {self.name}"
             )
@@ -378,7 +380,7 @@ class SymbolPartitionTimeSliceStream(TimeSlicePartitionStream):
             path_params["symbol"] = context["symbol"]
 
         url = self.get_url(context)
-        time_slices = self.create_time_slice_chunks()
+        time_slices = self.create_time_slice_chunks(context)
         max_records = self.config.get(self.name, {}).get(
             "max_records_per_request", 4000
         )

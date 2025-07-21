@@ -37,6 +37,38 @@ class SymbolFetcher:
         ]
 
 
+class CikFetcher:
+    """
+    Fetch and cache FMP CIKs in memory for the duration of a Meltano tap run.
+    """
+
+    def __init__(self, config: MappingProxyType):
+        self.config = config
+
+    def fetch_all_ciks(self) -> list[dict]:
+        endpoint = f"{self.config.get('base_url')}/stable/cik-list?apikey={self.config.get('api_key')}"
+        response = requests.get(endpoint)
+        response.raise_for_status()
+        ciks = response.json()
+        ciks = clean_json_keys(ciks)
+        return ciks
+
+    @staticmethod
+    def fetch_specific_ciks(cik_list: list[str]) -> list[dict]:
+        """
+        Create CIK records for a specific list of CIKs.
+        """
+        if isinstance(cik_list, str):
+            return [{"cik": cik_list, "company_name": None}]
+        return [
+            {
+                "cik": cik,
+                "company_name": None,
+            }
+            for cik in cik_list
+        ]
+
+
 def clean_strings(lst):
     cleaned_list = [
         re.sub(r"[^a-zA-Z0-9_]", "_", s) for s in lst

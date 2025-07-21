@@ -1,11 +1,11 @@
-from tap_fmp.client import SymbolPartitionedStream
+from tap_fmp.client import SymbolPartitionStream
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.helpers import generate_surrogate_key
 
 
-class AnalystEstimatesAnnualStream(SymbolPartitionedStream):
+class AnalystEstimatesAnnualStream(SymbolPartitionStream):
     """Stream for analyst estimates."""
 
     name = "analyst_estimates_annual"
@@ -46,7 +46,7 @@ class AnalystEstimatesQuarterlyStream(AnalystEstimatesAnnualStream):
     # Only need to change query_params in meltano.yml --> set period to quarterly for this stream.
 
 
-class RatingSnapshotStream(SymbolPartitionedStream):
+class RatingSnapshotStream(SymbolPartitionStream):
     name = "rating_snapshot"
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
@@ -64,7 +64,7 @@ class RatingSnapshotStream(SymbolPartitionedStream):
         return f"{self.url_base}/stable/ratings-snapshot"
 
 
-class HistoricalRatingsStream(SymbolPartitionedStream):
+class HistoricalRatingsStream(SymbolPartitionStream):
     """Stream for historical ratings."""
 
     name = "historical_ratings"
@@ -87,7 +87,7 @@ class HistoricalRatingsStream(SymbolPartitionedStream):
         return f"{self.url_base}/stable/ratings-historical"
 
 
-class PriceTargetSummaryStream(SymbolPartitionedStream):
+class PriceTargetSummaryStream(SymbolPartitionStream):
     """Stream for price target summary."""
 
     name = "price_target_summary"
@@ -116,7 +116,7 @@ class PriceTargetSummaryStream(SymbolPartitionedStream):
         return row
 
 
-class PriceTargetConsensusStream(SymbolPartitionedStream):
+class PriceTargetConsensusStream(SymbolPartitionStream):
     """Stream for price target consensus."""
 
     name = "price_target_consensus"
@@ -139,7 +139,7 @@ class PriceTargetConsensusStream(SymbolPartitionedStream):
         return row
 
 
-class PriceTargetNewsStream(SymbolPartitionedStream):
+class PriceTargetNewsStream(SymbolPartitionStream):
     """Stream for price target news."""
 
     name = "price_target_news"
@@ -180,7 +180,7 @@ class PriceTargetLatestNewsStream(PriceTargetNewsStream):
         return f"{self.url_base}/stable/price-target-latest-news"
 
 
-class StockGradesStream(SymbolPartitionedStream):
+class StockGradesStream(SymbolPartitionStream):
     """Stream for stock grades."""
 
     name = "stock_grades"
@@ -204,7 +204,7 @@ class StockGradesStream(SymbolPartitionedStream):
         return row
 
 
-class HistoricalStockGradesStream(SymbolPartitionedStream):
+class HistoricalStockGradesStream(SymbolPartitionStream):
     """Stream for historical stock grades."""
 
     name = "historical_stock_grades"
@@ -229,7 +229,7 @@ class HistoricalStockGradesStream(SymbolPartitionedStream):
         return row
 
 
-class StockGradesConsensusStream(SymbolPartitionedStream):
+class StockGradesConsensusStream(SymbolPartitionStream):
     """Stream for stock grades consensus."""
 
     name = "stock_grades_consensus"
@@ -254,7 +254,7 @@ class StockGradesConsensusStream(SymbolPartitionedStream):
         return row
 
 
-class StockGradeNewsStream(SymbolPartitionedStream):
+class StockGradeNewsStream(SymbolPartitionStream):
     """Stream for stock grade news."""
 
     name = "stock_grades_news"

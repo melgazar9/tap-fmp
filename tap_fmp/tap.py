@@ -34,8 +34,8 @@ from tap_fmp.streams.analyst_streams import (
     HistoricalRatingsStream,
     PriceTargetSummaryStream,
     PriceTargetConsensusStream,
-    PriceTargetNewsStream,
-    PriceTargetLatestNewsStream,
+    # PriceTargetNewsStream,
+    # PriceTargetLatestNewsStream,
     StockGradesStream,
     HistoricalStockGradesStream,
     StockGradesConsensusStream,
@@ -54,6 +54,26 @@ from tap_fmp.streams.calendar_streams import (
     StockSplitsCalendarStream,
 )
 
+from tap_fmp.streams.company_streams import (
+    CompanyProfileBySymbolStream,
+    CikProfileStream,
+    CompanyNotesStream,
+    StockPeerComparisonStream,
+    DelistedCompaniesStream,
+    CompanyEmployeeCountStream,
+    CompanyHistoricalEmployeeCountStream,
+    CompanyMarketCapStream,
+    CompanyBatchMarketCapStream,
+    HistoricalMarketCapStream,
+    CompanyShareAndLiquidityFloatStream,
+    AllSharesFloatStream,
+    LatestMergersAndAcquisitionsStream,
+    SearchMergersAndAcquisitionsStream,
+    CompanyExecutiveStream,
+    ExecutiveCompensationStream,
+    ExecutiveCompensationBenchmarkStream,
+)
+
 
 class TapFMP(Tap):
     """FMP tap class."""
@@ -63,6 +83,10 @@ class TapFMP(Tap):
     _cached_symbols: t.List[dict] | None = None
     _symbols_stream_instance: CompanySymbolsStream | None = None
     _symbols_lock = threading.Lock()
+
+    _cached_ciks: t.List[dict] | None = None
+    _cik_stream_instance: CikListStream | None = None
+    _ciks_lock = threading.Lock()
 
     config_jsonschema = th.PropertiesList(
         th.Property(
@@ -103,6 +127,24 @@ class TapFMP(Tap):
             self._symbols_stream_instance = CompanySymbolsStream(self)
         return self._symbols_stream_instance
 
+    def get_cached_ciks(self) -> t.List[dict]:
+        """Thread-safe CIK caching for parallel execution."""
+        if self._cached_ciks is None:
+            # prevent race conditions if running in parallel
+            with self._ciks_lock:
+                if self._cached_ciks is None:
+                    self.logger.info("Fetching and caching CIKs...")
+                    cik_stream = self.get_cik_stream()
+                    self._cached_ciks = list(cik_stream.get_records(context=None))
+                    self.logger.info(f"Cached {len(self._cached_ciks)} CIKs.")
+        return self._cached_ciks
+
+    def get_cik_stream(self) -> CikListStream:
+        if self._cik_stream_instance is None:
+            self.logger.info("Creating CikListStream instance...")
+            self._cik_stream_instance = CikListStream(self)
+        return self._cik_stream_instance
+
     def discover_streams(self) -> list:
         """Return a list of discovered streams."""
         return [
@@ -121,7 +163,6 @@ class TapFMP(Tap):
             AvailableSectorsStream(self),
             AvailableIndustriesStream(self),
             AvailableCountriesStream(self),
-
             ### Analyst Streams ###
             AnalystEstimatesAnnualStream(self),
             # AnalystEstimatesQuarterlyStream(self),
@@ -136,7 +177,6 @@ class TapFMP(Tap):
             StockGradesConsensusStream(self),
             StockGradeNewsStream(self),
             StockGradeLatestNewsStream(self),
-
             ### Calendar Streams ###
             DividendsCompanyStream(self),
             DividendsCalendarStream(self),
@@ -146,7 +186,26 @@ class TapFMP(Tap):
             IPOsProspectusStream(self),
             StockSplitDetailsStream(self),
             StockSplitsCalendarStream(self),
+            ### Company Streams ###
+            CompanyProfileBySymbolStream(self),
+            CikProfileStream(self),
+            CompanyNotesStream(self),
+            StockPeerComparisonStream(self),
+            DelistedCompaniesStream(self),
+            CompanyEmployeeCountStream(self),
+            CompanyHistoricalEmployeeCountStream(self),
+            CompanyMarketCapStream(self),
+            CompanyBatchMarketCapStream(self),
+            HistoricalMarketCapStream(self),
+            CompanyShareAndLiquidityFloatStream(self),
+            AllSharesFloatStream(self),
+            LatestMergersAndAcquisitionsStream(self),
+            SearchMergersAndAcquisitionsStream(self),
+            CompanyExecutiveStream(self),
+            ExecutiveCompensationStream(self),
+            ExecutiveCompensationBenchmarkStream(self),
         ]
+
 
 if __name__ == "__main__":
     TapFMP.cli()

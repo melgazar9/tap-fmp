@@ -3,7 +3,7 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpRestStream
-from tap_fmp.helpers import SymbolFetcher
+from tap_fmp.helpers import SymbolFetcher, CikFetcher
 
 
 class CompanySymbolsStream(FmpRestStream):
@@ -78,8 +78,41 @@ class CikListStream(FmpRestStream):
         th.Property("company_name", th.StringType),
     ).to_dict()
 
+    def get_cik_list(self) -> list[str] | None:
+        """Get a list of selected CIKs from config."""
+        ciks_config = self.config.get("ciks", {})
+        selected_ciks = ciks_config.get("select_ciks")
+
+        if not selected_ciks or selected_ciks in ("*", ["*"]):
+            return None
+
+        if isinstance(selected_ciks, str):
+            return selected_ciks.split(",")
+
+        if isinstance(selected_ciks, list):
+            if selected_ciks == ["*"]:
+                return None
+            return selected_ciks
+        return None
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/cik-list"
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        """Get CIK records - no partitions, handles all CIKs directly."""
+        selected_ciks = self.get_cik_list()
+
+        if not selected_ciks:
+            self.logger.info("No specific CIKs selected, fetching all CIKs...")
+            cik_fetcher = CikFetcher(self.config)
+            cik_records = cik_fetcher.fetch_all_ciks()
+        else:
+            self.logger.info(f"Processing selected CIKs: {selected_ciks}")
+            cik_fetcher = CikFetcher(self.config)
+            cik_records = cik_fetcher.fetch_specific_ciks(selected_ciks)
+
+        for record in cik_records:
+            yield record
 
 
 class SymbolChangesStream(FmpRestStream):
