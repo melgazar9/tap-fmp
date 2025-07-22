@@ -88,6 +88,11 @@ from tap_fmp.streams.market_hours_streams import (
     AllExchangeMarketHoursStream,
 )
 
+from tap_fmp.streams.statements_streams import (
+    IncomeStatementStream,
+    BalanceSheetStream,
+)
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -264,6 +269,11 @@ class TapFMP(Tap):
             ExchangeMarketHoursStream(self),
             HolidaysByExchangeStream(self),
             AllExchangeMarketHoursStream(self),
+
+            ### Statement Streams ###
+
+            IncomeStatementStream(self),
+            BalanceSheetStream(self),
         ]
 
 

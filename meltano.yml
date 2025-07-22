@@ -111,10 +111,14 @@ plugins:
       - custom_dcf_levered.*
 
       ### Market Hours Streams ###
+
       - exchange_market_hours.*
       - holidays_by_exchanges.*
       - all_exchange_market_hours.*
 
+      ### Statement Streams ###
+
+      - income_statement.*
 
     config:
       start_date: '2010-01-01T00:00:00Z'
@@ -211,6 +215,16 @@ plugins:
         other_params:
           time_slice_days: 90
           max_records_per_request: 5000
+
+      ### Statement Streams ###
+
+      income_statement:
+        query_params:
+          limit: 1000
+
+      latest_financial_statements:
+        query_params:
+          limit: 250
 
   loaders:
   - name: target-jsonl
