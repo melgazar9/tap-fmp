@@ -101,23 +101,35 @@ class ExchangeFetcher:
         ]
 
 def clean_strings(lst):
-    cleaned_list = [
-        re.sub(r"[^a-zA-Z0-9_]", "_", s) for s in lst
-    ]  # remove special characters
-    cleaned_list = [
-        re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower() for s in cleaned_list
-    ]  # camel case -> snake case
-    cleaned_list = [
-        re.sub(r"_+", "_", s).strip("_").lower() for s in cleaned_list
-    ]  # clean leading and trailing underscores
+    cleaned_list = []
+    for s in lst:
+        # Handle all caps words specially - if entire string is caps, just lowercase it
+        if s.isupper() and s.isalpha():
+            cleaned = s.lower()
+        else:
+            # Remove special characters first
+            cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", s)
+            # Convert camelCase to snake_case (but not all caps)
+            cleaned = re.sub(r"(?<!^)(?=[A-Z][a-z])", "_", cleaned)
+            # Clean up multiple underscores and strip leading/trailing ones
+            cleaned = re.sub(r"_+", "_", cleaned).strip("_").lower()
+        cleaned_list.append(cleaned)
     return cleaned_list
 
 
 def clean_json_keys(data: list[dict]) -> list[dict]:
-    return [
-        {new_key: value for new_key, value in zip(clean_strings(d.keys()), d.values())}
-        for d in data
-    ]
+    def clean_nested_dict(obj):
+        if isinstance(obj, dict):
+            return {
+                new_key: clean_nested_dict(value)
+                for new_key, value in zip(clean_strings(obj.keys()), obj.values())
+            }
+        elif isinstance(obj, list):
+            return [clean_nested_dict(item) for item in obj]
+        else:
+            return obj
+
+    return [clean_nested_dict(d) for d in data]
 
 
 def generate_surrogate_key(data: dict, namespace=uuid.NAMESPACE_DNS) -> str:

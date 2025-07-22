@@ -147,6 +147,8 @@ class FmpRestStream(Stream, ABC):
             response = requests.get(url, params=query_params)
             response.raise_for_status()
             records = response.json()
+            if isinstance(records, dict) and len(records):
+                records = [records]
             records = clean_json_keys(records)
             logging.info(
                 f"Records returned: {len(records) if isinstance(records, list) else 'not a list'}"
