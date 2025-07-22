@@ -104,7 +104,7 @@ class EarningsCalendarStream(TimeSliceCalendarStream):
 
 class IPOsCalendarStream(TimeSliceCalendarStream):
     name = "ipos_calendar"
-    replication_key = "filing_date"
+    replication_key = "date"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -115,7 +115,7 @@ class IPOsCalendarStream(TimeSliceCalendarStream):
         th.Property("exchange", th.StringType),
         th.Property("actions", th.StringType),
         th.Property("shares", th.NumberType),
-        th.Property("price_range", th.NumberType),
+        th.Property("price_range", th.StringType),
         th.Property("market_cap", th.NumberType),
     ).to_dict()
 

@@ -3,7 +3,7 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpRestStream
-from tap_fmp.helpers import SymbolFetcher, CikFetcher
+from tap_fmp.helpers import SymbolFetcher, CikFetcher, ExchangeFetcher, generate_surrogate_key
 
 
 class CompanySymbolsStream(FmpRestStream):
@@ -183,8 +183,46 @@ class AvailableExchangesStream(FmpRestStream):
         th.Property("delay", th.StringType),
     ).to_dict()
 
+    def get_exchange_list(self) -> list[str] | None:
+        """Get a list of selected exchanges from config."""
+        exchanges_config = self.config.get("exchanges", {})
+        selected_exchanges = exchanges_config.get("select_exchanges")
+
+        if not selected_exchanges or selected_exchanges in ("*", ["*"]):
+            return None
+
+        if isinstance(selected_exchanges, str):
+            return selected_exchanges.split(",")
+
+        if isinstance(selected_exchanges, list):
+            if selected_exchanges == ["*"]:
+                return None
+            return selected_exchanges
+        return None
+
     def get_url(self, context: Context):
-        return f"{self.url_base}/stable/available-exchanges"
+        return f"{self.url_base}/stable/all-exchange-market-hours"
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        """Get exchange records - no partitions, handles all exchanges directly."""
+        selected_exchanges = self.get_exchange_list()
+
+        if not selected_exchanges:
+            self.logger.info("No specific exchanges selected, fetching all exchanges...")
+            exchange_fetcher = ExchangeFetcher(self.config)
+            exchange_records = exchange_fetcher.fetch_all_exchanges()
+        else:
+            self.logger.info(f"Processing selected exchanges: {selected_exchanges}")
+            exchange_fetcher = ExchangeFetcher(self.config)
+            exchange_records = exchange_fetcher.fetch_specific_exchanges(selected_exchanges)
+
+        for record in exchange_records:
+            record = self.post_process(record)
+            yield record
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        row["surrogate_key"] = generate_surrogate_key(row)
+        return row
 
 
 class AvailableSectorsStream(FmpRestStream):

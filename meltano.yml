@@ -33,11 +33,14 @@ plugins:
 
 
     select:
-      # Search Streams
+      ### Search Streams ###
+
       - stock_screener.*
       - exchange_variants.*
 
-      # Directory Streams
+
+      ### Directory Streams ###
+
       - company_symbols.*
       - financial_statement_symbols.*
       - cik_list.*
@@ -50,7 +53,9 @@ plugins:
       - available_industries.*
       - available_countries.*
 
-      # Analyst Streams
+
+      ### Analyst Streams ###
+
       - analyst_estimates_annual.*
 #      - analyst_estimates_quarterly.*
       - rating_snapshot.*
@@ -65,7 +70,9 @@ plugins:
       - stock_grades_news.*
 #      - stock_grades_latest_news.*
 
-      # Calendar Streams
+
+      ### Calendar Streams ###
+
       - dividends_calendar.*
       - dividends_calendar.*
       - earnings_report.*
@@ -76,7 +83,8 @@ plugins:
       - stock_split_details.*
       - stock_splits_calendar.*
 
-      # Company Streams
+      ### Company Streams ###
+
       - company_profile_by_symbol.*
       - company_profile_by_cik.*
       - company_notes.*
@@ -94,6 +102,19 @@ plugins:
       - company_executives.*
       - executive_compensation.*
 #      - executive_compensation_benchmark.*
+
+      ### DCF Streams ###
+
+      - dcf_valuation.*
+      - levered_dcf.*
+      - custom_dcf.*
+      - custom_dcf_levered.*
+
+      ### Market Hours Streams ###
+      - exchange_market_hours.*
+      - holidays_by_exchanges.*
+      - all_exchange_market_hours.*
+
 
     config:
       start_date: '2010-01-01T00:00:00Z'
@@ -157,23 +178,29 @@ plugins:
         query_params:
           from: "2025-03-01"
           to: "2025-03-15"
+          limit: 100
 
       ### Calendar Streams ###
 
       dividends_calendar:
         query_params:
           from: "2025-03-01"
-        other_params:
-          time_slice_days: 90
-          max_records: 4000
 
       earnings_calendar:
         query_params:
           from: 2025-07-01
           to: 2025-08-30
-        other_params:
-          time_slice_days: 90
-          max_records: 4000
+
+      ipos_calendar:
+        query_params:
+          from: "2025-07-01"
+          to: "2025-07-10"
+
+      stock_splits_calendar:
+        query_params:
+          from: 2025-07-01
+          to: 2025-07-10
+          limit: 100
 
 
       ### Company Streams ###
@@ -183,7 +210,7 @@ plugins:
           from: "2025-03-01"
         other_params:
           time_slice_days: 90
-          max_records: 5000
+          max_records_per_request: 5000
 
   loaders:
   - name: target-jsonl

@@ -69,6 +69,37 @@ class CikFetcher:
         ]
 
 
+class ExchangeFetcher:
+    """
+    Fetch and cache FMP exchanges in memory for the duration of a Meltano tap run.
+    """
+
+    def __init__(self, config: MappingProxyType):
+        self.config = config
+
+    def fetch_all_exchanges(self) -> list[dict]:
+        endpoint = f"{self.config.get('base_url')}/stable/all-exchange-market-hours?apikey={self.config.get('api_key')}"
+        response = requests.get(endpoint)
+        response.raise_for_status()
+        exchanges = response.json()
+        exchanges = clean_json_keys(exchanges)
+        return exchanges
+
+    @staticmethod
+    def fetch_specific_exchanges(exchange_list: list[str]) -> list[dict]:
+        """
+        Create exchange records for a specific list of exchanges.
+        """
+        if isinstance(exchange_list, str):
+            return [{"exchange": exchange_list, "name": None}]
+        return [
+            {
+                "exchange": exchange,
+                "name": None,
+            }
+            for exchange in exchange_list
+        ]
+
 def clean_strings(lst):
     cleaned_list = [
         re.sub(r"[^a-zA-Z0-9_]", "_", s) for s in lst

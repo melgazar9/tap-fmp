@@ -75,6 +75,18 @@ from tap_fmp.streams.company_streams import (
     ExecutiveCompensationBenchmarkStream,
 )
 
+from tap_fmp.streams.discounted_cash_flow_streams import (
+    DcfValuationStream,
+    LeveredDcfStream,
+    CustomDcfStream,
+    CustomDcfLeveredStream,
+)
+
+from tap_fmp.streams.market_hours_streams import (
+    ExchangeMarketHoursStream,
+    HolidaysByExchangeStream,
+    AllExchangeMarketHoursStream,
+)
 
 class TapFMP(Tap):
     """FMP tap class."""
@@ -88,6 +100,10 @@ class TapFMP(Tap):
     _cached_ciks: t.List[dict] | None = None
     _cik_stream_instance: CikListStream | None = None
     _ciks_lock = threading.Lock()
+
+    _cached_exchanges: t.List[dict] | None = None
+    _exchange_stream_instance: AvailableExchangesStream | None = None
+    _exchanges_lock = threading.Lock()
 
     config_jsonschema = th.PropertiesList(
         th.Property(
@@ -145,6 +161,27 @@ class TapFMP(Tap):
             self.logger.info("Creating CikListStream instance...")
             self._cik_stream_instance = CikListStream(self)
         return self._cik_stream_instance
+
+    def get_cached_exchanges(self) -> t.List[dict]:
+        """Thread-safe exchange caching for parallel execution."""
+        if self._cached_exchanges is None:
+            # prevent race conditions if running in parallel
+            with self._exchanges_lock:
+                if self._cached_exchanges is None:
+                    self.logger.info("Fetching and caching exchanges...")
+                    exchange_stream = self.get_exchange_stream()
+                    self._cached_exchanges = list(
+                        exchange_stream.get_records(context=None)
+                    )
+                    self.logger.info(f"Cached {len(self._cached_exchanges)} exchanges.")
+        return self._cached_exchanges
+
+    def get_exchange_stream(self) -> AvailableExchangesStream:
+        if self._exchange_stream_instance is None:
+            self.logger.info("Creating AvailableExchangesStream instance...")
+            self._exchange_stream_instance = AvailableExchangesStream(self)
+        return self._exchange_stream_instance
+
 
     def discover_streams(self) -> list:
         """Return a list of discovered streams."""
@@ -214,6 +251,19 @@ class TapFMP(Tap):
             CompanyExecutiveStream(self),
             ExecutiveCompensationStream(self),
             ExecutiveCompensationBenchmarkStream(self),
+
+            ### DCF Streams ###
+
+            DcfValuationStream(self),
+            LeveredDcfStream(self),
+            CustomDcfStream(self),
+            CustomDcfLeveredStream(self),
+
+            ### Market Hours Streams ###
+
+            ExchangeMarketHoursStream(self),
+            HolidaysByExchangeStream(self),
+            AllExchangeMarketHoursStream(self),
         ]
 
 

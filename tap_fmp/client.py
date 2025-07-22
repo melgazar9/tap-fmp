@@ -346,9 +346,7 @@ class TimeSliceStream(FmpRestStream):
         url = self.get_url(context)
 
         time_slices = self.create_time_slice_chunks(context)
-        max_records = self.config.get(self.name, {}).get(
-            "max_records_per_request", 4000
-        )
+        max_records = self.config.get(self.name, {}).get("other_params", {}).get("max_records_per_request", 4000)
 
         for from_date, to_date in time_slices:
             try:
@@ -384,9 +382,7 @@ class SymbolPartitionTimeSliceStream(TimeSliceStream):
 
         url = self.get_url(context)
         time_slices = self.create_time_slice_chunks(context)
-        max_records = self.config.get(self.name, {}).get(
-            "max_records_per_request", 4000
-        )
+        max_records = self.config.get(self.name, {}).get("other_params", {}).get("max_records_per_request", 4000)
 
         for from_date, to_date in time_slices:
             try:
