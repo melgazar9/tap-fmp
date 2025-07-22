@@ -7,10 +7,7 @@ from tap_fmp.helpers import generate_surrogate_key
 
 class CalendarStream(SymbolPartitionStream):
     primary_keys = ["surrogate_key"]
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
+    _add_surrogate_key = True
 
 
 class TimeSliceCalendarStream(TimeSliceStream):
@@ -18,10 +15,7 @@ class TimeSliceCalendarStream(TimeSliceStream):
     replication_key = "date"
     is_timestamp_replication_key = True
     is_sorted = False  # cannot assume data is sorted across all pages
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
+    _add_surrogate_key = True
 
 
 class DividendsCompanyStream(CalendarStream):

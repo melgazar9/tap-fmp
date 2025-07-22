@@ -7,16 +7,12 @@ from tap_fmp.client import (
 )
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
-
 from tap_fmp.helpers import generate_surrogate_key
-
 
 class CompanySymbolPartitionStream(SymbolPartitionStream):
     primary_keys = ["surrogate_key"]
 
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
+    _add_surrogate_key = True
 
 
 class CompanyProfileBySymbolStream(CompanySymbolPartitionStream):
@@ -110,6 +106,8 @@ class CikProfileStream(FmpRestStream):
         th.Property("is_fund", th.BooleanType),
     ).to_dict()
 
+    _add_surrogate_key = True
+
     @property
     def partitions(self):
         return [{"cik": c["cik"]} for c in self._tap.get_cached_ciks()]
@@ -120,10 +118,6 @@ class CikProfileStream(FmpRestStream):
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         self.query_params.update({"cik": context.get("cik")})
         yield from super().get_records(context)
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
 
 
 class CompanyNotesStream(CompanySymbolPartitionStream):
@@ -170,13 +164,10 @@ class DelistedCompaniesStream(FmpRestStream):
         th.Property("delisted_date", th.StringType),
     ).to_dict()
 
+    _add_surrogate_key = True
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/delisted-companies"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
-
 
 class CompanyEmployeeCountStream(CompanySymbolPartitionStream):
     name = "company_employee_count"
@@ -273,6 +264,7 @@ class AllSharesFloatStream(FmpRestStream):
     name = "all_shares_float"
     primary_keys = ["surrogate_key"]
     _paginate = True
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -286,15 +278,10 @@ class AllSharesFloatStream(FmpRestStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/shares-float-all"
 
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
-
 
 class LatestMergersAndAcquisitionsStream(FmpRestStream):
     name = "latest_mergers_and_acquisitions"
     primary_keys = ["surrogate_key"]
-    _paginate = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -309,12 +296,11 @@ class LatestMergersAndAcquisitionsStream(FmpRestStream):
         th.Property("link", th.StringType),
     ).to_dict()
 
+    _add_surrogate_key = True
+    _paginate = True
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/mergers-acquisitions-latest"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
 
 
 class SearchMergersAndAcquisitionsStream(LatestMergersAndAcquisitionsStream):

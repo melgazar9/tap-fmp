@@ -119,6 +119,31 @@ plugins:
       ### Statement Streams ###
 
       - income_statement.*
+      - balance_sheet.*
+      - cash_flow.*
+      - latest_financial_statements.*
+#      - income_statement_ttm.*
+#      - balance_sheet_ttm.*
+#      - cash_flow_ttm.*
+      - key_metrics.*
+      - financial_ratios.*
+      - key_metrics_ttm.*
+      - financial_ratios_ttm.*
+      - financial_scores.*
+      - owner_earnings.*
+      - enterprise_values.*
+      - income_statement_growth.*
+      - balance_sheet_growth.*
+      - cash_flow_growth.*
+      - financial_statement_growth.*
+      - financial_report_dates.*
+      - financial_reports_form_10k_json.*
+      - revenue_product_segmentation.*
+      - revenue_geographic_segmentation.*
+      - as_reported_income_statements.*
+      - as_reported_balance_statements.*
+      - as_reported_cashflow_statements.*
+      - as_reported_financial_statements.*
 
     config:
       start_date: '2010-01-01T00:00:00Z'
@@ -222,9 +247,26 @@ plugins:
         query_params:
           limit: 1000
 
+      income_statement_ttm:
+        query_params:
+          limit: 100
+
+      balance_sheet_ttm:
+        query_params:
+          limit: 100
+
+      cash_flow_ttm:
+        query_params:
+          limit: 100
+
       latest_financial_statements:
         query_params:
           limit: 250
+
+      financial_ratios:
+        query_params:
+          limit: 1000
+          periods: ["annual"]
 
   loaders:
   - name: target-jsonl

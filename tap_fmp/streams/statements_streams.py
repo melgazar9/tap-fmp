@@ -3,21 +3,25 @@
 from __future__ import annotations
 
 import typing as t
+from typing import Iterable
 
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
+from datetime import datetime
 
 from tap_fmp.client import FmpRestStream, SymbolPartitionStream
-
-from tap_fmp.helpers import generate_surrogate_key
 
 
 class StatementStream(FmpRestStream):
     primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     @property
     def partitions(self):
-        periods = ["Q1", "Q2", "Q3", "Q4", "FY", "annual", "quarter"]
+        query_params = self.config.get(self.name, {}).get("query_params", {})
+        periods = query_params.get("periods")
+        if periods is None or periods == "*":
+            periods = ["Q1", "Q2", "Q3", "Q4", "FY", "annual", "quarter"]
         return [
             {"symbol": s["symbol"], "period": p}
             for s in self._tap.get_cached_symbols()
@@ -27,10 +31,6 @@ class StatementStream(FmpRestStream):
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         self.query_params.update(context)
         yield from super().get_records(context)
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
 
 
 class IncomeStatementStream(StatementStream):
@@ -44,7 +44,7 @@ class IncomeStatementStream(StatementStream):
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.DateType),
         th.Property("accepted_date", th.DateType),
-        th.Property("fiscal_year", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("revenue", th.NumberType),
         th.Property("cost_of_revenue", th.NumberType),
@@ -82,12 +82,17 @@ class IncomeStatementStream(StatementStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/income-statement"
 
+    def post_process(self, row: dict, context: Context = None) -> dict:
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row, context)
+
 class BalanceSheetStream(StatementStream):
     name = "balance_sheet"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.DateType, required=True),
-        th.Property("date", th.StringType, required=True),
+        th.Property("date", th.DateType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("reported_currency", th.StringType),
         th.Property("cik", th.StringType),
@@ -147,10 +152,16 @@ class BalanceSheetStream(StatementStream):
         th.Property("total_investments", th.NumberType),
         th.Property("total_debt", th.NumberType),
         th.Property("net_debt", th.NumberType),
+        th.Property("capital_lease_obligations_non_current", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/balance-sheet-statement"
+
+    def post_process(self, row: dict, context: Context = None) -> dict:
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row)
 
 
 class CashFlowStream(StatementStream):
@@ -164,7 +175,7 @@ class CashFlowStream(StatementStream):
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.DateType),
         th.Property("accepted_date", th.DateTimeType),
-        th.Property("fiscal_year", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
 
         th.Property("net_income", th.NumberType),
@@ -210,15 +221,21 @@ class CashFlowStream(StatementStream):
         th.Property("free_cash_flow", th.NumberType),
         th.Property("income_taxes_paid", th.NumberType),
         th.Property("interest_paid", th.NumberType),
-    )
+    ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/cash-flow-statement"
+
+    def post_process(self, row: dict, context: Context = None) -> dict:
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row, context)
 
 
 class LatestFinancialStatementsStream(FmpRestStream):
     name = "latest_financial_statements"
     _paginate = True
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.DateType, required=True),
@@ -232,10 +249,6 @@ class LatestFinancialStatementsStream(FmpRestStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/latest-financial-statements"
 
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
-
 class IncomeStatementTtmStream(SymbolPartitionStream):
     name = "income_statement_ttm"
     primary_keys = ["surrogate_key"]
@@ -248,7 +261,7 @@ class IncomeStatementTtmStream(SymbolPartitionStream):
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.DateType),
         th.Property("accepted_date", th.DateTimeType),
-        th.Property("fiscal_year", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
 
         th.Property("revenue", th.NumberType),
@@ -283,10 +296,15 @@ class IncomeStatementTtmStream(SymbolPartitionStream):
         th.Property("eps_diluted", th.NumberType),
         th.Property("weighted_average_shs_out", th.NumberType),
         th.Property("weighted_average_shs_out_dil", th.NumberType),
-    )
+    ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/income-statement-ttm"
+
+    def post_process(self, row: dict, context: Context = None) -> dict:
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row, context)
 
 class BalanceSheetTtmStream(SymbolPartitionStream):
     name = "balance_sheet_ttm"
@@ -300,7 +318,7 @@ class BalanceSheetTtmStream(SymbolPartitionStream):
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.DateType),
         th.Property("accepted_date", th.DateTimeType),
-        th.Property("fiscal_year", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("cash_and_cash_equivalents", th.NumberType),
         th.Property("short_term_investments", th.NumberType),
@@ -354,12 +372,889 @@ class BalanceSheetTtmStream(SymbolPartitionStream):
         th.Property("total_investments", th.NumberType),
         th.Property("total_debt", th.NumberType),
         th.Property("net_debt", th.NumberType),
-    )
+        th.Property("capital_lease_obligations_non_current", th.NumberType),
+    ).to_dict()
+
+    _add_surrogate_key = True
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/income-statement-ttm"
 
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
+    def post_process(self, row: dict, context: Context = None) -> dict:
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        for k in list(row.keys()):
+            if "t_t_m" in k:
+                new_key = k.replace("t_t_m", "ttm")
+                row[new_key] = row.pop(k)
+        return super().post_process(row, context)
 
+class CashFlowTtmStream(SymbolPartitionStream):
+    """Cash flow statement data for companies."""
+    name = "cash_flow_ttm"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("date", th.DateType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("reported_currency", th.StringType),
+        th.Property("cik", th.StringType),
+        th.Property("filing_date", th.StringType),
+        th.Property("accepted_date", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
+        th.Property("period", th.StringType),
+        th.Property("net_income", th.NumberType),
+        th.Property("depreciation_and_amortization", th.NumberType),
+        th.Property("deferred_income_tax", th.NumberType),
+        th.Property("stock_based_compensation", th.NumberType),
+        th.Property("change_in_working_capital", th.NumberType),
+        th.Property("accounts_receivables", th.NumberType),
+        th.Property("inventory", th.NumberType),
+        th.Property("accounts_payables", th.NumberType),
+        th.Property("other_working_capital", th.NumberType),
+        th.Property("other_non_cash_items", th.NumberType),
+        th.Property("net_cash_provided_by_operating_activities", th.NumberType),
+        th.Property("investments_in_property_plant_and_equipment", th.NumberType),
+        th.Property("acquisitions_net", th.NumberType),
+        th.Property("purchases_of_investments", th.NumberType),
+        th.Property("sales_maturities_of_investments", th.NumberType),
+        th.Property("other_investing_activities", th.NumberType),
+        th.Property("net_cash_provided_by_investing_activities", th.NumberType),
+        th.Property("net_debt_issuance", th.NumberType),
+        th.Property("long_term_net_debt_issuance", th.NumberType),
+        th.Property("short_term_net_debt_issuance", th.NumberType),
+        th.Property("net_stock_issuance", th.NumberType),
+        th.Property("net_common_stock_issuance", th.NumberType),
+        th.Property("common_stock_issuance", th.NumberType),
+        th.Property("common_stock_repurchased", th.NumberType),
+        th.Property("net_preferred_stock_issuance", th.NumberType),
+        th.Property("net_dividends_paid", th.NumberType),
+        th.Property("common_dividends_paid", th.NumberType),
+        th.Property("preferred_dividends_paid", th.NumberType),
+        th.Property("other_financing_activities", th.NumberType),
+        th.Property("net_cash_provided_by_financing_activities", th.NumberType),
+        th.Property("effect_of_forex_changes_on_cash", th.NumberType),
+        th.Property("net_change_in_cash", th.NumberType),
+        th.Property("cash_at_end_of_period", th.NumberType),
+        th.Property("cash_at_beginning_of_period", th.NumberType),
+        th.Property("operating_cash_flow", th.NumberType),
+        th.Property("capital_expenditure", th.NumberType),
+        th.Property("free_cash_flow", th.NumberType),
+        th.Property("income_taxes_paid", th.NumberType),
+        th.Property("interest_paid", th.NumberType)
+    ).to_dict()
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/cash-flow-statement-ttm"
+
+    def post_process(self, row: dict, context: Context = None) -> dict:
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row, context)
+
+class KeyMetricsStream(StatementStream):
+    """Key metrics data for companies."""
+    name = "key_metrics"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("date", th.DateType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("period", th.StringType),
+        th.Property("revenue_per_share", th.NumberType),
+        th.Property("net_income_per_share", th.NumberType),
+        th.Property("operating_cash_flow_per_share", th.NumberType),
+        th.Property("free_cash_flow_per_share", th.NumberType),
+        th.Property("cash_per_share", th.NumberType),
+        th.Property("book_value_per_share", th.NumberType),
+        th.Property("tangible_book_value_per_share", th.NumberType),
+        th.Property("shareholders_equity_per_share", th.NumberType),
+        th.Property("interest_debt_per_share", th.NumberType),
+        th.Property("market_cap", th.NumberType),
+        th.Property("enterprise_value", th.NumberType),
+        th.Property("pe_ratio", th.NumberType),
+        th.Property("price_to_sales_ratio", th.NumberType),
+        th.Property("pocf_ratio", th.NumberType),
+        th.Property("pfcf_ratio", th.NumberType),
+        th.Property("pb_ratio", th.NumberType),
+        th.Property("ptb_ratio", th.NumberType),
+        th.Property("ev_to_sales", th.NumberType),
+        th.Property("enterprise_value_over_ebitda", th.NumberType),
+        th.Property("ev_to_operating_cash_flow", th.NumberType),
+        th.Property("ev_to_free_cash_flow", th.NumberType),
+        th.Property("earnings_yield", th.NumberType),
+        th.Property("free_cash_flow_yield", th.NumberType),
+        th.Property("debt_to_equity", th.NumberType),
+        th.Property("debt_to_assets", th.NumberType),
+        th.Property("net_debt_to_ebitda", th.NumberType),
+        th.Property("current_ratio", th.NumberType),
+        th.Property("interest_coverage", th.NumberType),
+        th.Property("income_quality", th.NumberType),
+        th.Property("dividend_yield", th.NumberType),
+        th.Property("payout_ratio", th.NumberType),
+        th.Property("sales_general_and_administrative_to_revenue", th.NumberType),
+        th.Property("research_and_development_to_revenue", th.NumberType),
+        th.Property("intangibles_to_total_assets", th.NumberType),
+        th.Property("capex_to_operating_cash_flow", th.NumberType),
+        th.Property("capex_to_revenue", th.NumberType),
+        th.Property("capex_to_depreciation", th.NumberType),
+        th.Property("stock_based_compensation_to_revenue", th.NumberType),
+        th.Property("graham_number", th.NumberType),
+        th.Property("roic", th.NumberType),
+        th.Property("return_on_tangible_assets", th.NumberType),
+        th.Property("graham_net_net", th.NumberType),
+        th.Property("working_capital", th.NumberType),
+        th.Property("tangible_asset_value", th.NumberType),
+        th.Property("net_current_asset_value", th.NumberType),
+        th.Property("invested_capital", th.NumberType),
+        th.Property("average_receivables", th.NumberType),
+        th.Property("average_payables", th.NumberType),
+        th.Property("average_inventory", th.NumberType),
+        th.Property("days_sales_outstanding", th.NumberType),
+        th.Property("days_payables_outstanding", th.NumberType),
+        th.Property("days_of_inventory_on_hand", th.NumberType),
+        th.Property("receivables_turnover", th.NumberType),
+        th.Property("payables_turnover", th.NumberType),
+        th.Property("inventory_turnover", th.NumberType),
+        th.Property("roe", th.NumberType),
+        th.Property("capex_per_share", th.NumberType),
+    ).to_dict()
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/key-metrics"
+
+    def post_process(self, row: dict, context: Context = None) -> dict:
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row, context)
+
+class FinancialRatiosStream(StatementStream):
+    """Financial ratios data for companies."""
+    name = "financial_ratios"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
+        th.Property("date", th.StringType, required=True),
+        th.Property("fiscal_year", th.IntegerType),
+        th.Property("period", th.StringType),
+        th.Property("reported_currency", th.StringType),
+        th.Property("gross_profit_margin", th.NumberType),
+        th.Property("ebit_margin", th.NumberType),
+        th.Property("ebitda_margin", th.NumberType),
+        th.Property("operating_profit_margin", th.NumberType),
+        th.Property("pretax_profit_margin", th.NumberType),
+        th.Property("continuous_operations_profit_margin", th.NumberType),
+        th.Property("net_profit_margin", th.NumberType),
+        th.Property("bottom_line_profit_margin", th.NumberType),
+        th.Property("receivables_turnover", th.NumberType),
+        th.Property("payables_turnover", th.NumberType),
+        th.Property("inventory_turnover", th.NumberType),
+        th.Property("fixed_asset_turnover", th.NumberType),
+        th.Property("asset_turnover", th.NumberType),
+        th.Property("current_ratio", th.NumberType),
+        th.Property("quick_ratio", th.NumberType),
+        th.Property("solvency_ratio", th.NumberType),
+        th.Property("cash_ratio", th.NumberType),
+        th.Property("price_to_earnings_ratio", th.NumberType),
+        th.Property("price_to_earnings_growth_ratio", th.NumberType),
+        th.Property("forward_price_to_earnings_growth_ratio", th.NumberType),
+        th.Property("price_to_book_ratio", th.NumberType),
+        th.Property("price_to_sales_ratio", th.NumberType),
+        th.Property("price_to_free_cash_flow_ratio", th.NumberType),
+        th.Property("price_to_operating_cash_flow_ratio", th.NumberType),
+        th.Property("debt_to_assets_ratio", th.NumberType),
+        th.Property("debt_to_equity_ratio", th.NumberType),
+        th.Property("debt_to_capital_ratio", th.NumberType),
+        th.Property("long_term_debt_to_capital_ratio", th.NumberType),
+        th.Property("financial_leverage_ratio", th.NumberType),
+        th.Property("working_capital_turnover_ratio", th.NumberType),
+        th.Property("operating_cash_flow_ratio", th.NumberType),
+        th.Property("operating_cash_flow_sales_ratio", th.NumberType),
+        th.Property("free_cash_flow_operating_cash_flow_ratio", th.NumberType),
+        th.Property("debt_service_coverage_ratio", th.NumberType),
+        th.Property("interest_coverage_ratio", th.NumberType),
+        th.Property("short_term_operating_cash_flow_coverage_ratio", th.NumberType),
+        th.Property("operating_cash_flow_coverage_ratio", th.NumberType),
+        th.Property("capital_expenditure_coverage_ratio", th.NumberType),
+        th.Property("dividend_paid_and_capex_coverage_ratio", th.NumberType),
+        th.Property("dividend_payout_ratio", th.NumberType),
+        th.Property("dividend_yield", th.NumberType),
+        th.Property("dividend_yield_percentage", th.NumberType),
+        th.Property("revenue_per_share", th.NumberType),
+        th.Property("net_income_per_share", th.NumberType),
+        th.Property("interest_debt_per_share", th.NumberType),
+        th.Property("cash_per_share", th.NumberType),
+        th.Property("book_value_per_share", th.NumberType),
+        th.Property("tangible_book_value_per_share", th.NumberType),
+        th.Property("shareholders_equity_per_share", th.NumberType),
+        th.Property("operating_cash_flow_per_share", th.NumberType),
+        th.Property("capex_per_share", th.NumberType),
+        th.Property("free_cash_flow_per_share", th.NumberType),
+        th.Property("net_income_per_ebt", th.NumberType),
+        th.Property("ebt_per_ebit", th.NumberType),
+        th.Property("price_to_fair_value", th.NumberType),
+        th.Property("debt_to_market_cap", th.NumberType),
+        th.Property("effective_tax_rate", th.NumberType),
+        th.Property("enterprise_value_multiple", th.NumberType),
+        th.Property("dividend_per_share", th.NumberType),
+    ).to_dict()
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/ratios"
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        if "net_income_per_e_b_t" in row:
+            row["net_income_per_ebt"] = row.pop("net_income_per_e_b_t")
+        return super().post_process(row, context)
+
+class KeyMetricsTtmStream(SymbolPartitionStream):
+    """Key metrics TTM data for companies."""
+    name = "key_metrics_ttm"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("market_cap", th.NumberType),
+        th.Property("enterprise_value_ttm", th.NumberType),
+        th.Property("ev_to_sales_ttm", th.NumberType),
+        th.Property("ev_to_operating_cash_flow_ttm", th.NumberType),
+        th.Property("ev_to_free_cash_flow_ttm", th.NumberType),
+        th.Property("ev_to_ebitda_ttm", th.NumberType),
+        th.Property("net_debt_to_ebitda_ttm", th.NumberType),
+        th.Property("current_ratio_ttm", th.NumberType),
+        th.Property("income_quality_ttm", th.NumberType),
+        th.Property("graham_number_ttm", th.NumberType),
+        th.Property("graham_net_net_ttm", th.NumberType),
+        th.Property("tax_burden_ttm", th.NumberType),
+        th.Property("interest_burden_ttm", th.NumberType),
+        th.Property("working_capital_ttm", th.NumberType),
+        th.Property("invested_capital_ttm", th.NumberType),
+        th.Property("return_on_assets_ttm", th.NumberType),
+        th.Property("operating_return_on_assets_ttm", th.NumberType),
+        th.Property("return_on_tangible_assets_ttm", th.NumberType),
+        th.Property("return_on_equity_ttm", th.NumberType),
+        th.Property("return_on_invested_capital_ttm", th.NumberType),
+        th.Property("return_on_capital_employed_ttm", th.NumberType),
+        th.Property("earnings_yield_ttm", th.NumberType),
+        th.Property("free_cash_flow_yield_ttm", th.NumberType),
+        th.Property("capex_to_operating_cash_flow_ttm", th.NumberType),
+        th.Property("capex_to_depreciation_ttm", th.NumberType),
+        th.Property("capex_to_revenue_ttm", th.NumberType),
+        th.Property("sales_general_and_administrative_to_revenue_ttm", th.NumberType),
+        th.Property("research_and_developement_to_revenue_ttm", th.NumberType),
+        th.Property("stock_based_compensation_to_revenue_ttm", th.NumberType),
+        th.Property("intangibles_to_total_assets_ttm", th.NumberType),
+        th.Property("average_receivables_ttm", th.NumberType),
+        th.Property("average_payables_ttm", th.NumberType),
+        th.Property("average_inventory_ttm", th.NumberType),
+        th.Property("days_of_sales_outstanding_ttm", th.NumberType),
+        th.Property("days_of_payables_outstanding_ttm", th.NumberType),
+        th.Property("days_of_inventory_outstanding_ttm", th.NumberType),
+        th.Property("operating_cycle_ttm", th.NumberType),
+        th.Property("cash_conversion_cycle_ttm", th.NumberType),
+        th.Property("free_cash_flow_to_equity_ttm", th.NumberType),
+        th.Property("free_cash_flow_to_firm_ttm", th.NumberType),
+        th.Property("tangible_asset_value_ttm", th.NumberType),
+        th.Property("net_current_asset_value_ttm", th.NumberType),
+    ).to_dict()
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/key-metrics-ttm"
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        for k in list(row.keys()):
+            if "t_t_m" in k:
+                new_key = k.replace("t_t_m", "ttm")
+                row[new_key] = row.pop(k)
+        return super().post_process(row, context)
+
+class FinancialRatiosTtmStream(SymbolPartitionStream):
+    """Financial ratios TTM data for companies."""
+    name = "financial_ratios_ttm"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("gross_profit_margin_ttm", th.NumberType),
+        th.Property("ebit_margin_ttm", th.NumberType),
+        th.Property("ebitda_margin_ttm", th.NumberType),
+        th.Property("operating_profit_margin_ttm", th.NumberType),
+        th.Property("pretax_profit_margin_ttm", th.NumberType),
+        th.Property("continuous_operations_profit_margin_ttm", th.NumberType),
+        th.Property("net_profit_margin_ttm", th.NumberType),
+        th.Property("bottom_line_profit_margin_ttm", th.NumberType),
+        th.Property("receivables_turnover_ttm", th.NumberType),
+        th.Property("payables_turnover_ttm", th.NumberType),
+        th.Property("inventory_turnover_ttm", th.NumberType),
+        th.Property("fixed_asset_turnover_ttm", th.NumberType),
+        th.Property("asset_turnover_ttm", th.NumberType),
+        th.Property("current_ratio_ttm", th.NumberType),
+        th.Property("quick_ratio_ttm", th.NumberType),
+        th.Property("solvency_ratio_ttm", th.NumberType),
+        th.Property("cash_ratio_ttm", th.NumberType),
+        th.Property("price_to_earnings_ratio_ttm", th.NumberType),
+        th.Property("price_to_earnings_growth_ratio_ttm", th.NumberType),
+        th.Property("forward_price_to_earnings_growth_ratio_ttm", th.NumberType),
+        th.Property("price_to_book_ratio_ttm", th.NumberType),
+        th.Property("price_to_sales_ratio_ttm", th.NumberType),
+        th.Property("price_to_free_cash_flow_ratio_ttm", th.NumberType),
+        th.Property("price_to_operating_cash_flow_ratio_ttm", th.NumberType),
+        th.Property("debt_to_assets_ratio_ttm", th.NumberType),
+        th.Property("debt_to_equity_ratio_ttm", th.NumberType),
+        th.Property("debt_to_capital_ratio_ttm", th.NumberType),
+        th.Property("long_term_debt_to_capital_ratio_ttm", th.NumberType),
+        th.Property("financial_leverage_ratio_ttm", th.NumberType),
+        th.Property("working_capital_turnover_ratio_ttm", th.NumberType),
+        th.Property("operating_cash_flow_ratio_ttm", th.NumberType),
+        th.Property("operating_cash_flow_sales_ratio_ttm", th.NumberType),
+        th.Property("free_cash_flow_operating_cash_flow_ratio_ttm", th.NumberType),
+        th.Property("debt_service_coverage_ratio_ttm", th.NumberType),
+        th.Property("interest_coverage_ratio_ttm", th.NumberType),
+        th.Property("short_term_operating_cash_flow_coverage_ratio_ttm", th.NumberType),
+        th.Property("operating_cash_flow_coverage_ratio_ttm", th.NumberType),
+        th.Property("capital_expenditure_coverage_ratio_ttm", th.NumberType),
+        th.Property("dividend_paid_and_capex_coverage_ratio_ttm", th.NumberType),
+        th.Property("dividend_payout_ratio_ttm", th.NumberType),
+        th.Property("dividend_yield_ttm", th.NumberType),
+        th.Property("enterprise_value_ttm", th.NumberType),
+        th.Property("revenue_per_share_ttm", th.NumberType),
+        th.Property("net_income_per_share_ttm", th.NumberType),
+        th.Property("interest_debt_per_share_ttm", th.NumberType),
+        th.Property("cash_per_share_ttm", th.NumberType),
+        th.Property("book_value_per_share_ttm", th.NumberType),
+        th.Property("tangible_book_value_per_share_ttm", th.NumberType),
+        th.Property("shareholders_equity_per_share_ttm", th.NumberType),
+        th.Property("operating_cash_flow_per_share_ttm", th.NumberType),
+        th.Property("capex_per_share_ttm", th.NumberType),
+        th.Property("free_cash_flow_per_share_ttm", th.NumberType),
+        th.Property("net_income_per_ebt_ttm", th.NumberType),
+        th.Property("ebt_per_ebit_ttm", th.NumberType),
+        th.Property("price_to_fair_value_ttm", th.NumberType),
+        th.Property("debt_to_market_cap_ttm", th.NumberType),
+        th.Property("effective_tax_rate_ttm", th.NumberType),
+        th.Property("enterprise_value_multiple_ttm", th.NumberType),
+    ).to_dict()
+
+    _add_surrogate_key = True
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/ratios-ttm"
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        for k in list(row.keys()):
+            if "t_t_m" in k:
+                new_key = k.replace("t_t_m", "ttm")
+                row[new_key] = row.pop(k)
+        return super().post_process(row, context)
+
+
+class FinancialScoresStream(SymbolPartitionStream):
+    """Financial scores data for companies."""
+    name = "financial_scores"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("altman_z_score", th.NumberType),
+        th.Property("piotroski_score", th.NumberType),
+        th.Property("working_capital", th.NumberType),
+        th.Property("total_assets", th.NumberType),
+        th.Property("retained_earnings", th.NumberType),
+        th.Property("ebit", th.NumberType),
+        th.Property("market_cap", th.NumberType),
+        th.Property("total_liabilities", th.NumberType),
+        th.Property("revenue", th.NumberType),
+    ).to_dict()
+
+    _add_surrogate_key = True
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/financial-scores"
+
+class OwnerEarningsStream(SymbolPartitionStream):
+    """Owner earnings data for companies."""
+    name = "owner_earnings"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("date", th.DateType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("period", th.StringType),
+        th.Property("owner_earnings", th.NumberType),
+        th.Property("net_income", th.NumberType),
+        th.Property("depreciation_and_amortization", th.NumberType),
+        th.Property("capital_expenditure", th.NumberType),
+        th.Property("change_in_working_capital", th.NumberType),
+    ).to_dict()
+
+    _add_surrogate_key = True
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/owner-earnings"
+
+class EnterpriseValuesStream(StatementStream):
+    """Enterprise values data for companies."""
+    name = "enterprise_values"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("date", th.DateType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("stock_price", th.NumberType),
+        th.Property("number_of_shares", th.NumberType),
+        th.Property("market_capitalization", th.NumberType),
+        th.Property("minus_cash_and_cash_equivalents", th.NumberType),
+        th.Property("add_total_debt", th.NumberType),
+        th.Property("enterprise_value", th.NumberType),
+        th.Property("period", th.StringType),
+    ).to_dict()
+
+    _add_surrogate_key = True
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/enterprise-values"
+
+
+class IncomeStatementGrowthStream(StatementStream):
+    """Income statement growth data for companies."""
+    name = "income_statement_growth"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("date", th.DateType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("period", th.StringType),
+        th.Property("growth_revenue", th.NumberType),
+        th.Property("growth_cost_of_revenue", th.NumberType),
+        th.Property("growth_gross_profit", th.NumberType),
+        th.Property("growth_gross_profit_ratio", th.NumberType),
+        th.Property("growth_research_and_development_expenses", th.NumberType),
+        th.Property("growth_general_and_administrative_expenses", th.NumberType),
+        th.Property("growth_selling_and_marketing_expenses", th.NumberType),
+        th.Property("growth_other_expenses", th.NumberType),
+        th.Property("growth_operating_expenses", th.NumberType),
+        th.Property("growth_cost_and_expenses", th.NumberType),
+        th.Property("growth_interest_expense", th.NumberType),
+        th.Property("growth_depreciation_and_amortization", th.NumberType),
+        th.Property("growth_ebitda", th.NumberType),
+        th.Property("growth_ebitda_ratio", th.NumberType),
+        th.Property("growth_operating_income", th.NumberType),
+        th.Property("growth_operating_income_ratio", th.NumberType),
+        th.Property("growth_total_other_income_expenses_net", th.NumberType),
+        th.Property("growth_income_before_tax", th.NumberType),
+        th.Property("growth_income_before_tax_ratio", th.NumberType),
+        th.Property("growth_income_tax_expense", th.NumberType),
+        th.Property("growth_net_income", th.NumberType),
+        th.Property("growth_net_income_ratio", th.NumberType),
+        th.Property("growth_eps", th.NumberType),
+        th.Property("growth_eps_diluted", th.NumberType),
+        th.Property("growth_weighted_average_shs_out", th.NumberType),
+        th.Property("growth_weighted_average_shs_out_dil", th.NumberType),
+    ).to_dict()
+
+    _add_surrogate_key = True
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/income-statement-growth"
+
+
+class BalanceSheetGrowthStream(StatementStream):
+    """Balance sheet growth data for companies."""
+    name = "balance_sheet_growth"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
+        th.Property("date", th.DateType, required=True),
+        th.Property("fiscal_year", th.IntegerType),
+        th.Property("period", th.StringType),
+        th.Property("reported_currency", th.StringType),
+        th.Property("growth_cash_and_cash_equivalents", th.NumberType),
+        th.Property("growth_short_term_investments", th.NumberType),
+        th.Property("growth_cash_and_short_term_investments", th.NumberType),
+        th.Property("growth_net_receivables", th.NumberType),
+        th.Property("growth_inventory", th.NumberType),
+        th.Property("growth_other_current_assets", th.NumberType),
+        th.Property("growth_total_current_assets", th.NumberType),
+        th.Property("growth_property_plant_equipment_net", th.NumberType),
+        th.Property("growth_goodwill", th.NumberType),
+        th.Property("growth_intangible_assets", th.NumberType),
+        th.Property("growth_goodwill_and_intangible_assets", th.NumberType),
+        th.Property("growth_long_term_investments", th.NumberType),
+        th.Property("growth_tax_assets", th.NumberType),
+        th.Property("growth_other_non_current_assets", th.NumberType),
+        th.Property("growth_total_non_current_assets", th.NumberType),
+        th.Property("growth_other_assets", th.NumberType),
+        th.Property("growth_total_assets", th.NumberType),
+        th.Property("growth_account_payables", th.NumberType),
+        th.Property("growth_short_term_debt", th.NumberType),
+        th.Property("growth_tax_payables", th.NumberType),
+        th.Property("growth_deferred_revenue", th.NumberType),
+        th.Property("growth_other_current_liabilities", th.NumberType),
+        th.Property("growth_total_current_liabilities", th.NumberType),
+        th.Property("growth_long_term_debt", th.NumberType),
+        th.Property("growth_deferred_revenue_non_current", th.NumberType),
+        th.Property("growth_deferred_tax_liabilities_non_current", th.NumberType),
+        th.Property("growth_other_non_current_liabilities", th.NumberType),
+        th.Property("growth_total_non_current_liabilities", th.NumberType),
+        th.Property("growth_other_liabilities", th.NumberType),
+        th.Property("growth_total_liabilities", th.NumberType),
+        th.Property("growth_preferred_stock", th.NumberType),
+        th.Property("growth_common_stock", th.NumberType),
+        th.Property("growth_retained_earnings", th.NumberType),
+        th.Property("growth_accumulated_other_comprehensive_income_loss", th.NumberType),
+        th.Property("growth_othertotal_stockholders_equity", th.NumberType),
+        th.Property("growth_total_stockholders_equity", th.NumberType),
+        th.Property("growth_minority_interest", th.NumberType),
+        th.Property("growth_total_equity", th.NumberType),
+        th.Property("growth_total_liabilities_and_stockholders_equity", th.NumberType),
+        th.Property("growth_total_investments", th.NumberType),
+        th.Property("growth_total_debt", th.NumberType),
+        th.Property("growth_net_debt", th.NumberType),
+        th.Property("growth_accounts_receivables", th.NumberType),
+        th.Property("growth_other_receivables", th.NumberType),
+        th.Property("growth_prepaids", th.NumberType),
+        th.Property("growth_total_payables", th.NumberType),
+        th.Property("growth_other_payables", th.NumberType),
+        th.Property("growth_accrued_expenses", th.NumberType),
+        th.Property("growth_capital_lease_obligations_current", th.NumberType),
+        th.Property("growth_additional_paid_in_capital", th.NumberType),
+        th.Property("growth_treasury_stock", th.NumberType),
+    ).to_dict()
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/balance-sheet-statement-growth"
+
+    def post_process(self, row: dict, context: Context | None = None):
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row)
+
+
+class CashFlowGrowthStream(StatementStream):
+    """Cash flow growth data for companies."""
+    name = "cash_flow_growth"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
+        th.Property("date", th.DateType, required=True),
+        th.Property("fiscal_year", th.IntegerType),
+        th.Property("period", th.StringType),
+        th.Property("reported_currency", th.StringType),
+        th.Property("growth_net_income", th.NumberType),
+        th.Property("growth_depreciation_and_amortization", th.NumberType),
+        th.Property("growth_deferred_income_tax", th.NumberType),
+        th.Property("growth_stock_based_compensation", th.NumberType),
+        th.Property("growth_change_in_working_capital", th.NumberType),
+        th.Property("growth_accounts_receivables", th.NumberType),
+        th.Property("growth_inventory", th.NumberType),
+        th.Property("growth_accounts_payables", th.NumberType),
+        th.Property("growth_other_working_capital", th.NumberType),
+        th.Property("growth_other_non_cash_items", th.NumberType),
+        th.Property("growth_net_cash_provided_by_operating_activites", th.NumberType),
+        th.Property("growth_investments_in_property_plant_and_equipment", th.NumberType),
+        th.Property("growth_acquisitions_net", th.NumberType),
+        th.Property("growth_purchases_of_investments", th.NumberType),
+        th.Property("growth_sales_maturities_of_investments", th.NumberType),
+        th.Property("growth_other_investing_activites", th.NumberType),
+        th.Property("growth_net_cash_used_for_investing_activites", th.NumberType),
+        th.Property("growth_debt_repayment", th.NumberType),
+        th.Property("growth_common_stock_issued", th.NumberType),
+        th.Property("growth_common_stock_repurchased", th.NumberType),
+        th.Property("growth_dividends_paid", th.NumberType),
+        th.Property("growth_other_financing_activites", th.NumberType),
+        th.Property("growth_net_cash_used_provided_by_financing_activities", th.NumberType),
+        th.Property("growth_effect_of_forex_changes_on_cash", th.NumberType),
+        th.Property("growth_net_change_in_cash", th.NumberType),
+        th.Property("growth_cash_at_end_of_period", th.NumberType),
+        th.Property("growth_cash_at_beginning_of_period", th.NumberType),
+        th.Property("growth_operating_cash_flow", th.NumberType),
+        th.Property("growth_capital_expenditure", th.NumberType),
+        th.Property("growth_free_cash_flow", th.NumberType),
+        th.Property("growth_net_debt_issuance", th.NumberType),
+        th.Property("growth_long_term_net_debt_issuance", th.NumberType),
+        th.Property("growth_short_term_net_debt_issuance", th.NumberType),
+        th.Property("growth_net_stock_issuance", th.NumberType),
+        th.Property("growth_preferred_dividends_paid", th.NumberType),
+        th.Property("growth_income_taxes_paid", th.NumberType),
+        th.Property("growth_interest_paid", th.NumberType),
+    ).to_dict()
+
+    _add_surrogate_key = True
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/cash-flow-statement-growth"
+
+    def post_process(self, row: dict, context: Context | None = None) -> Iterable[dict]:
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row)
+
+class FinancialStatementGrowthStream(StatementStream):
+    """Financial statement growth data for companies."""
+    name = "financial_statement_growth"
+
+    schema = th.PropertiesList(
+        th.Property("symbol", th.StringType),
+        th.Property("date", th.DateType),
+        th.Property("fiscal_year", th.IntegerType),
+        th.Property("period", th.StringType),
+        th.Property("reported_currency", th.StringType),
+
+        th.Property("revenue_growth", th.NumberType),
+        th.Property("gross_profit_growth", th.NumberType),
+        th.Property("ebit_growth", th.NumberType),
+        th.Property("operating_income_growth", th.NumberType),
+        th.Property("net_income_growth", th.NumberType),
+        th.Property("eps_growth", th.NumberType),
+        th.Property("eps_diluted_growth", th.NumberType),
+        th.Property("weighted_average_shares_growth", th.NumberType),
+        th.Property("weighted_average_shares_diluted_growth", th.NumberType),
+        th.Property("dividends_per_share_growth", th.NumberType),
+        th.Property("operating_cash_flow_growth", th.NumberType),
+        th.Property("receivables_growth", th.NumberType),
+        th.Property("inventory_growth", th.NumberType),
+        th.Property("asset_growth", th.NumberType),
+        th.Property("book_value_per_share_growth", th.NumberType),
+        th.Property("debt_growth", th.NumberType),
+        th.Property("rd_expense_growth", th.NumberType),
+        th.Property("sga_expenses_growth", th.NumberType),
+        th.Property("free_cash_flow_growth", th.NumberType),
+
+        th.Property("ten_y_revenue_growth_per_share", th.NumberType),
+        th.Property("five_y_revenue_growth_per_share", th.NumberType),
+        th.Property("three_y_revenue_growth_per_share", th.NumberType),
+
+        th.Property("ten_y_operating_cf_growth_per_share", th.NumberType),
+        th.Property("five_y_operating_cf_growth_per_share", th.NumberType),
+        th.Property("three_y_operating_cf_growth_per_share", th.NumberType),
+
+        th.Property("ten_y_net_income_growth_per_share", th.NumberType),
+        th.Property("five_y_net_income_growth_per_share", th.NumberType),
+        th.Property("three_y_net_income_growth_per_share", th.NumberType),
+
+        th.Property("ten_y_shareholders_equity_growth_per_share", th.NumberType),
+        th.Property("five_y_shareholders_equity_growth_per_share", th.NumberType),
+        th.Property("three_y_shareholders_equity_growth_per_share", th.NumberType),
+
+        th.Property("ten_y_dividend_per_share_growth_per_share", th.NumberType),
+        th.Property("five_y_dividend_per_share_growth_per_share", th.NumberType),
+        th.Property("three_y_dividend_per_share_growth_per_share", th.NumberType),
+
+        th.Property("ebitda_growth", th.NumberType),
+        th.Property("growth_capital_expenditure", th.NumberType),
+        th.Property("ten_y_bottom_line_net_income_growth_per_share", th.NumberType),
+        th.Property("five_y_bottom_line_net_income_growth_per_share", th.NumberType),
+        th.Property("three_y_bottom_line_net_income_growth_per_share", th.NumberType),
+    ).to_dict()
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/financial-growth"
+
+    def post_process(self, row: dict, context: Context | None = None) -> Iterable[dict]:
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row)
+
+class FinancialStatementReportDatesStream(SymbolPartitionStream):
+    """Financial statements report dates."""
+    name = "financial_report_dates"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("date", th.DateType),
+        th.Property("period", th.StringType),
+        th.Property("link_xlsx", th.StringType),
+        th.Property("link_json", th.StringType),
+    ).to_dict()
+
+    _add_surrogate_key = True
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/financial-reports-dates"
+
+
+class FinancialReportsForm10kJsonStream(StatementStream):
+    """Financial reports Form 10-K JSON."""
+    name = "financial_reports_form_10k_json"
+
+    schema = th.PropertiesList(
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("period", th.StringType, required=True),
+        th.Property("year", th.StringType, required=True),
+        th.Property("cover_page", th.StringType),
+        th.Property("auditor_information", th.StringType),
+        th.Property("consolidated_statements_of_oper", th.StringType),
+        th.Property("consolidated_statements_of_comp", th.StringType),
+        th.Property("consolidated_balance_sheets", th.StringType),
+        th.Property("consolidated_balance_sheets_parenthetical", th.StringType),
+        th.Property("consolidated_statements_of_shar", th.StringType),
+        th.Property("consolidated_statements_of_cash", th.StringType),
+        th.Property("summary_of_significant_accounting_policies", th.StringType),
+        th.Property("revenue", th.StringType),
+        th.Property("financial_instruments", th.StringType),
+        th.Property("consolidated_financial_statemen", th.StringType),
+        th.Property("income_taxes", th.StringType),
+        th.Property("leases", th.StringType),
+        th.Property("debt", th.StringType),
+        th.Property("shareholders_equity", th.StringType),
+        th.Property("benefit_plans", th.StringType),
+        th.Property("commitments_and_contingencies", th.StringType),
+        th.Property("segment_information_and_geograp", th.StringType),
+        th.Property("summary_of_significant_accoun_2", th.StringType),
+        th.Property("summary_of_significant_accoun_3", th.StringType),
+        th.Property("revenue_tables", th.StringType),
+        th.Property("financial_instruments_tables", th.StringType),
+        th.Property("consolidated_financial_statem_2", th.StringType),
+        th.Property("income_taxes_tables", th.StringType),
+        th.Property("leases_tables", th.StringType),
+        th.Property("debt_tables", th.StringType),
+        th.Property("shareholders_equity_tables", th.StringType),
+        th.Property("benefit_plans_tables", th.StringType),
+        th.Property("commitments_and_contingencies_tables", th.StringType),
+        th.Property("segment_information_and_geogr_2", th.StringType),
+        th.Property("summary_of_significant_accoun_4", th.StringType),
+        th.Property("summary_of_significant_accoun_5", th.StringType),
+        th.Property("revenue_net_sales_disaggregat", th.StringType),
+        th.Property("revenue_additional_informatio", th.StringType),
+        th.Property("revenue_deferred_revenue_exp", th.StringType),
+        th.Property("financial_instruments_cash_c", th.StringType),
+        th.Property("financial_instruments_non_cur", th.StringType),
+        th.Property("financial_instruments_additio", th.StringType),
+        th.Property("financial_instruments_notiona", th.StringType),
+        th.Property("financial_instruments_gross_f", th.StringType),
+        th.Property("financial_instruments_derivat", th.StringType),
+        th.Property("consolidated_financial_statem_3", th.StringType),
+        th.Property("consolidated_financial_statem_4", th.StringType),
+        th.Property("consolidated_financial_statem_5", th.StringType),
+        th.Property("income_taxes_provision_for_in", th.StringType),
+        th.Property("income_taxes_additional_infor", th.StringType),
+        th.Property("income_taxes_reconciliation_o", th.StringType),
+        th.Property("income_taxes_significant_comp", th.StringType),
+        th.Property("income_taxes_aggregate_change", th.StringType),
+        th.Property("leases_additional_information", th.StringType),
+        th.Property("leases_rou_assets_and_lease_l", th.StringType),
+        th.Property("leases_lease_liability_maturi", th.StringType),
+        th.Property("debt_additional_information", th.StringType),
+        th.Property("debt_summary_of_cash_flows_as", th.StringType),
+        th.Property("debt_summary_of_term_debt_de", th.StringType),
+        th.Property("debt_future_principal_payment", th.StringType),
+        th.Property("shareholders_equity_addition", th.StringType),
+        th.Property("shareholders_equity_shares_o", th.StringType),
+        th.Property("benefit_plans_additional_info", th.StringType),
+        th.Property("benefit_plans_restricted_stoc", th.StringType),
+        th.Property("benefit_plans_summary_of_shar", th.StringType),
+        th.Property("commitments_and_contingencies_", th.StringType),
+        th.Property("segment_information_and_geogr_3", th.StringType),
+        th.Property("segment_information_and_geogr_4", th.StringType),
+        th.Property("segment_information_and_geogr_5", th.StringType),
+        th.Property("segment_information_and_geogr_6", th.StringType),
+    ).to_dict()
+
+    @property
+    def partitions(self):
+        query_params = self.config.get(self.name, {}).get("query_params", {})
+        periods = query_params.get("periods")
+        years = query_params.get("years")
+        if periods is None or periods == "*":
+            periods = ["Q1", "Q2", "Q3", "Q4", "FY", "annual", "quarter"]
+        if years is None or years == "*":
+            years = [y + 1 for y in range(2015, datetime.today().date().year)]
+            years = [str(y) for y in years]
+        return [
+            {"symbol": s["symbol"], "period": p}
+            for s in self._tap.get_cached_symbols()
+            for p in periods
+            for y in years
+        ]
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/financial-reports-json"
+
+
+class RevenueProductSegmentationStream(StatementStream):
+    """Revenue product segmentation data."""
+    name = "revenue_product_segmentation"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("date", th.DateType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("fiscal_year", th.IntegerType),
+        th.Property("period", th.StringType),
+        th.Property("reported_currency", th.StringType),
+        th.Property("data", th.StringType),
+    ).to_dict()
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/revenue-product-segmentation"
+
+    def post_process(self, row: dict, context: Context = None) -> dict:
+        if "data" in row:
+            row["data"] = str(row["data"])
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row, context)
+
+
+class RevenueGeographicSegmentationStream(RevenueProductSegmentationStream):
+    """Revenue geographic segmentation data."""
+    name = "revenue_geographic_segmentation"
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/revenue-geographic-segmentation"
+
+class AsReportedIncomeStatementsStream(StatementStream):
+    """As reported income statements."""
+    name = "as_reported_income_statements"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("fiscal_year", th.IntegerType, required=True),
+        th.Property("period", th.StringType, required=True),
+        th.Property("reported_currency", th.StringType),
+        th.Property("date", th.DateType, required=True),
+        th.Property("data", th.StringType)
+    ).to_dict()
+
+    _add_surrogate_key = True
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/income-statement-as-reported"
+
+    def post_process(self, row: dict, context: Context = None) -> dict:
+        if "data" in row:
+            row["data"] = str(row["data"])
+        if "fiscal_year" in row:
+            row["fiscal_year"] = int(row["fiscal_year"])
+        return super().post_process(row, context)
+
+
+class AsReportedBalanceStatementsStream(AsReportedIncomeStatementsStream):
+    """As reported balance statements."""
+    name = "as_reported_balance_statements"
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/balance-sheet-statement-as-reported"
+
+
+class AsReportedCashflowStatementsStream(AsReportedIncomeStatementsStream):
+    """As reported cash flow statements."""
+    name = "as_reported_cashflow_statements"
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/cash-flow-statement-as-reported"
+
+
+class AsReportedFinancialStatementsStream(AsReportedIncomeStatementsStream):
+    """As reported financial statements (all combined)."""
+    name = "as_reported_financial_statements"
+
+    def get_url(self, context: Context):
+        return f"{self.url_base}/stable/financial-statement-full-as-reported"

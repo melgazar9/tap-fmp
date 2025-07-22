@@ -88,10 +88,9 @@ class HistoricalRatingsStream(SymbolPartitionStream):
 
 
 class PriceTargetSummaryStream(SymbolPartitionStream):
-    """Stream for price target summary."""
-
     name = "price_target_summary"
     primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -112,8 +111,7 @@ class PriceTargetSummaryStream(SymbolPartitionStream):
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         row["publishers"] = str(row["publishers"])
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
+        return super().post_process(row, context)
 
 
 class PriceTargetConsensusStream(SymbolPartitionStream):
@@ -121,6 +119,8 @@ class PriceTargetConsensusStream(SymbolPartitionStream):
 
     name = "price_target_consensus"
     primary_keys = ["surrogate_key"]
+
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -134,17 +134,12 @@ class PriceTargetConsensusStream(SymbolPartitionStream):
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/price-target-consensus"
 
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
-
 
 class PriceTargetNewsStream(SymbolPartitionStream):
-    """Stream for price target news."""
-
     name = "price_target_news"
     primary_keys = ["surrogate_key"]
     _paginate = True
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -165,10 +160,9 @@ class PriceTargetNewsStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/price-target-news"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
         row["news_url"] = row.pop("news_u_r_l")
         row["news_base_url"] = row.pop("news_base_u_r_l")
-        return row
+        return super().post_process(row, context)
 
 
 class PriceTargetLatestNewsStream(PriceTargetNewsStream):
@@ -196,12 +190,10 @@ class StockGradesStream(SymbolPartitionStream):
         th.Property("action", th.StringType),
     ).to_dict()
 
+    _add_surrogate_key = True
+
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/grades"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
 
 
 class HistoricalStockGradesStream(SymbolPartitionStream):
@@ -221,12 +213,10 @@ class HistoricalStockGradesStream(SymbolPartitionStream):
         th.Property("analyst_ratings_strong_sell", th.NumberType),
     ).to_dict()
 
+    _add_surrogate_key = True
+
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/grades-historical"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
 
 
 class StockGradesConsensusStream(SymbolPartitionStream):
@@ -246,12 +236,10 @@ class StockGradesConsensusStream(SymbolPartitionStream):
         th.Property("consensus", th.StringType),
     ).to_dict()
 
+    _add_surrogate_key = True
+
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/grades-consensus"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
 
 
 class StockGradeNewsStream(SymbolPartitionStream):
@@ -276,14 +264,15 @@ class StockGradeNewsStream(SymbolPartitionStream):
         th.Property("price_when_posted", th.NumberType),
     ).to_dict()
 
+    _add_surrogate_key = True
+
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/grades-news"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         row["news_base_url"] = row.pop("news_base_u_r_l")
         row["news_url"] = row.pop("news_u_r_l")
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
+        return super().post_process(row, context)
 
 
 class StockGradeLatestNewsStream(StockGradeNewsStream):

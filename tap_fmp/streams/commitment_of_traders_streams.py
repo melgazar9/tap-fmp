@@ -141,12 +141,10 @@ class CotReportStream(SymbolPartitionTimeSliceStream):
         th.Property("contract_units", th.StringType)
     ).to_dict()
 
+    _add_surrogate_key = True
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/commitment-of-traders-report"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
 
 
 class CotAnalysisByDateStream(SymbolPartitionTimeSliceStream):

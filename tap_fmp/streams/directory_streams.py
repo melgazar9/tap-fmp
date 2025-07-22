@@ -183,6 +183,8 @@ class AvailableExchangesStream(FmpRestStream):
         th.Property("delay", th.StringType),
     ).to_dict()
 
+    _add_surrogate_key = True
+
     def get_exchange_list(self) -> list[str] | None:
         """Get a list of selected exchanges from config."""
         exchanges_config = self.config.get("exchanges", {})
@@ -219,10 +221,6 @@ class AvailableExchangesStream(FmpRestStream):
         for record in exchange_records:
             record = self.post_process(record)
             yield record
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
 
 
 class AvailableSectorsStream(FmpRestStream):

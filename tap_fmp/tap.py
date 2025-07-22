@@ -91,6 +91,26 @@ from tap_fmp.streams.market_hours_streams import (
 from tap_fmp.streams.statements_streams import (
     IncomeStatementStream,
     BalanceSheetStream,
+    CashFlowStream,
+    KeyMetricsStream,
+    FinancialRatiosStream,
+    KeyMetricsTtmStream,
+    FinancialRatiosTtmStream,
+    FinancialScoresStream,
+    OwnerEarningsStream,
+    EnterpriseValuesStream,
+    IncomeStatementGrowthStream,
+    BalanceSheetGrowthStream,
+    CashFlowGrowthStream,
+    FinancialStatementReportDatesStream,
+    FinancialReportsForm10kJsonStream,
+    RevenueProductSegmentationStream,
+    RevenueGeographicSegmentationStream,
+    AsReportedIncomeStatementsStream,
+    AsReportedBalanceStatementsStream,
+    AsReportedCashflowStatementsStream,
+    AsReportedFinancialStatementsStream,
+    BalanceSheetTtmStream,
 )
 
 class TapFMP(Tap):
@@ -271,9 +291,28 @@ class TapFMP(Tap):
             AllExchangeMarketHoursStream(self),
 
             ### Statement Streams ###
-
             IncomeStatementStream(self),
             BalanceSheetStream(self),
+            CashFlowStream(self),
+            KeyMetricsStream(self),
+            FinancialRatiosStream(self),
+            KeyMetricsTtmStream(self),
+            FinancialRatiosTtmStream(self),
+            FinancialScoresStream(self),
+            OwnerEarningsStream(self),
+            EnterpriseValuesStream(self),
+            IncomeStatementGrowthStream(self),
+            BalanceSheetGrowthStream(self),
+            CashFlowGrowthStream(self),
+            FinancialStatementReportDatesStream(self),
+            FinancialReportsForm10kJsonStream(self),
+            RevenueProductSegmentationStream(self),
+            RevenueGeographicSegmentationStream(self),
+            AsReportedIncomeStatementsStream(self),
+            AsReportedBalanceStatementsStream(self),
+            AsReportedCashflowStatementsStream(self),
+            AsReportedFinancialStatementsStream(self),
+            BalanceSheetTtmStream(self),
         ]
 
 

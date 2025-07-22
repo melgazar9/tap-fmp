@@ -2,8 +2,7 @@ from tap_fmp.client import SymbolPartitionStream, TimeSliceStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
-from tap_fmp.helpers import generate_surrogate_key
-
+from typing import Generator
 
 class DcfValuationStream(SymbolPartitionStream):
     name = "dcf_valuation"
@@ -81,18 +80,22 @@ class CustomDcfStream(SymbolPartitionStream):
         th.Property("free_cash_flow_t1", th.NumberType),
     ).to_dict()
 
+    _add_surrogate_key = True
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/custom-discounted-cash-flow"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
+        if "costof_debt" in row:
+            row["cost_of_debt"] = row.pop("costof_debt")
+        return super().post_process(row)
 
 
 class CustomDcfLeveredStream(CustomDcfStream):
     name = "custom_dcf_levered"
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("year", th.StringType),
         th.Property("revenue", th.NumberType),

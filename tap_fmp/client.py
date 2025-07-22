@@ -13,13 +13,14 @@ import typing as t
 import logging
 import requests
 from singer_sdk.exceptions import ConfigValidationError
-
+from tap_fmp.helpers import generate_surrogate_key
 
 class FmpRestStream(Stream, ABC):
     """FMP stream class with symbol partitioning support."""
 
     _use_cached_symbols_default = False
     _paginate = False
+    _add_surrogate_key = False
 
     def __init__(self, tap: Tap) -> None:
         super().__init__(tap)
@@ -217,6 +218,11 @@ class FmpRestStream(Stream, ABC):
                 record = self.post_process(record)
                 self._check_missing_fields(self.schema, record)
                 yield record
+    
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        if self._add_surrogate_key:
+            record["surrogate_key"] = generate_surrogate_key(record)
+        return record
 
 
 class SymbolPartitionStream(FmpRestStream):

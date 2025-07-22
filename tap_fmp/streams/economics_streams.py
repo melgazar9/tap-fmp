@@ -8,10 +8,7 @@ from tap_fmp.helpers import generate_surrogate_key
 
 class EconomicsStream(TimeSliceStream):
     primary_keys = ["surrogate_key"]
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["surrogate_key"] = generate_surrogate_key(row)
-        return row
+    _add_surrogate_key = True
 
 
 class TreasuryRatesStream(EconomicsStream):
