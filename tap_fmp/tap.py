@@ -122,7 +122,32 @@ from tap_fmp.streams.statements_streams import (
 #     IndustryPerformanceSummaryStream,
 # )
 
+from tap_fmp.streams.indexes_streams import (
+    IndexListStream,
+    IndexQuoteStream,
+    IndexShortQuoteStream,
+    AllIndexQuotesStream,
+    HistoricalIndexLightChartStream,
+    HistoricalIndexFullChartStream,
+    Index1MinuteIntervalStream,
+    Index5MinuteIntervalStream,
+    Index1HourIntervalStream,
+    SP500ConstituentStream,
+    NasdaqConstituentStream,
+    DowJonesConstituentStream,
+    HistoricalSP500ConstituentStream,
+    HistoricalNasdaqConstituentStream,
+    HistoricalDowJonesConstituentStream,
+)
 
+from tap_fmp.streams.insider_trades_streams import (
+    LatestInsiderTradingStream,
+    SearchInsiderTradesStream,
+    SearchInsiderTradesByReportingNameStream,
+    AllInsiderTransactionTypesStream,
+    InsiderTradeStatisticsStream,
+    AcquisitionOwnershipStream,
+)
 
 class TapFMP(Tap):
     """FMP tap class."""
@@ -324,6 +349,34 @@ class TapFMP(Tap):
             AsReportedCashflowStatementsStream(self),
             AsReportedFinancialStatementsStream(self),
             BalanceSheetTtmStream(self),
+
+            ### Index Streams ###
+
+            IndexListStream(self),
+            IndexQuoteStream(self),
+            IndexShortQuoteStream(self),
+            AllIndexQuotesStream(self),
+            HistoricalIndexLightChartStream(self),
+            HistoricalIndexFullChartStream(self),
+            Index1MinuteIntervalStream(self),
+            Index5MinuteIntervalStream(self),
+            Index1HourIntervalStream(self),
+            SP500ConstituentStream(self),
+            NasdaqConstituentStream(self),
+            DowJonesConstituentStream(self),
+            HistoricalSP500ConstituentStream(self),
+            HistoricalNasdaqConstituentStream(self),
+            HistoricalDowJonesConstituentStream(self),
+
+            ### Insider Trades Streams ###
+
+            LatestInsiderTradingStream(self),
+            SearchInsiderTradesStream(self),
+            SearchInsiderTradesByReportingNameStream(self),
+            AllInsiderTransactionTypesStream(self),
+            InsiderTradeStatisticsStream(self),
+            AcquisitionOwnershipStream(self),
+
         ]
 
 

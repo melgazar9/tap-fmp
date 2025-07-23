@@ -154,7 +154,32 @@ plugins:
 #      - positions_summary.*
 #      - industry_performance_summary.*
 
+      ### Index Streams ###
 
+      - index_list.*
+      - index_quote.*
+      - index_short_quote.*
+#      - all_index_quotes.*
+      - historical_index_light_chart.*
+      - historical_index_full_chart.*
+#      - index_1min.*
+      - index_5min.*
+      - index_1hr.*
+#      - sp500_constituent.*
+#      - nasdaq_constituent.*
+#      - dow_jones_constituent.*
+#      - historical_sp500_constituent.*
+#      - historical_nasdaq_constituent.*
+#      - historical_dow_jones_constituent.*
+
+      ### Insider Trades Streams ###
+
+      - latest_insider_trading.*
+      - insider_trades_search.*
+      - insider_trades_by_reporting_name_search.*
+      - all_insider_transaction_types.*
+      - insider_trade_statistics.*
+      - acquisition_ownership.*
 
     config:
       start_date: '2010-01-01T00:00:00Z'
@@ -292,7 +317,9 @@ plugins:
         query_params:
           period: annual
 
-
+      insider_trades_by_reporting_name_search:
+        query_params:
+          name: "Zuckerberg Mark"
 
   loaders:
   - name: target-jsonl

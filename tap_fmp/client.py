@@ -21,6 +21,7 @@ class FmpRestStream(Stream, ABC):
     _use_cached_symbols_default = False
     _paginate = False
     _add_surrogate_key = False
+    _max_pages = 10000  # prevent infinite loops
 
     def __init__(self, tap: Tap) -> None:
         super().__init__(tap)
@@ -173,11 +174,10 @@ class FmpRestStream(Stream, ABC):
 
     def _handle_pagination(self, url: str, query_params: dict) -> t.Iterable[dict]:
         page = 0
-        max_pages = 10000  # prevent infinite loops
         consecutive_empty_pages = 0
         max_consecutive_empty = 2
 
-        while page < max_pages:
+        while page < self._max_pages:
             records = self._fetch_with_retry(url, query_params, page)
 
             if not isinstance(records, list):
@@ -203,9 +203,9 @@ class FmpRestStream(Stream, ABC):
 
             page += 1
 
-        if page >= max_pages:
+        if page >= self._max_pages:
             self.logger.warning(
-                f"Reached maximum pages ({max_pages}). Some data may be missing."
+                f"Reached maximum pages ({self._max_pages}). Some data may be missing."
             )
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
