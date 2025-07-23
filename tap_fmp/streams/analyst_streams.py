@@ -159,11 +159,6 @@ class PriceTargetNewsStream(SymbolPartitionStream):
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/price-target-news"
 
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["news_url"] = row.pop("news_u_r_l")
-        row["news_base_url"] = row.pop("news_base_u_r_l")
-        return super().post_process(row, context)
-
 
 class PriceTargetLatestNewsStream(PriceTargetNewsStream):
     """Stream for price target latest news."""
@@ -268,11 +263,6 @@ class StockGradeNewsStream(SymbolPartitionStream):
 
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/grades-news"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["news_base_url"] = row.pop("news_base_u_r_l")
-        row["news_url"] = row.pop("news_u_r_l")
-        return super().post_process(row, context)
 
 
 class StockGradeLatestNewsStream(StockGradeNewsStream):

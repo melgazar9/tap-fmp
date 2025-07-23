@@ -266,7 +266,22 @@ plugins:
       financial_ratios:
         query_params:
           limit: 1000
-          periods: ["annual"]
+          period: ["annual"]
+
+      key_metrics:
+        query_params:
+          period: annual
+
+      revenue_product_segmentation:
+        query_params:
+          period:
+            annual
+
+      revenue_geographic_segmentation:
+        query_params:
+          period: annual
+
+
 
   loaders:
   - name: target-jsonl

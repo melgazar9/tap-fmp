@@ -254,6 +254,7 @@ class CompanyShareAndLiquidityFloatStream(CompanySymbolPartitionStream):
         th.Property("free_float", th.NumberType),
         th.Property("float_shares", th.NumberType),
         th.Property("outstanding_shares", th.NumberType),
+        th.Property("source", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
