@@ -145,6 +145,17 @@ plugins:
       - as_reported_cashflow_statements.*
       - as_reported_financial_statements.*
 
+      ### Form 13F Streams ###
+
+#      - institutional_ownership_filings.*
+#      - filings_extract.*
+#      - holder_performance_summary.*
+#      - holder_industry_breakdown.*
+#      - positions_summary.*
+#      - industry_performance_summary.*
+
+
+
     config:
       start_date: '2010-01-01T00:00:00Z'
       api_key: ${FMP_API_KEY}
