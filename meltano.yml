@@ -181,6 +181,20 @@ plugins:
       - insider_trade_statistics.*
       - acquisition_ownership.*
 
+      ### Market Performance Streams ###
+
+      - market_sector_performance_snapshot.*
+      - industry_performance_snapshot.*
+      - historical_sector_performance.*
+      - historical_industry_performance.*
+      - sector_pe_snapshot.*
+      - industry_pe_snapshot.*
+      - historical_sector_pe.*
+      - historical_industry_pe.*
+      - biggest_stock_gainers.*
+      - biggest_stock_losers.*
+      - top_traded_stocks.*
+
     config:
       start_date: '2010-01-01T00:00:00Z'
       api_key: ${FMP_API_KEY}
@@ -320,6 +334,45 @@ plugins:
       insider_trades_by_reporting_name_search:
         query_params:
           name: "Zuckerberg Mark"
+
+
+      ### Market Performance Streams ###
+
+      market_sector_performance_snapshot:
+        other_params:
+          date_range: "2025-05-01, 2025-05-10"
+
+      industry_performance_snapshot:
+        other_params:
+          date_range: "2025-05-01, 2025-05-10"
+
+      sector_pe_snapshot:
+        other_params:
+          date_range: "2025-05-01, 2025-05-10"
+
+      industry_pe_snapshot:
+        other_params:
+          date_range: "2025-05-01, 2025-05-10"
+
+      historical_sector_performance:
+        query_params:
+          from: "2025-01-01"
+          to: "2025-05-01"
+
+      historical_industry_performance:
+        query_params:
+          from: "2025-01-01"
+          to: "2025-05-01"
+
+      historical_sector_pe:
+        query_params:
+          from: "2025-01-01"
+          to: "2025-05-01"
+
+      historical_industry_pe:
+        query_params:
+          from: "2025-01-01"
+          to: "2025-05-01"
 
   loaders:
   - name: target-jsonl

@@ -149,6 +149,20 @@ from tap_fmp.streams.insider_trades_streams import (
     AcquisitionOwnershipStream,
 )
 
+from tap_fmp.streams.market_performance_streams import (
+    MarketSectorPerformanceSnapshotStream,
+    IndustryPerformanceSnapshotStream,
+    HistoricalSectorPerformanceStream,
+    HistoricalIndustryPerformanceStream,
+    SectorPeSnapshotStream,
+    IndustryPeSnapshotStream,
+    HistoricalSectorPeStream,
+    HistoricalIndustryPeStream,
+    BiggestStockGainersStream,
+    BiggestStockLosersStream,
+    TopTradedStocksStream,
+)
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -165,6 +179,53 @@ class TapFMP(Tap):
     _cached_exchanges: t.List[dict] | None = None
     _exchange_stream_instance: AvailableExchangesStream | None = None
     _exchanges_lock = threading.Lock()
+
+    _cached_industries: t.List[dict] | None = None
+    _industry_stream_instance: AvailableIndustriesStream | None = None
+    _industries_lock = threading.Lock()
+
+    _cached_sectors: t.List[dict] | None = None
+    _sector_stream_instance: AvailableSectorsStream | None = None
+    _sectors_lock = threading.Lock()
+
+    def get_cached_sectors(self) -> t.List[dict]:
+        """Thread-safe sector caching for parallel execution."""
+        if self._cached_sectors is None:
+            with self._sectors_lock:
+                if self._cached_sectors is None:
+                    self.logger.info("Fetching and caching sectors...")
+                    sector_stream = self.get_sector_stream()
+                    self._cached_sectors = list(
+                        sector_stream.get_records(context=None)
+                    )
+                    self.logger.info(f"Cached {len(self._cached_sectors)} sectors.")
+        return self._cached_sectors
+
+    def get_sector_stream(self) -> AvailableSectorsStream:
+        if self._sector_stream_instance is None:
+            self.logger.info("Creating AvailableSectorsStream instance...")
+            self._sector_stream_instance = AvailableSectorsStream(self)
+        return self._sector_stream_instance
+
+    def get_cached_industries(self) -> t.List[dict]:
+        """Thread-safe industry caching for parallel execution."""
+        if self._cached_industries is None:
+            with self._industries_lock:
+                if self._cached_industries is None:
+                    self.logger.info("Fetching and caching industries...")
+                    industry_stream = self.get_industry_stream()
+                    self._cached_industries = list(
+                        industry_stream.get_records(context=None)
+                    )
+                    self.logger.info(f"Cached {len(self._cached_industries)} industries.")
+        return self._cached_industries
+
+    def get_industry_stream(self) -> AvailableIndustriesStream:
+        if self._industry_stream_instance is None:
+            self.logger.info("Creating AvailableIndustriesStream instance...")
+            self._industry_stream_instance = AvailableIndustriesStream(self)
+        return self._industry_stream_instance
+
 
     config_jsonschema = th.PropertiesList(
         th.Property(
@@ -376,6 +437,20 @@ class TapFMP(Tap):
             AllInsiderTransactionTypesStream(self),
             InsiderTradeStatisticsStream(self),
             AcquisitionOwnershipStream(self),
+
+            ### Market Sector Performance Streams ###
+
+            MarketSectorPerformanceSnapshotStream(self),
+            IndustryPerformanceSnapshotStream(self),
+            HistoricalSectorPerformanceStream(self),
+            HistoricalIndustryPerformanceStream(self),
+            SectorPeSnapshotStream(self),
+            IndustryPeSnapshotStream(self),
+            HistoricalSectorPeStream(self),
+            HistoricalIndustryPeStream(self),
+            BiggestStockGainersStream(self),
+            BiggestStockLosersStream(self),
+            TopTradedStocksStream(self),
 
         ]
 
