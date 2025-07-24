@@ -195,6 +195,19 @@ plugins:
       - biggest_stock_losers.*
       - top_traded_stocks.*
 
+      ### Commodity Streams ###
+
+      - commodities_list.*
+      - commodities_quote.*
+      - commodities_quote_short.*
+#      - all_commodities_quotes.*
+      - commodities_light_chart.*
+      - commodities_full_chart.*
+#      - commodities_1min.*
+      - commodities_5min.*
+      - commodities_1hr.*
+
+
     config:
       start_date: '2010-01-01T00:00:00Z'
       api_key: ${FMP_API_KEY}
@@ -373,6 +386,50 @@ plugins:
         query_params:
           from: "2025-01-01"
           to: "2025-05-01"
+
+      ### Commodity Streams ###
+
+      commodities_quote:
+        query_params:
+          symbol: GCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      commodities_quote_short:
+        query_params:
+          symbol: GCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      commodities_light_chart:
+        query_params:
+          symbol: GCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      commodities_full_chart:
+        query_params:
+          symbol: GCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      commodities_1min:
+        query_params:
+          symbol: GCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      commodities_5min:
+        query_params:
+          symbol: GCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      commodities_1hr:
+        query_params:
+          symbol: GCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
 
   loaders:
   - name: target-jsonl

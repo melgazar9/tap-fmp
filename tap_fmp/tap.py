@@ -163,6 +163,18 @@ from tap_fmp.streams.market_performance_streams import (
     TopTradedStocksStream,
 )
 
+from tap_fmp.streams.commodity_streams import (
+    CommoditiesListStream,
+    CommoditiesQuoteStream,
+    CommoditiesQuoteShortStream,
+    AllCommoditiesQuotesStream,
+    CommoditiesLightChartStream,
+    CommoditiesFullChartStream,
+    Commodities1minStream,
+    Commodities5minStream,
+    Commodities1HrStream,
+)
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -187,6 +199,30 @@ class TapFMP(Tap):
     _cached_sectors: t.List[dict] | None = None
     _sector_stream_instance: AvailableSectorsStream | None = None
     _sectors_lock = threading.Lock()
+
+    _cached_commodities: t.List[dict] | None = None
+    _commodity_stream_instance: CommoditiesListStream | None = None
+    _commodities_lock = threading.Lock()
+
+    def get_cached_commodities(self) -> t.List[dict]:
+        """Thread-safe commodity caching for parallel execution."""
+        if self._cached_commodities is None:
+            with self._commodities_lock:
+                if self._cached_commodities is None:
+                    self.logger.info("Fetching and caching commodities...")
+                    commodity_stream = self.get_commodity_stream()
+                    self._cached_commodities = list(
+                        commodity_stream.get_records(context=None)
+                    )
+                    self.logger.info(f"Cached {len(self._cached_commodities)} commodities.")
+        return self._cached_commodities
+
+    def get_commodity_stream(self) -> CommoditiesListStream:
+        if self._commodity_stream_instance is None:
+            self.logger.info("Creating CommoditiesListStream instance...")
+            self._commodity_stream_instance = CommoditiesListStream(self)
+        return self._commodity_stream_instance
+
 
     def get_cached_sectors(self) -> t.List[dict]:
         """Thread-safe sector caching for parallel execution."""
@@ -451,6 +487,18 @@ class TapFMP(Tap):
             BiggestStockGainersStream(self),
             BiggestStockLosersStream(self),
             TopTradedStocksStream(self),
+
+            ### Commodity Streams ###
+
+            CommoditiesListStream(self),
+            CommoditiesQuoteStream(self),
+            CommoditiesQuoteShortStream(self),
+            AllCommoditiesQuotesStream(self),
+            CommoditiesLightChartStream(self),
+            CommoditiesFullChartStream(self),
+            Commodities1minStream(self),
+            Commodities5minStream(self),
+            Commodities1HrStream(self),
 
         ]
 

@@ -109,7 +109,7 @@ class FmpRestStream(Stream, ABC):
         if self.replication_method == "INCREMENTAL":
             state = self.get_context_state(context)
             if state.get("replication_key_value"):
-                return state["starting_replication_value"]
+                return state["replication_key_value"]
             elif state.get("starting_replication_value"):
                 return state["starting_replication_value"]
             else:
