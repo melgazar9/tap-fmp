@@ -11,7 +11,7 @@ class ChartLightStream(SymbolPartitionTimeSliceStream):
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("price", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
@@ -29,7 +29,7 @@ class PriceVolumeStream(SymbolPartitionTimeSliceStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
         th.Property("change", th.NumberType),
         th.Property("change_percent", th.NumberType),
         th.Property("vwap", th.NumberType),
@@ -58,7 +58,7 @@ class UnadjustedPriceStream(SymbolPartitionTimeSliceStream):
         th.Property("adj_high", th.NumberType),
         th.Property("adj_low", th.NumberType),
         th.Property("adj_close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
@@ -84,7 +84,7 @@ class DividendAdjustedPriceStream(SymbolPartitionTimeSliceStream):
         th.Property("adj_high", th.NumberType),
         th.Property("adj_low", th.NumberType),
         th.Property("adj_close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
@@ -103,7 +103,7 @@ class Prices1minStream(SymbolPartitionTimeSliceStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):

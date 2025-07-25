@@ -175,6 +175,37 @@ from tap_fmp.streams.commodity_streams import (
     Commodities1HrStream,
 )
 
+from tap_fmp.streams.fundraisers_streams import (
+    LatestCrowdfundingCampaignsStream,
+    CrowdfundingByCikStream,
+    EquityOfferingUpdatesStream,
+    EquityOfferingByCikStream,
+)
+
+from tap_fmp.streams.crypto_streams import (
+    CryptoListStream,
+    FullCryptoQuoteStream,
+    CryptoQuoteShortStream,
+    AllCryptoQuotesStream,
+    HistoricalCryptoLightChartStream,
+    HistoricalCryptoFullChartStream,
+    Crypto1minStream,
+    Crypto5minStream,
+    Crypto1HrStream,
+)
+
+from tap_fmp.streams.forex_streams import (
+    ForexPairsStream,
+    ForexQuoteStream,
+    ForexQuoteShortStream,
+    BatchForexQuotesStream,
+    ForexLightChartStream,
+    ForexFullChartStream,
+    Forex1minStream,
+    Forex5minStream,
+    Forex1HrStream,
+)
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -203,6 +234,52 @@ class TapFMP(Tap):
     _cached_commodities: t.List[dict] | None = None
     _commodity_stream_instance: CommoditiesListStream | None = None
     _commodities_lock = threading.Lock()
+
+    _cached_crypto_symbols: t.List[dict] | None = None
+    _crypto_stream_instance: CryptoListStream | None = None
+    _crypto_lock = threading.Lock()
+
+    _cached_forex_pairs: t.List[dict] | None = None
+    _forex_stream_instance: ForexPairsStream | None = None
+    _forex_lock = threading.Lock()
+
+    def get_cached_forex_pairs(self) -> t.List[dict]:
+        """Thread-safe forex caching for parallel execution."""
+        if self._cached_forex_pairs is None:
+            with self._forex_lock:
+                if self._cached_forex_pairs is None:
+                    self.logger.info("Fetching and caching forex pairs...")
+                    forex_stream = self.get_forex_stream()
+                    self._cached_forex_pairs = list(
+                        forex_stream.get_records(context=None)
+                    )
+                    self.logger.info(f"Cached {len(self._cached_forex_pairs)} forex pairs.")
+        return self._cached_forex_pairs
+
+    def get_forex_stream(self) -> ForexPairsStream:
+        if self._forex_stream_instance is None:
+            self.logger.info("Creating ForexCurrencyPairsStream instance...")
+            self._forex_stream_instance = ForexPairsStream(self)
+        return self._forex_stream_instance
+
+    def get_cached_crypto_symbols(self) -> t.List[dict]:
+        """Thread-safe crypto caching for parallel execution."""
+        if self._cached_crypto_symbols is None:
+            with self._crypto_lock:
+                if self._cached_crypto_symbols is None:
+                    self.logger.info("Fetching and caching crypto...")
+                    crypto_stream = self.get_crypto_stream()
+                    self._cached_crypto_symbols = list(
+                        crypto_stream.get_records(context=None)
+                    )
+                    self.logger.info(f"Cached {len(self._cached_crypto_symbols)} crypto.")
+        return self._cached_crypto_symbols
+
+    def get_crypto_stream(self) -> CryptoListStream:
+        if self._crypto_stream_instance is None:
+            self.logger.info("Creating CryptoListStream instance...")
+            self._crypto_stream_instance = CryptoListStream(self)
+        return self._crypto_stream_instance
 
     def get_cached_commodities(self) -> t.List[dict]:
         """Thread-safe commodity caching for parallel execution."""
@@ -285,7 +362,6 @@ class TapFMP(Tap):
     def get_cached_symbols(self) -> t.List[dict]:
         """Thread-safe symbol caching for parallel execution."""
         if self._cached_symbols is None:
-            # prevent race conditions if running in parallel
             with self._symbols_lock:
                 if self._cached_symbols is None:
                     self.logger.info("Fetching and caching symbols...")
@@ -305,7 +381,6 @@ class TapFMP(Tap):
     def get_cached_ciks(self) -> t.List[dict]:
         """Thread-safe CIK caching for parallel execution."""
         if self._cached_ciks is None:
-            # prevent race conditions if running in parallel
             with self._ciks_lock:
                 if self._cached_ciks is None:
                     self.logger.info("Fetching and caching CIKs...")
@@ -323,7 +398,6 @@ class TapFMP(Tap):
     def get_cached_exchanges(self) -> t.List[dict]:
         """Thread-safe exchange caching for parallel execution."""
         if self._cached_exchanges is None:
-            # prevent race conditions if running in parallel
             with self._exchanges_lock:
                 if self._cached_exchanges is None:
                     self.logger.info("Fetching and caching exchanges...")
@@ -500,6 +574,36 @@ class TapFMP(Tap):
             Commodities5minStream(self),
             Commodities1HrStream(self),
 
+            ### Fundraiser Streams ###
+
+            LatestCrowdfundingCampaignsStream(self),
+            CrowdfundingByCikStream(self),
+            EquityOfferingUpdatesStream(self),
+            EquityOfferingByCikStream(self),
+
+            ### Crypto Streams ###
+
+            CryptoListStream(self),
+            FullCryptoQuoteStream(self),
+            CryptoQuoteShortStream(self),
+            AllCryptoQuotesStream(self),
+            HistoricalCryptoLightChartStream(self),
+            HistoricalCryptoFullChartStream(self),
+            Crypto1minStream(self),
+            Crypto5minStream(self),
+            Crypto1HrStream(self),
+
+            ### Forex Streams ###
+
+            ForexPairsStream(self),
+            ForexQuoteStream(self),
+            ForexQuoteShortStream(self),
+            BatchForexQuotesStream(self),
+            ForexLightChartStream(self),
+            ForexFullChartStream(self),
+            Forex1minStream(self),
+            Forex5minStream(self),
+            Forex1HrStream(self),
         ]
 
 

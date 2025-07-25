@@ -41,7 +41,6 @@ class CommodityPriceMixin(FmpRestStream):
         query_params_symbol = self.query_params.get("symbol")
         other_params_symbols = self.config.get("other_params", {}).get("symbols")
 
-        # Validation: can't specify symbols in both places
         assert not (query_params_symbol and other_params_symbols), (
             f"Cannot specify symbol configurations in both query_params and "
             f"other_params for stream {self.name}."
@@ -52,12 +51,12 @@ class CommodityPriceMixin(FmpRestStream):
         elif other_params_symbols:
             return [{"symbol": symbol} for symbol in other_params_symbols] if isinstance(other_params_symbols, list) else other_params_symbols
         else:
-            return [{"symbol": commodity_json.get("symbol")} for commodity_json in self._tap.get_cached_commodities()]
+            return [{"symbol": c.get("symbol")} for c in self._tap.get_cached_commodities()]
 
 class CommoditiesQuoteStream(CommodityPriceMixin, CommodityPartitionStream):
     """Stream for Commodities Quote API."""
     
-    name = "commodities_quote"
+    name = "commodities_quotes"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
     

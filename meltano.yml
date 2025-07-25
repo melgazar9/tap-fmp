@@ -207,6 +207,37 @@ plugins:
       - commodities_5min.*
       - commodities_1hr.*
 
+      ### Fundraiser Streams ###
+
+      - latest_crowdfunding_campaigns.*
+      - crowdfunding_by_cik.*
+      - equity_offering_updates.*
+      - equity_offering_by_cik.*
+
+      ### Crypto Streams ###
+
+      - crypto_list.*
+      - full_crypto_quote.*
+      - crypto_quote_short.*
+#      - all_crypto_quotes.*
+      - historical_crypto_light_chart.*
+      - historical_crypto_full_chart.*
+#      - crypto_1min.*
+      - crypto_5min.*
+      - crypto_1hr.*
+
+      ### Forex Streams ###
+
+      - forex_pairs.*
+      - forex_quote.*
+      - forex_quote_short.*
+#      - batch_forex_quotes.*
+      - forex_light_chart.*
+      - forex_full_chart.*
+#      - forex_1min.*
+      - forex_5min.*
+      - forex_1hr.*
+
 
     config:
       start_date: '2010-01-01T00:00:00Z'
@@ -389,7 +420,7 @@ plugins:
 
       ### Commodity Streams ###
 
-      commodities_quote:
+      commodities_quotes:
         query_params:
           symbol: GCUSD
           from: "2025-01-02"
@@ -430,6 +461,116 @@ plugins:
           symbol: GCUSD
           from: "2025-01-02"
           to: "2025-01-10"
+
+      ### Fundraiser Streams ###
+
+      latest_crowdfunding_campaigns:
+        query_params:
+          limit: 100
+
+      equity_offering_updates:
+        query_params:
+          limit: 100
+
+      ### Crypto Streams ###
+
+      crypto_1min:
+        query_params:
+          symbol: BTCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      crypto_5min:
+        query_params:
+          symbol: BTCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      crypto_1hr:
+        query_params:
+          symbol: BTCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      crypto_quotes:
+        query_params:
+          symbol: BTCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      crypto_quotes_short:
+        query_params:
+          symbol: BTCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      historical_crypto_light_chart:
+        query_params:
+          symbol: BTCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      historical_crypto_full_chart:
+        query_params:
+          symbol: BTCUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      ### Forex Streams ###
+
+      forex_1min:
+        query_params:
+          symbol: EURUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      forex_5min:
+        query_params:
+          symbol: EURUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      forex_1hr:
+        query_params:
+          symbol: EURUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      forex_quotes:
+        query_params:
+          symbol: EURUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      forex_quotes_short:
+        query_params:
+          symbol: EURUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      forex_light_chart:
+        query_params:
+          symbol: EURUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
+
+      forex_full_chart:
+        query_params:
+          symbol: EURUSD
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 100
 
   loaders:
   - name: target-jsonl
