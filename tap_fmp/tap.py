@@ -240,6 +240,21 @@ from tap_fmp.streams.senate_streams import (
     HouseTradesByNameStream,
 )
 
+from tap_fmp.streams.sec_filings_streams import (
+    Latest8KFilingsStream,
+    LatestSecFilingsStream,
+    SecFilingsByFormTypeStream,
+    SecFilingsBySymbolStream,
+    SecFilingsByCikStream,
+    SecFilingsByNameStream,
+    SecFilingsCompanySearchBySymbolStream,
+    SecFilingsCompanySearchByCikStream,
+    SecCompanyFullProfileStream,
+    IndustryClassificationListStream,
+    IndustryClassificationSearchStream,
+    AllIndustryClassificationStream,
+)
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -672,6 +687,21 @@ class TapFMP(Tap):
             SenateTradesByNameStream(self),
             HouseTradesStream(self),
             HouseTradesByNameStream(self),
+
+            ### SEC Filings Streams ###
+
+            Latest8KFilingsStream(self),
+            LatestSecFilingsStream(self),
+            SecFilingsByFormTypeStream(self),
+            SecFilingsBySymbolStream(self),
+            SecFilingsByCikStream(self),
+            SecFilingsByNameStream(self),
+            SecFilingsCompanySearchBySymbolStream(self),
+            SecFilingsCompanySearchByCikStream(self),
+            SecCompanyFullProfileStream(self),
+            IndustryClassificationListStream(self),
+            IndustryClassificationSearchStream(self),
+            AllIndustryClassificationStream(self),
         ]
 
 

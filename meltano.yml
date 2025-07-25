@@ -272,6 +272,22 @@ plugins:
       - house_trades.*
       - house_trades_by_name.*
 
+      ### SEC Filings Streams ###
+
+      - latest_8k_filings.*
+      - latest_sec_filings.*
+      - sec_filings_by_form_type.*
+      - sec_filings_by_symbol.*
+      - sec_filings_by_cik.*
+      - sec_filings_by_name.*
+      - sec_filings_company_search_by_symbol.*
+      - sec_filings_company_search_by_cik.*
+      - sec_company_full_profile.*
+      - industry_classification_list.*
+      - industry_classification_search.*
+      - all_industry_classification.*
+
+
     config:
       start_date: '2010-01-01T00:00:00Z'
       api_key: ${FMP_API_KEY}
@@ -733,6 +749,40 @@ plugins:
       latest_house_disclosures:
         query_params:
           limit: 250
+
+      ### SEC Filings Streams ###
+
+      latest_8k_filings:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-10"
+          limit: 1000
+        other_params:
+          max_records_per_request: 1000
+
+      sec_filings_by_form_type:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-10"
+        other_params:
+          form_types: [ "10-K", "10-Q", "8-K" ]
+
+      sec_filings_by_symbol:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      sec_filings_by_cik:
+        query_params:
+          cik: "0000320193"  # Apple
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      latest_sec_filings:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-10"
+
 
   loaders:
   - name: target-jsonl
