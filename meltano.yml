@@ -263,6 +263,14 @@ plugins:
       - williams.*
       - average_directional_index.*
 
+      ### Senate Streams ###
+
+      - latest_senate_disclosures.*
+      - latest_house_disclosures.*
+      - senate_trading_activity.*
+      - senate_trades_by_name.*
+      - house_trades.*
+      - house_trades_by_name.*
 
     config:
       start_date: '2010-01-01T00:00:00Z'
@@ -715,6 +723,16 @@ plugins:
           to: "2025-01-03"
         other_params:
           timeframes: "5min,1hour"
+
+      ### Senate Streams ###
+
+      latest_senate_disclosures:
+        query_params:
+          limit: 250
+
+      latest_house_disclosures:
+        query_params:
+          limit: 250
 
   loaders:
   - name: target-jsonl

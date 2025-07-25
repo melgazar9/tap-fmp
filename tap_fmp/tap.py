@@ -231,6 +231,15 @@ from tap_fmp.streams.technical_indicators_streams import (
     AverageDirectionalIndexStream,
 )
 
+from tap_fmp.streams.senate_streams import (
+    LatestSenateDisclosuresStream,
+    LatestHouseDisclosuresStream,
+    SenateTradingActivityStream,
+    SenateTradesByNameStream,
+    HouseTradesStream,
+    HouseTradesByNameStream,
+)
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -655,6 +664,14 @@ class TapFMP(Tap):
             WilliamsStream(self),
             AverageDirectionalIndexStream(self),
 
+            ### Senate Streams ###
+
+            LatestSenateDisclosuresStream(self),
+            LatestHouseDisclosuresStream(self),
+            SenateTradingActivityStream(self),
+            SenateTradesByNameStream(self),
+            HouseTradesStream(self),
+            HouseTradesByNameStream(self),
         ]
 
 
