@@ -251,6 +251,18 @@ plugins:
       - search_crypto_news.*
       - search_forex_news.*
 
+      ### Technical Indicator Streams ###
+
+      - simple_moving_average.*
+      - exponential_moving_average.*
+      - weighted_moving_average.*
+      - double_exponential_moving_average.*
+      - triple_exponential_moving_average.*
+      - relative_strength_index.*
+      - standard_deviation.*
+      - williams.*
+      - average_directional_index.*
+
 
     config:
       start_date: '2010-01-01T00:00:00Z'
@@ -629,6 +641,80 @@ plugins:
           symbols: "EURUSD"
           from: "2025-01-02"
           to: "2025-01-03"
+
+      ### Technical Indicator Streams ###
+
+      simple_moving_average:
+        query_params:
+          periodLength: 10
+          from: "2025-01-02"
+          to: "2025-01-03"
+        other_params:
+          timeframes: "5min,1hour"
+
+      exponential_moving_average:
+        query_params:
+          periodLength: 10
+          from: "2025-01-02"
+          to: "2025-01-03"
+        other_params:
+          timeframes: "5min,1hour"
+
+      weighted_moving_average:
+        query_params:
+          periodLength: 10
+          from: "2025-01-02"
+          to: "2025-01-03"
+        other_params:
+          timeframes: "5min,1hour"
+
+      double_exponential_moving_average:
+        query_params:
+          periodLength: 10
+          from: "2025-01-02"
+          to: "2025-01-03"
+        other_params:
+          timeframes: "5min,1hour"
+
+      triple_exponential_moving_average:
+        query_params:
+          periodLength: 10
+          from: "2025-01-02"
+          to: "2025-01-03"
+        other_params:
+          timeframes: "5min,1hour"
+
+      relative_strength_index:
+        query_params:
+          periodLength: 10
+          from: "2025-01-02"
+          to: "2025-01-03"
+        other_params:
+          timeframes: "5min,1hour"
+
+      standard_deviation:
+        query_params:
+          periodLength: 10
+          from: "2025-01-02"
+          to: "2025-01-03"
+        other_params:
+          timeframes: "5min,1hour"
+
+      williams:
+        query_params:
+          periodLength: 10
+          from: "2025-01-02"
+          to: "2025-01-03"
+        other_params:
+          timeframes: "5min,1hour"
+
+      average_directional_index:
+        query_params:
+          periodLength: 10
+          from: "2025-01-02"
+          to: "2025-01-03"
+        other_params:
+          timeframes: "5min,1hour"
 
   loaders:
   - name: target-jsonl

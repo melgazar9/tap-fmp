@@ -219,6 +219,18 @@ from tap_fmp.streams.news_streams import (
     SearchForexNewsStream,
 )
 
+from tap_fmp.streams.technical_indicators_streams import (
+    SimpleMovingAverageStream,
+    ExponentialMovingAverageStream,
+    WeightedMovingAverageStream,
+    DoubleExponentialMovingAverageStream,
+    TripleExponentialMovingAverageStream,
+    RelativeStrengthIndexStream,
+    StandardDeviationStream,
+    WilliamsStream,
+    AverageDirectionalIndexStream,
+)
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -630,6 +642,18 @@ class TapFMP(Tap):
             SearchStockNewsStream(self),
             SearchCryptoNewsStream(self),
             SearchForexNewsStream(self),
+
+            ### Technical Indicator Streams ###
+
+            SimpleMovingAverageStream(self),
+            ExponentialMovingAverageStream(self),
+            WeightedMovingAverageStream(self),
+            DoubleExponentialMovingAverageStream(self),
+            TripleExponentialMovingAverageStream(self),
+            RelativeStrengthIndexStream(self),
+            StandardDeviationStream(self),
+            WilliamsStream(self),
+            AverageDirectionalIndexStream(self),
 
         ]
 
