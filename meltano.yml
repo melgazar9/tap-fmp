@@ -238,6 +238,19 @@ plugins:
       - forex_5min.*
       - forex_1hr.*
 
+      ### News Streams ###
+
+      - fmp_articles.*
+      - general_news.*
+#      - press_releases.*
+      - stock_news.*
+      - crypto_news.*
+      - forex_news.*
+#      - search_press_releases.*
+      - search_stock_news.*
+      - search_crypto_news.*
+      - search_forex_news.*
+
 
     config:
       start_date: '2010-01-01T00:00:00Z'
@@ -571,6 +584,51 @@ plugins:
           from: "2025-01-02"
           to: "2025-01-10"
           limit: 100
+
+      ### News Streams ###
+
+      fmp_articles:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-03"
+
+      general_news:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-03"
+
+      stock_news:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-03"
+
+      crypto_news:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-03"
+
+      forex_news:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-03"
+
+      search_stock_news:
+        query_params:
+          symbols: "AAPL,META"
+          from: "2025-01-02"
+          to: "2025-01-03"
+
+      search_crypto_news:
+        query_params:
+          symbols: "BTCUSD,ETHUSD"
+          from: "2025-01-02"
+          to: "2025-01-03"
+
+      search_forex_news:
+        query_params:
+          symbols: "EURUSD"
+          from: "2025-01-02"
+          to: "2025-01-03"
 
   loaders:
   - name: target-jsonl

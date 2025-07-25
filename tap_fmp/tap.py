@@ -206,6 +206,19 @@ from tap_fmp.streams.forex_streams import (
     Forex1HrStream,
 )
 
+from tap_fmp.streams.news_streams import (
+    FmpArticlesStream,
+    GeneralNewsStream,
+    PressReleasesStream,
+    StockNewsStream,
+    CryptoNewsStream,
+    ForexNewsStream,
+    SearchPressReleasesStream,
+    SearchStockNewsStream,
+    SearchCryptoNewsStream,
+    SearchForexNewsStream,
+)
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -604,6 +617,20 @@ class TapFMP(Tap):
             Forex1minStream(self),
             Forex5minStream(self),
             Forex1HrStream(self),
+
+            ### News Streams ###
+
+            FmpArticlesStream(self),
+            GeneralNewsStream(self),
+            PressReleasesStream(self),
+            StockNewsStream(self),
+            CryptoNewsStream(self),
+            ForexNewsStream(self),
+            SearchPressReleasesStream(self),
+            SearchStockNewsStream(self),
+            SearchCryptoNewsStream(self),
+            SearchForexNewsStream(self),
+
         ]
 
 
