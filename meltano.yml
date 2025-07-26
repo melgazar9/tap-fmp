@@ -520,6 +520,8 @@ plugins:
       equity_offering_updates:
         query_params:
           limit: 100
+        other_params:
+          use_cached_ciks: true
 
       ### Crypto Streams ###
 

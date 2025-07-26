@@ -48,7 +48,7 @@ class LatestCrowdfundingCampaignsStream(FmpRestStream):
         th.Property("over_subscription_allocation_type", th.StringType),
         th.Property("maximum_offering_amount", th.NumberType),
         th.Property("offering_deadline_date", th.StringType),
-        th.Property("current_number_of_employees", th.IntegerType),
+        th.Property("current_number_of_employees", th.NumberType),
         th.Property("total_asset_most_recent_fiscal_year", th.NumberType),
         th.Property("total_asset_prior_fiscal_year", th.NumberType),
         th.Property("cash_and_cash_equi_valent_most_recent_fiscal_year", th.NumberType),
@@ -133,7 +133,7 @@ class CrowdfundingByCikStream(FmpRestStream):
         th.Property("over_subscription_allocation_type", th.StringType),
         th.Property("maximum_offering_amount", th.NumberType),
         th.Property("offering_deadline_date", th.StringType),
-        th.Property("current_number_of_employees", th.IntegerType),
+        th.Property("current_number_of_employees", th.NumberType),
         th.Property("total_asset_most_recent_fiscal_year", th.NumberType),
         th.Property("total_asset_prior_fiscal_year", th.NumberType),
         th.Property("cash_and_cash_equi_valent_most_recent_fiscal_year", th.NumberType),
@@ -223,6 +223,17 @@ class EquityOfferingUpdatesStream(FmpRestStream):
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/fundraising-latest"
+
+    @property
+    def partitions(self):
+        if self.config.get(self.name, {}).get("other_params", {}).get("use_cached_ciks"):
+            return [{"cik": c["cik"]} for c in self._tap.get_cached_ciks()]
+        return {}
+
+    def get_records(self, context: Context | None):
+        if context:
+            self.query_params.update(context)
+        return super().get_records(context)
 
 
 # class EquityOfferingSearchStream(FmpRestStream):

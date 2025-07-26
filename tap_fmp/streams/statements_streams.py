@@ -649,51 +649,17 @@ class KeyMetricsTtmStream(TtmStream):
         th.Property("free_cash_flow_to_firm_ttm", th.NumberType),
         th.Property("tangible_asset_value_ttm", th.NumberType),
         th.Property("net_current_asset_value_ttm", th.NumberType),
-        th.Property("enterprise_value_ttm", th.NumberType),
-        th.Property("ev_to_salesttm", th.NumberType),
-        th.Property("ev_to_operating_cash_flowttm", th.NumberType),
-        th.Property("ev_to_free_cash_flowttm", th.NumberType),
-        th.Property("ev_toebitdattm", th.NumberType),
-        th.Property("net_debt_toebitdattm", th.NumberType),
-        th.Property("current_ratiottm", th.NumberType),
-        th.Property("income_qualityttm", th.NumberType),
-        th.Property("graham_numberttm", th.NumberType),
-        th.Property("graham_net_netttm", th.NumberType),
-        th.Property("tax_burdenttm", th.NumberType),
-        th.Property("interest_burdenttm", th.NumberType),
-        th.Property("working_capitalttm", th.NumberType),
-        th.Property("invested_capitalttm", th.NumberType),
-        th.Property("return_on_assetsttm", th.NumberType),
-        th.Property("operating_return_on_assetsttm", th.NumberType),
-        th.Property("return_on_tangible_assetsttm", th.NumberType),
-        th.Property("return_on_equityttm", th.NumberType),
-        th.Property("return_on_invested_capitalttm", th.NumberType),
-        th.Property("return_on_capital_employedttm", th.NumberType),
-        th.Property("earnings_yieldttm", th.NumberType),
-        th.Property("free_cash_flow_yieldttm", th.NumberType),
-        th.Property("capex_to_operating_cash_flowttm", th.NumberType),
-        th.Property("capex_to_depreciationttm", th.NumberType),
-        th.Property("capex_to_revenuettm", th.NumberType),
-        th.Property("sales_general_and_administrative_to_revenuettm", th.NumberType),
-        th.Property("research_and_developement_to_revenuettm", th.NumberType),
-        th.Property("stock_based_compensation_to_revenuettm", th.NumberType),
-        th.Property("intangibles_to_total_assetsttm", th.NumberType),
-        th.Property("average_receivablesttm", th.NumberType),
-        th.Property("average_payablesttm", th.NumberType),
-        th.Property("average_inventoryttm", th.NumberType),
-        th.Property("days_of_sales_outstandingttm", th.NumberType),
-        th.Property("days_of_payables_outstandingttm", th.NumberType),
-        th.Property("days_of_inventory_outstandingttm", th.NumberType),
-        th.Property("operating_cyclettm", th.NumberType),
-        th.Property("cash_conversion_cyclettm", th.NumberType),
-        th.Property("free_cash_flow_to_equityttm", th.NumberType),
-        th.Property("free_cash_flow_to_firmttm", th.NumberType),
-        th.Property("tangible_asset_value_ttm", th.NumberType),
-        th.Property("net_current_asset_value_ttm", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/key-metrics-ttm"
+
+    def post_process(self, row: dict, context: Context = None) -> dict:
+        row = {
+            (k[:-3].rstrip('_') + '_ttm') if (k.lower().endswith('ttm') and not k.lower().endswith('_ttm')) else k: v
+            for k, v in row.items()
+        }
+        return super().post_process(row, context)
 
 
 class FinancialRatiosTtmStream(TtmStream):
