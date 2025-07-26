@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream, TimeSliceStream
+from tap_fmp.client import FmpRestStream, TimeSliceStream
 
 
 class BaseNewsTimeSliceStream(TimeSliceStream):

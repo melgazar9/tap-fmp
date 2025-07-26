@@ -6,7 +6,9 @@ import typing as t
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 from datetime import datetime
+
 from tap_fmp.client import FmpRestStream, SymbolPartitionStream
+
 
 class StatementStream(FmpRestStream):
     primary_keys = ["surrogate_key"]
