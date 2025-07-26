@@ -3,14 +3,10 @@
 from __future__ import annotations
 
 import typing as t
-from typing import Iterable
-
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 from datetime import datetime
-
 from tap_fmp.client import FmpRestStream, SymbolPartitionStream
-
 
 class StatementStream(FmpRestStream):
     primary_keys = ["surrogate_key"]
@@ -37,6 +33,7 @@ class StatementStream(FmpRestStream):
             row["fiscal_year"] = int(row["fiscal_year"])
         return super().post_process(row, context)
 
+
 class TtmStream(SymbolPartitionStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -45,6 +42,7 @@ class TtmStream(SymbolPartitionStream):
         if "fiscal_year" in row:
             row["fiscal_year"] = int(row["fiscal_year"])
         return super().post_process(row, context)
+
 
 class IncomeStatementStream(StatementStream):
     name = "income_statement"
@@ -94,6 +92,7 @@ class IncomeStatementStream(StatementStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/income-statement"
+
 
 class BalanceSheetStream(StatementStream):
     name = "balance_sheet"
@@ -180,7 +179,6 @@ class CashFlowStream(StatementStream):
         th.Property("accepted_date", th.DateTimeType),
         th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
-
         th.Property("net_income", th.NumberType),
         th.Property("depreciation_and_amortization", th.NumberType),
         th.Property("deferred_income_tax", th.NumberType),
@@ -192,14 +190,12 @@ class CashFlowStream(StatementStream):
         th.Property("other_working_capital", th.NumberType),
         th.Property("other_non_cash_items", th.NumberType),
         th.Property("net_cash_provided_by_operating_activities", th.NumberType),
-
         th.Property("investments_in_property_plant_and_equipment", th.NumberType),
         th.Property("acquisitions_net", th.NumberType),
         th.Property("purchases_of_investments", th.NumberType),
         th.Property("sales_maturities_of_investments", th.NumberType),
         th.Property("other_investing_activities", th.NumberType),
         th.Property("net_cash_provided_by_investing_activities", th.NumberType),
-
         th.Property("net_debt_issuance", th.NumberType),
         th.Property("long_term_net_debt_issuance", th.NumberType),
         th.Property("short_term_net_debt_issuance", th.NumberType),
@@ -213,12 +209,10 @@ class CashFlowStream(StatementStream):
         th.Property("preferred_dividends_paid", th.NumberType),
         th.Property("other_financing_activities", th.NumberType),
         th.Property("net_cash_provided_by_financing_activities", th.NumberType),
-
         th.Property("effect_of_forex_changes_on_cash", th.NumberType),
         th.Property("net_change_in_cash", th.NumberType),
         th.Property("cash_at_end_of_period", th.NumberType),
         th.Property("cash_at_beginning_of_period", th.NumberType),
-
         th.Property("operating_cash_flow", th.NumberType),
         th.Property("capital_expenditure", th.NumberType),
         th.Property("free_cash_flow", th.NumberType),
@@ -247,6 +241,7 @@ class LatestFinancialStatementsStream(FmpRestStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/latest-financial-statements"
 
+
 class IncomeStatementTtmStream(TtmStream):
     name = "income_statement_ttm"
 
@@ -260,7 +255,6 @@ class IncomeStatementTtmStream(TtmStream):
         th.Property("accepted_date", th.DateTimeType),
         th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
-
         th.Property("revenue", th.NumberType),
         th.Property("cost_of_revenue", th.NumberType),
         th.Property("gross_profit", th.NumberType),
@@ -271,7 +265,6 @@ class IncomeStatementTtmStream(TtmStream):
         th.Property("other_expenses", th.NumberType),
         th.Property("operating_expenses", th.NumberType),
         th.Property("cost_and_expenses", th.NumberType),
-
         th.Property("net_interest_income", th.NumberType),
         th.Property("interest_income", th.NumberType),
         th.Property("interest_expense", th.NumberType),
@@ -297,6 +290,7 @@ class IncomeStatementTtmStream(TtmStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/income-statement-ttm"
+
 
 class BalanceSheetTtmStream(TtmStream):
     name = "balance_sheet_ttm"
@@ -371,8 +365,10 @@ class BalanceSheetTtmStream(TtmStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/income-statement-ttm"
 
+
 class CashFlowTtmStream(TtmStream):
     """Cash flow statement data for companies."""
+
     name = "cash_flow_ttm"
 
     schema = th.PropertiesList(
@@ -423,14 +419,16 @@ class CashFlowTtmStream(TtmStream):
         th.Property("capital_expenditure", th.NumberType),
         th.Property("free_cash_flow", th.NumberType),
         th.Property("income_taxes_paid", th.NumberType),
-        th.Property("interest_paid", th.NumberType)
+        th.Property("interest_paid", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/cash-flow-statement-ttm"
 
+
 class KeyMetricsStream(StatementStream):
     """Key metrics data for companies."""
+
     name = "key_metrics"
 
     schema = th.PropertiesList(
@@ -515,14 +513,15 @@ class KeyMetricsStream(StatementStream):
         th.Property("days_of_sales_outstanding", th.NumberType),
         th.Property("research_and_developement_to_revenue", th.NumberType),
         th.Property("ev_to_ebitda", th.NumberType),
-
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/key-metrics"
 
+
 class FinancialRatiosStream(StatementStream):
     """Financial ratios data for companies."""
+
     name = "financial_ratios"
 
     schema = th.PropertiesList(
@@ -597,8 +596,10 @@ class FinancialRatiosStream(StatementStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ratios"
 
+
 class KeyMetricsTtmStream(TtmStream):
     """Key metrics TTM data for companies."""
+
     name = "key_metrics_ttm"
 
     schema = th.PropertiesList(
@@ -687,14 +688,15 @@ class KeyMetricsTtmStream(TtmStream):
         th.Property("free_cash_flow_to_firmttm", th.NumberType),
         th.Property("tangible_asset_value_ttm", th.NumberType),
         th.Property("net_current_asset_value_ttm", th.NumberType),
-
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/key-metrics-ttm"
 
+
 class FinancialRatiosTtmStream(TtmStream):
     """Financial ratios TTM data for companies."""
+
     name = "financial_ratios_ttm"
 
     schema = th.PropertiesList(
@@ -832,6 +834,7 @@ class FinancialRatiosTtmStream(TtmStream):
 
 class FinancialScoresStream(SymbolPartitionStream):
     """Financial scores data for companies."""
+
     name = "financial_scores"
 
     schema = th.PropertiesList(
@@ -855,8 +858,10 @@ class FinancialScoresStream(SymbolPartitionStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/financial-scores"
 
+
 class OwnerEarningsStream(SymbolPartitionStream):
     """Owner earnings data for companies."""
+
     name = "owner_earnings"
 
     schema = th.PropertiesList(
@@ -878,8 +883,10 @@ class OwnerEarningsStream(SymbolPartitionStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/owner-earnings"
 
+
 class EnterpriseValuesStream(StatementStream):
     """Enterprise values data for companies."""
+
     name = "enterprise_values"
 
     schema = th.PropertiesList(
@@ -903,6 +910,7 @@ class EnterpriseValuesStream(StatementStream):
 
 class IncomeStatementGrowthStream(StatementStream):
     """Income statement growth data for companies."""
+
     name = "income_statement_growth"
 
     schema = th.PropertiesList(
@@ -949,7 +957,6 @@ class IncomeStatementGrowthStream(StatementStream):
         th.Property("growth_net_income_from_continuing_operations", th.NumberType),
         th.Property("fiscal_year", th.IntegerType),
         th.Property("reported_currency", th.StringType),
-
     ).to_dict()
 
     _add_surrogate_key = True
@@ -960,6 +967,7 @@ class IncomeStatementGrowthStream(StatementStream):
 
 class BalanceSheetGrowthStream(StatementStream):
     """Balance sheet growth data for companies."""
+
     name = "balance_sheet_growth"
 
     schema = th.PropertiesList(
@@ -1002,7 +1010,9 @@ class BalanceSheetGrowthStream(StatementStream):
         th.Property("growth_preferred_stock", th.NumberType),
         th.Property("growth_common_stock", th.NumberType),
         th.Property("growth_retained_earnings", th.NumberType),
-        th.Property("growth_accumulated_other_comprehensive_income_loss", th.NumberType),
+        th.Property(
+            "growth_accumulated_other_comprehensive_income_loss", th.NumberType
+        ),
         th.Property("growth_othertotal_stockholders_equity", th.NumberType),
         th.Property("growth_total_stockholders_equity", th.NumberType),
         th.Property("growth_minority_interest", th.NumberType),
@@ -1028,6 +1038,7 @@ class BalanceSheetGrowthStream(StatementStream):
 
 class CashFlowGrowthStream(StatementStream):
     """Cash flow growth data for companies."""
+
     name = "cash_flow_growth"
 
     schema = th.PropertiesList(
@@ -1048,7 +1059,9 @@ class CashFlowGrowthStream(StatementStream):
         th.Property("growth_other_working_capital", th.NumberType),
         th.Property("growth_other_non_cash_items", th.NumberType),
         th.Property("growth_net_cash_provided_by_operating_activites", th.NumberType),
-        th.Property("growth_investments_in_property_plant_and_equipment", th.NumberType),
+        th.Property(
+            "growth_investments_in_property_plant_and_equipment", th.NumberType
+        ),
         th.Property("growth_acquisitions_net", th.NumberType),
         th.Property("growth_purchases_of_investments", th.NumberType),
         th.Property("growth_sales_maturities_of_investments", th.NumberType),
@@ -1059,7 +1072,9 @@ class CashFlowGrowthStream(StatementStream):
         th.Property("growth_common_stock_repurchased", th.NumberType),
         th.Property("growth_dividends_paid", th.NumberType),
         th.Property("growth_other_financing_activites", th.NumberType),
-        th.Property("growth_net_cash_used_provided_by_financing_activities", th.NumberType),
+        th.Property(
+            "growth_net_cash_used_provided_by_financing_activities", th.NumberType
+        ),
         th.Property("growth_effect_of_forex_changes_on_cash", th.NumberType),
         th.Property("growth_net_change_in_cash", th.NumberType),
         th.Property("growth_cash_at_end_of_period", th.NumberType),
@@ -1081,8 +1096,10 @@ class CashFlowGrowthStream(StatementStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/cash-flow-statement-growth"
 
+
 class FinancialStatementGrowthStream(StatementStream):
     """Financial statement growth data for companies."""
+
     name = "financial_statement_growth"
 
     schema = th.PropertiesList(
@@ -1091,7 +1108,6 @@ class FinancialStatementGrowthStream(StatementStream):
         th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("reported_currency", th.StringType),
-
         th.Property("revenue_growth", th.NumberType),
         th.Property("gross_profit_growth", th.NumberType),
         th.Property("ebit_growth", th.NumberType),
@@ -1111,27 +1127,21 @@ class FinancialStatementGrowthStream(StatementStream):
         th.Property("rd_expense_growth", th.NumberType),
         th.Property("sga_expenses_growth", th.NumberType),
         th.Property("free_cash_flow_growth", th.NumberType),
-
         th.Property("ten_y_revenue_growth_per_share", th.NumberType),
         th.Property("five_y_revenue_growth_per_share", th.NumberType),
         th.Property("three_y_revenue_growth_per_share", th.NumberType),
-
         th.Property("ten_y_operating_cf_growth_per_share", th.NumberType),
         th.Property("five_y_operating_cf_growth_per_share", th.NumberType),
         th.Property("three_y_operating_cf_growth_per_share", th.NumberType),
-
         th.Property("ten_y_net_income_growth_per_share", th.NumberType),
         th.Property("five_y_net_income_growth_per_share", th.NumberType),
         th.Property("three_y_net_income_growth_per_share", th.NumberType),
-
         th.Property("ten_y_shareholders_equity_growth_per_share", th.NumberType),
         th.Property("five_y_shareholders_equity_growth_per_share", th.NumberType),
         th.Property("three_y_shareholders_equity_growth_per_share", th.NumberType),
-
         th.Property("ten_y_dividend_per_share_growth_per_share", th.NumberType),
         th.Property("five_y_dividend_per_share_growth_per_share", th.NumberType),
         th.Property("three_y_dividend_per_share_growth_per_share", th.NumberType),
-
         th.Property("ebitda_growth", th.NumberType),
         th.Property("growth_capital_expenditure", th.NumberType),
         th.Property("ten_y_bottom_line_net_income_growth_per_share", th.NumberType),
@@ -1142,8 +1152,10 @@ class FinancialStatementGrowthStream(StatementStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/financial-growth"
 
+
 class FinancialStatementReportDatesStream(SymbolPartitionStream):
     """Financial statements report dates."""
+
     name = "financial_report_dates"
 
     schema = th.PropertiesList(
@@ -1169,6 +1181,7 @@ class FinancialStatementReportDatesStream(SymbolPartitionStream):
 
 class FinancialReportsForm10kJsonStream(StatementStream):
     """Financial reports Form 10-K JSON."""
+
     name = "financial_reports_form_10k_json"
 
     schema = th.PropertiesList(
@@ -1181,10 +1194,14 @@ class FinancialReportsForm10kJsonStream(StatementStream):
         th.Property("consolidated_statements_of_oper", th.ArrayType(th.AnyType())),
         th.Property("consolidated_statements_of_comp", th.ArrayType(th.AnyType())),
         th.Property("consolidated_balance_sheets", th.ArrayType(th.AnyType())),
-        th.Property("consolidated_balance_sheets_parenthetical", th.ArrayType(th.AnyType())),
+        th.Property(
+            "consolidated_balance_sheets_parenthetical", th.ArrayType(th.AnyType())
+        ),
         th.Property("consolidated_statements_of_shar", th.ArrayType(th.AnyType())),
         th.Property("consolidated_statements_of_cash", th.ArrayType(th.AnyType())),
-        th.Property("summary_of_significant_accounting_policies", th.ArrayType(th.AnyType())),
+        th.Property(
+            "summary_of_significant_accounting_policies", th.ArrayType(th.AnyType())
+        ),
         th.Property("revenue", th.ArrayType(th.AnyType())),
         th.Property("financial_instruments", th.ArrayType(th.AnyType())),
         th.Property("consolidated_financial_statemen", th.ArrayType(th.AnyType())),
@@ -1410,6 +1427,7 @@ class FinancialReportsForm10kJsonStream(StatementStream):
 
 class RevenueProductSegmentationStream(StatementStream):
     """Revenue product segmentation data."""
+
     name = "revenue_product_segmentation"
 
     schema = th.PropertiesList(
@@ -1433,13 +1451,16 @@ class RevenueProductSegmentationStream(StatementStream):
 
 class RevenueGeographicSegmentationStream(RevenueProductSegmentationStream):
     """Revenue geographic segmentation data."""
+
     name = "revenue_geographic_segmentation"
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/revenue-geographic-segmentation"
 
+
 class AsReportedIncomeStatementsStream(StatementStream):
     """As reported income statements."""
+
     name = "as_reported_income_statements"
 
     schema = th.PropertiesList(
@@ -1449,7 +1470,7 @@ class AsReportedIncomeStatementsStream(StatementStream):
         th.Property("period", th.StringType, required=True),
         th.Property("reported_currency", th.StringType),
         th.Property("date", th.DateType, required=True),
-        th.Property("data", th.StringType)
+        th.Property("data", th.StringType),
     ).to_dict()
 
     _add_surrogate_key = True
@@ -1465,6 +1486,7 @@ class AsReportedIncomeStatementsStream(StatementStream):
 
 class AsReportedBalanceStatementsStream(AsReportedIncomeStatementsStream):
     """As reported balance statements."""
+
     name = "as_reported_balance_statements"
 
     def get_url(self, context: Context):
@@ -1473,6 +1495,7 @@ class AsReportedBalanceStatementsStream(AsReportedIncomeStatementsStream):
 
 class AsReportedCashflowStatementsStream(AsReportedIncomeStatementsStream):
     """As reported cash flow statements."""
+
     name = "as_reported_cashflow_statements"
 
     def get_url(self, context: Context):
@@ -1481,6 +1504,7 @@ class AsReportedCashflowStatementsStream(AsReportedIncomeStatementsStream):
 
 class AsReportedFinancialStatementsStream(AsReportedIncomeStatementsStream):
     """As reported financial statements (all combined)."""
+
     name = "as_reported_financial_statements"
 
     def get_url(self, context: Context):

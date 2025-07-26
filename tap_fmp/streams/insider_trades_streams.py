@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from symtable import Symbol
-
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
@@ -11,12 +9,13 @@ from tap_fmp.client import FmpRestStream, SymbolPartitionStream
 
 from datetime import datetime
 
+
 class LatestInsiderTradingStream(FmpRestStream):
     """Stream for Latest Insider Trading API."""
-    
+
     name = "latest_insider_trading"
     primary_keys = ["surrogate_key"]
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -56,10 +55,10 @@ class LatestInsiderTradingStream(FmpRestStream):
 
 class SearchInsiderTradesStream(SymbolPartitionStream):
     """Stream for Search Insider Trades API."""
-    
+
     name = "insider_trades_search"
     primary_keys = ["surrogate_key"]
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -90,10 +89,10 @@ class SearchInsiderTradesStream(SymbolPartitionStream):
 
 class SearchInsiderTradesByReportingNameStream(FmpRestStream):
     """Stream for Search Insider Trades by Reporting Name API."""
-    
+
     name = "insider_trades_by_reporting_name_search"
     primary_keys = ["reporting_cik", "reporting_name"]
-    
+
     schema = th.PropertiesList(
         th.Property("reporting_cik", th.StringType),
         th.Property("reporting_name", th.StringType),
@@ -106,7 +105,7 @@ class SearchInsiderTradesByReportingNameStream(FmpRestStream):
 
 class AllInsiderTransactionTypesStream(FmpRestStream):
     """Stream for All Insider Transaction Types API."""
-    
+
     name = "all_insider_transaction_types"
     primary_keys = ["transaction_type"]
 
@@ -121,10 +120,10 @@ class AllInsiderTransactionTypesStream(FmpRestStream):
 
 class InsiderTradeStatisticsStream(SymbolPartitionStream):
     """Stream for Insider Trade Statistics API."""
-    
+
     name = "insider_trade_statistics"
     primary_keys = ["surrogate_key"]
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -151,10 +150,10 @@ class InsiderTradeStatisticsStream(SymbolPartitionStream):
 
 class AcquisitionOwnershipStream(SymbolPartitionStream):
     """Stream for Acquisition Ownership API."""
-    
+
     name = "acquisition_ownership"
     primary_keys = ["surrogate_key"]
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("cik", th.StringType),

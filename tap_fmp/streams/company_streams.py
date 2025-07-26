@@ -7,7 +7,7 @@ from tap_fmp.client import (
 )
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
-from tap_fmp.helpers import generate_surrogate_key
+
 
 class CompanySymbolPartitionStream(SymbolPartitionStream):
     primary_keys = ["surrogate_key"]
@@ -168,6 +168,7 @@ class DelistedCompaniesStream(FmpRestStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/delisted-companies"
+
 
 class CompanyEmployeeCountStream(CompanySymbolPartitionStream):
     name = "company_employee_count"

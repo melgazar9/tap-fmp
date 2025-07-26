@@ -3,7 +3,11 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpRestStream
-from tap_fmp.helpers import SymbolFetcher, CikFetcher, ExchangeFetcher, generate_surrogate_key
+from tap_fmp.helpers import (
+    SymbolFetcher,
+    CikFetcher,
+    ExchangeFetcher,
+)
 
 
 class CompanySymbolsStream(FmpRestStream):
@@ -210,13 +214,17 @@ class AvailableExchangesStream(FmpRestStream):
         selected_exchanges = self.get_exchange_list()
 
         if not selected_exchanges:
-            self.logger.info("No specific exchanges selected, fetching all exchanges...")
+            self.logger.info(
+                "No specific exchanges selected, fetching all exchanges..."
+            )
             exchange_fetcher = ExchangeFetcher(self.config)
             exchange_records = exchange_fetcher.fetch_all_exchanges()
         else:
             self.logger.info(f"Processing selected exchanges: {selected_exchanges}")
             exchange_fetcher = ExchangeFetcher(self.config)
-            exchange_records = exchange_fetcher.fetch_specific_exchanges(selected_exchanges)
+            exchange_records = exchange_fetcher.fetch_specific_exchanges(
+                selected_exchanges
+            )
 
         for record in exchange_records:
             record = self.post_process(record)

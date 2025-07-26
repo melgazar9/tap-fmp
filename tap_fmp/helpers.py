@@ -100,13 +100,14 @@ class ExchangeFetcher:
             for exchange in exchange_list
         ]
 
+
 def clean_strings(lst):
     cleaned_list = []
     for s in lst:
         cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", s)
-        cleaned = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1_\2', cleaned)
-        cleaned = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', cleaned)
-        cleaned = re.sub(r'_+', '_', cleaned).strip('_').lower()
+        cleaned = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", cleaned)
+        cleaned = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cleaned)
+        cleaned = re.sub(r"_+", "_", cleaned).strip("_").lower()
         cleaned_list.append(cleaned)
     return cleaned_list
 
@@ -122,6 +123,7 @@ def clean_json_keys(data: list[dict]) -> list[dict]:
             return [clean_nested_dict(item) for item in obj]
         else:
             return obj
+
     return [clean_nested_dict(d) for d in data]
 
 

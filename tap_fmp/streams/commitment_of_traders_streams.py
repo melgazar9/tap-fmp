@@ -2,9 +2,6 @@ from tap_fmp.client import SymbolPartitionTimeSliceStream, FmpRestStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
-from tap_fmp.helpers import generate_surrogate_key
-
-
 
 class CotReportStream(SymbolPartitionTimeSliceStream):
     name = "cot_report"
@@ -138,7 +135,7 @@ class CotReportStream(SymbolPartitionTimeSliceStream):
         th.Property("conc_net_le4_tdr_short_other", th.NumberType),
         th.Property("conc_net_le8_tdr_long_other", th.NumberType),
         th.Property("conc_net_le8_tdr_short_other", th.NumberType),
-        th.Property("contract_units", th.StringType)
+        th.Property("contract_units", th.StringType),
     ).to_dict()
 
     _add_surrogate_key = True
@@ -176,6 +173,7 @@ class CotAnalysisByDateStream(SymbolPartitionTimeSliceStream):
         if "net_postion" in row:
             row["net_position"] = row.pop("net_postion")
         return super().post_process(row, context)
+
 
 class CotReportListStream(FmpRestStream):
     name = "cot_report_list"

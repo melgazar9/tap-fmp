@@ -5,7 +5,12 @@ from __future__ import annotations
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream, TimeSliceStream, SymbolPartitionTimeSliceStream
+from tap_fmp.client import (
+    FmpRestStream,
+    SymbolPartitionStream,
+    TimeSliceStream,
+    SymbolPartitionTimeSliceStream,
+)
 
 
 class BaseSecFilingTimeSliceStream(TimeSliceStream):
@@ -17,7 +22,7 @@ class BaseSecFilingTimeSliceStream(TimeSliceStream):
     _symbol_in_query_params = False
     _paginate = True
     _max_pages = 100
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -39,7 +44,7 @@ class BaseSecFilingTimeSliceStream(TimeSliceStream):
 
 class Latest8KFilingsStream(BaseSecFilingTimeSliceStream):
     """Stream for Latest 8-K SEC Filings API."""
-    
+
     name = "latest_8k_filings"
 
     def get_url(self, context: Context | None = None) -> str:
@@ -48,7 +53,7 @@ class Latest8KFilingsStream(BaseSecFilingTimeSliceStream):
 
 class LatestSecFilingsStream(BaseSecFilingTimeSliceStream):
     """Stream for Latest SEC Filings API."""
-    
+
     name = "latest_sec_filings"
 
     def get_url(self, context: Context | None = None) -> str:
@@ -57,7 +62,7 @@ class LatestSecFilingsStream(BaseSecFilingTimeSliceStream):
 
 class SecFilingFormTypePartitionMixin(BaseSecFilingTimeSliceStream):
     """Mixin for SEC filing streams that need form type partitioning."""
-    
+
     @property
     def partitions(self):
         query_params_form_type = self.query_params.get("formType")
@@ -69,9 +74,17 @@ class SecFilingFormTypePartitionMixin(BaseSecFilingTimeSliceStream):
         )
 
         if query_params_form_type:
-            return [{"formType": query_params_form_type}] if isinstance(query_params_form_type, str) else query_params_form_type
+            return (
+                [{"formType": query_params_form_type}]
+                if isinstance(query_params_form_type, str)
+                else query_params_form_type
+            )
         elif other_params_form_types:
-            return [{"formType": form_type} for form_type in other_params_form_types] if isinstance(other_params_form_types, list) else other_params_form_types
+            return (
+                [{"formType": form_type} for form_type in other_params_form_types]
+                if isinstance(other_params_form_types, list)
+                else other_params_form_types
+            )
         else:
             default_form_types = ["10-K", "10-Q", "8-K", "DEF 14A", "13F-HR"]
             return [{"formType": form_type} for form_type in default_form_types]
@@ -80,14 +93,15 @@ class SecFilingFormTypePartitionMixin(BaseSecFilingTimeSliceStream):
         self.query_params.update(context)
         return super().get_records(context)
 
+
 class SecFilingsByFormTypeStream(SecFilingFormTypePartitionMixin):
     """Stream for SEC Filings By Form Type API."""
-    
+
     name = "sec_filings_by_form_type"
     primary_keys = ["surrogate_key"]
     _paginate = True
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -96,7 +110,7 @@ class SecFilingsByFormTypeStream(SecFilingFormTypePartitionMixin):
         th.Property("accepted_date", th.StringType),
         th.Property("form_type", th.StringType),
         th.Property("link", th.StringType),
-        th.Property("final_link", th.StringType)
+        th.Property("final_link", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
@@ -105,13 +119,13 @@ class SecFilingsByFormTypeStream(SecFilingFormTypePartitionMixin):
 
 class SecFilingsBySymbolStream(SymbolPartitionTimeSliceStream):
     """Stream for SEC Filings By Symbol API."""
-    
+
     name = "sec_filings_by_symbol"
     primary_keys = ["surrogate_key"]
     replication_key = "filing_date"
     _add_surrogate_key = True
     _paginate = True
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType),
         th.Property("cik", th.StringType),
@@ -119,7 +133,7 @@ class SecFilingsBySymbolStream(SymbolPartitionTimeSliceStream):
         th.Property("accepted_date", th.StringType),
         th.Property("form_type", th.StringType),
         th.Property("link", th.StringType),
-        th.Property("final_link", th.StringType)
+        th.Property("final_link", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
@@ -128,13 +142,13 @@ class SecFilingsBySymbolStream(SymbolPartitionTimeSliceStream):
 
 class SecFilingsByCikStream(TimeSliceStream):
     """Stream for SEC Filings By CIK API."""
-    
+
     name = "sec_filings_by_cik"
     primary_keys = ["surrogate_key"]
     replication_key = "filing_date"
     _add_surrogate_key = True
     _paginate = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -162,7 +176,7 @@ class SecFilingsByCikStream(TimeSliceStream):
 
 class SecFilingsByNameStream(FmpRestStream):
     """Stream for SEC Filings By Name API."""
-    
+
     name = "sec_filings_by_name"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -175,7 +189,7 @@ class SecFilingsByNameStream(FmpRestStream):
         th.Property("sic_code", th.StringType),
         th.Property("industry_title", th.StringType),
         th.Property("business_address", th.StringType),
-        th.Property("phone_number", th.StringType)
+        th.Property("phone_number", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
@@ -195,7 +209,7 @@ class SecFilingsByNameStream(FmpRestStream):
 
 class SecFilingsCompanySearchBySymbolStream(SymbolPartitionStream):
     """Stream for SEC Filings Company Search By Symbol API."""
-    
+
     name = "sec_filings_company_search_by_symbol"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -207,7 +221,7 @@ class SecFilingsCompanySearchBySymbolStream(SymbolPartitionStream):
         th.Property("sic_code", th.StringType),
         th.Property("industry_title", th.StringType),
         th.Property("business_address", th.StringType),
-        th.Property("phone_number", th.StringType)
+        th.Property("phone_number", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
@@ -216,7 +230,7 @@ class SecFilingsCompanySearchBySymbolStream(SymbolPartitionStream):
 
 class SecFilingsCompanySearchByCikStream(FmpRestStream):
     """Stream for SEC Filings Company Search By CIK API."""
-    
+
     name = "sec_filings_company_search_by_cik"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -228,7 +242,7 @@ class SecFilingsCompanySearchByCikStream(FmpRestStream):
         th.Property("sic_code", th.StringType),
         th.Property("industry_title", th.StringType),
         th.Property("business_address", th.StringType),
-        th.Property("phone_number", th.StringType)
+        th.Property("phone_number", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
@@ -245,11 +259,11 @@ class SecFilingsCompanySearchByCikStream(FmpRestStream):
 
 class SecCompanyFullProfileStream(SymbolPartitionStream):
     """Stream for SEC Company Full Profile API."""
-    
+
     name = "sec_company_full_profile"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType),
         th.Property("symbol", th.StringType),
@@ -300,11 +314,11 @@ class SecCompanyFullProfileStream(SymbolPartitionStream):
 
 class IndustryClassificationListStream(FmpRestStream):
     """Stream for Industry Classification List API."""
-    
+
     name = "industry_classification_list"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("sic", th.StringType),
@@ -321,11 +335,11 @@ class IndustryClassificationListStream(FmpRestStream):
 
 class IndustryClassificationSearchStream(FmpRestStream):
     """Stream for Industry Classification Search API."""
-    
+
     name = "industry_classification_search"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -345,11 +359,11 @@ class IndustryClassificationSearchStream(FmpRestStream):
 
 class AllIndustryClassificationStream(FmpRestStream):
     """Stream for All Industry Classification API."""
-    
+
     name = "all_industry_classification"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),

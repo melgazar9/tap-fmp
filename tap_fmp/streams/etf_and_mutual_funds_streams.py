@@ -1,4 +1,4 @@
-"""ESG (Environmental, Social, and Governance) Streams. """
+"""ESG (Environmental, Social, and Governance) Streams."""
 
 import typing as t
 from typing import Any, Generator
@@ -7,7 +7,6 @@ from tap_fmp.client import SymbolPartitionStream, FmpRestStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 from datetime import datetime
-from tap_fmp.helpers import generate_surrogate_key
 
 
 class EtfStream(SymbolPartitionStream):
@@ -101,6 +100,7 @@ class EtfAssetExposureStream(EtfStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/etf/asset-exposure"
 
+
 class EtfSectorWeightingStream(EtfStream):
     name = "etf_sector_weighting"
 
@@ -113,6 +113,7 @@ class EtfSectorWeightingStream(EtfStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/etf/sector-weightings"
+
 
 class MutualFundAndEtfDisclosureStream(EtfStream):
     name = "mutual_fund_and_etf_disclosure"
@@ -129,6 +130,7 @@ class MutualFundAndEtfDisclosureStream(EtfStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/etf/disclosure-holders-latest"
+
 
 class MutualFundDisclosuresStream(FmpRestStream):
     name = "mutual_fund_disclosures"
@@ -178,11 +180,14 @@ class MutualFundDisclosuresStream(FmpRestStream):
         return mutual_fund_partitions
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        self.query_params.update(context.get("quarter"), context.get("year"), context.get("symbol"))
+        self.query_params.update(
+            context.get("quarter"), context.get("year"), context.get("symbol")
+        )
         yield from super().get_records(context)
 
+
 class MutualFundAndEtfDisclosureNameSearchStream(FmpRestStream):
-    """ Ignore for now, just keep as a placeholder. Need to supply 'name' as a query parameter. """
+    """Ignore for now, just keep as a placeholder. Need to supply 'name' as a query parameter."""
 
     name = "mutual_fund_and_etf_disclosure_name_search"
 
@@ -206,6 +211,7 @@ class MutualFundAndEtfDisclosureNameSearchStream(FmpRestStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/etf/disclosure-holders-search"
 
+
 class FundAndEtfDisclosuresByDateStream(EtfStream):
     name = "fund_and_etf_disclosures_by_date"
 
@@ -220,6 +226,8 @@ class FundAndEtfDisclosuresByDateStream(EtfStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/etf/holdings"
 
-    def post_process(self, row: dict, context: Context | None = None) -> Generator[Any, None, None]:
+    def post_process(
+        self, row: dict, context: Context | None = None
+    ) -> Generator[Any, None, None]:
         row["symbol"] = context.get("symbol")
         yield from super().post_process(row, context)

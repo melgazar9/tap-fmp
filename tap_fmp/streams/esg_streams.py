@@ -1,4 +1,4 @@
-"""ESG (Environmental, Social, and Governance) Streams. """
+"""ESG (Environmental, Social, and Governance) Streams."""
 
 import typing as t
 
@@ -6,7 +6,6 @@ from tap_fmp.client import SymbolPartitionStream, FmpRestStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 from datetime import datetime
-from tap_fmp.helpers import generate_surrogate_key
 
 
 class EsgStream(SymbolPartitionStream):
@@ -36,6 +35,7 @@ class EsgInvestmentSearchStream(EsgStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/esg-disclosures"
 
+
 class EsgRatingsStream(EsgStream):
     name = "esg_ratings"
 
@@ -52,6 +52,7 @@ class EsgRatingsStream(EsgStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/esg-ratings"
+
 
 class EsgBenchmarkStream(FmpRestStream):
     name = "esg_benchmark"

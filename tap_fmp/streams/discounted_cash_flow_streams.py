@@ -2,7 +2,6 @@ from tap_fmp.client import SymbolPartitionStream, TimeSliceStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
-from typing import Generator
 
 class DcfValuationStream(SymbolPartitionStream):
     name = "dcf_valuation"
@@ -18,14 +17,17 @@ class DcfValuationStream(SymbolPartitionStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/discounted-cash-flow"
 
+
 class LeveredDcfStream(DcfValuationStream):
     name = "levered_dcf"
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/levered-discounted-cash-flow"
 
+
 class CustomDcfStream(SymbolPartitionStream):
-    """ There are many query parameters for this endpoint. For simplicity, we'll use the defaults. """
+    """There are many query parameters for this endpoint. For simplicity, we'll use the defaults."""
+
     name = "custom_dcf"
     primary_keys = ["surrogate_key"]
 

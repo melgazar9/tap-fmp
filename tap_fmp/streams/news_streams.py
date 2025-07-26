@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import typing as t
-
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 from tap_fmp.client import FmpRestStream, SymbolPartitionStream, TimeSliceStream
@@ -28,6 +26,7 @@ class BaseNewsTimeSliceStream(TimeSliceStream):
         th.Property("url", th.StringType),
     ).to_dict()
 
+
 class BaseSearchNewsStream(BaseNewsTimeSliceStream):
     _max_pages = 100
 
@@ -42,14 +41,15 @@ class BaseSearchNewsStream(BaseNewsTimeSliceStream):
         self.query_params.update(context)
         return super().get_records(context)
 
+
 class FmpArticlesStream(FmpRestStream):
     """Stream for FMP Articles API."""
-    
+
     name = "fmp_articles"
     primary_keys = ["surrogate_key"]
     _paginate = True
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("title", th.StringType),
@@ -68,7 +68,7 @@ class FmpArticlesStream(FmpRestStream):
 
 class GeneralNewsStream(BaseNewsTimeSliceStream):
     """Stream for General News API."""
-    
+
     name = "general_news"
 
     def get_url(self, context: Context | None = None) -> str:
@@ -77,7 +77,7 @@ class GeneralNewsStream(BaseNewsTimeSliceStream):
 
 class PressReleasesStream(BaseNewsTimeSliceStream):
     """Stream for Press Releases API."""
-    
+
     name = "press_releases"
 
     def get_url(self, context: Context | None = None) -> str:
@@ -86,7 +86,7 @@ class PressReleasesStream(BaseNewsTimeSliceStream):
 
 class StockNewsStream(BaseNewsTimeSliceStream):
     """Stream for Stock News API."""
-    
+
     name = "stock_news"
 
     def get_url(self, context: Context | None = None) -> str:
@@ -95,7 +95,7 @@ class StockNewsStream(BaseNewsTimeSliceStream):
 
 class CryptoNewsStream(BaseNewsTimeSliceStream):
     """Stream for Crypto News API."""
-    
+
     name = "crypto_news"
 
     def get_url(self, context: Context | None = None) -> str:
@@ -104,17 +104,18 @@ class CryptoNewsStream(BaseNewsTimeSliceStream):
 
 class ForexNewsStream(BaseNewsTimeSliceStream):
     """Stream for Forex News API."""
-    
+
     name = "forex_news"
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/news/forex-latest"
 
+
 class SearchPressReleasesStream(BaseSearchNewsStream):
     """Stream for Search Press Releases API."""
-    
+
     name = "search_press_releases"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -133,9 +134,9 @@ class SearchPressReleasesStream(BaseSearchNewsStream):
 
 class SearchStockNewsStream(BaseSearchNewsStream):
     """Stream for Search Stock News API."""
-    
+
     name = "search_stock_news"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -154,12 +155,12 @@ class SearchStockNewsStream(BaseSearchNewsStream):
 
 class SearchCryptoNewsStream(BaseSearchNewsStream):
     """Stream for Search Crypto News API."""
-    
+
     name = "search_crypto_news"
     _paginate = True
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -178,12 +179,12 @@ class SearchCryptoNewsStream(BaseSearchNewsStream):
 
 class SearchForexNewsStream(BaseSearchNewsStream):
     """Stream for Search Forex News API."""
-    
+
     name = "search_forex_news"
     _paginate = True
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),

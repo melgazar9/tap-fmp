@@ -4,18 +4,24 @@ from __future__ import annotations
 
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
-from tap_fmp.streams.chart_streams import ChartLightStream, PriceVolumeStream, Prices1minStream, Prices5minStream, Prices1HrStream
+from tap_fmp.streams.chart_streams import (
+    ChartLightStream,
+    PriceVolumeStream,
+    Prices1minStream,
+    Prices5minStream,
+    Prices1HrStream,
+)
 
 from tap_fmp.client import FmpRestStream, SymbolPartitionStream
 
 
 class CommoditiesListStream(FmpRestStream):
     """Stream for Commodities List API."""
-    
+
     name = "commodities_list"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -28,12 +34,14 @@ class CommoditiesListStream(FmpRestStream):
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/commodities-list"
 
+
 class CommodityPartitionStream(SymbolPartitionStream):
     """Base class for commodity streams that need commodity symbol partitioning."""
-    
+
     @property
     def partitions(self):
         return self._tap.get_cached_commodities()
+
 
 class CommodityPriceMixin(FmpRestStream):
     @property
@@ -47,19 +55,30 @@ class CommodityPriceMixin(FmpRestStream):
         )
 
         if query_params_symbol:
-            return [{"symbol": query_params_symbol}] if isinstance(query_params_symbol, str) else query_params_symbol
+            return (
+                [{"symbol": query_params_symbol}]
+                if isinstance(query_params_symbol, str)
+                else query_params_symbol
+            )
         elif other_params_symbols:
-            return [{"symbol": symbol} for symbol in other_params_symbols] if isinstance(other_params_symbols, list) else other_params_symbols
+            return (
+                [{"symbol": symbol} for symbol in other_params_symbols]
+                if isinstance(other_params_symbols, list)
+                else other_params_symbols
+            )
         else:
-            return [{"symbol": c.get("symbol")} for c in self._tap.get_cached_commodities()]
+            return [
+                {"symbol": c.get("symbol")} for c in self._tap.get_cached_commodities()
+            ]
+
 
 class CommoditiesQuoteStream(CommodityPriceMixin, CommodityPartitionStream):
     """Stream for Commodities Quote API."""
-    
+
     name = "commodities_quotes"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -89,7 +108,7 @@ class CommoditiesQuoteShortStream(CommodityPriceMixin, CommodityPartitionStream)
     name = "commodities_quote_short"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -104,11 +123,11 @@ class CommoditiesQuoteShortStream(CommodityPriceMixin, CommodityPartitionStream)
 
 class AllCommoditiesQuotesStream(FmpRestStream):
     """Stream for All Commodities Quotes API."""
-    
+
     name = "all_commodities_quotes"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -120,17 +139,22 @@ class AllCommoditiesQuotesStream(FmpRestStream):
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/batch-commodity-quotes"
 
+
 class CommoditiesLightChartStream(CommodityPriceMixin, ChartLightStream):
     name = "commodities_light_chart"
+
 
 class CommoditiesFullChartStream(CommodityPriceMixin, PriceVolumeStream):
     name = "commodities_full_chart"
 
+
 class Commodities1minStream(CommodityPriceMixin, Prices1minStream):
     name = "commodities_1min"
 
+
 class Commodities5minStream(CommodityPriceMixin, Prices5minStream):
     name = "commodities_5min"
+
 
 class Commodities1HrStream(CommodityPriceMixin, Prices1HrStream):
     name = "commodities_1hr"

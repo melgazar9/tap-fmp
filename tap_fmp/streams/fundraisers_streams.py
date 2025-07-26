@@ -11,12 +11,12 @@ from tap_fmp.client import FmpRestStream
 
 class LatestCrowdfundingCampaignsStream(FmpRestStream):
     """Stream for Latest Crowdfunding Campaigns API."""
-    
+
     name = "latest_crowdfunding_campaigns"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
     _paginate = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("cik", th.StringType),
@@ -97,11 +97,11 @@ class LatestCrowdfundingCampaignsStream(FmpRestStream):
 
 class CrowdfundingByCikStream(FmpRestStream):
     """Stream for Crowdfunding By CIK API."""
-    
+
     name = "crowdfunding_by_cik"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("cik", th.StringType),
@@ -165,14 +165,15 @@ class CrowdfundingByCikStream(FmpRestStream):
         self.query_params.update(context)
         return super().get_records(context)
 
+
 class EquityOfferingUpdatesStream(FmpRestStream):
     """Stream for Equity Offering Updates API."""
-    
+
     name = "equity_offering_updates"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
     _paginate = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("cik", th.StringType),
@@ -248,11 +249,11 @@ class EquityOfferingUpdatesStream(FmpRestStream):
 
 class EquityOfferingByCikStream(FmpRestStream):
     """Stream for Equity Offering By CIK API."""
-    
+
     name = "equity_offering_by_cik"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("cik", th.StringType),

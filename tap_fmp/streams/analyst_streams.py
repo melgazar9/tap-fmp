@@ -2,8 +2,6 @@ from tap_fmp.client import SymbolPartitionStream
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.helpers import generate_surrogate_key
-
 
 class AnalystEstimatesAnnualStream(SymbolPartitionStream):
     """Stream for analyst estimates."""

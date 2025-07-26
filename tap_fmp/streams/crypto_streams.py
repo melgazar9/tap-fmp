@@ -2,21 +2,28 @@
 
 from __future__ import annotations
 
-import typing as t
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream, SymbolPartitionTimeSliceStream
-from tap_fmp.streams.chart_streams import Prices1minStream, Prices5minStream, Prices1HrStream
+from tap_fmp.client import (
+    FmpRestStream,
+    SymbolPartitionStream,
+    SymbolPartitionTimeSliceStream,
+)
+from tap_fmp.streams.chart_streams import (
+    Prices1minStream,
+    Prices5minStream,
+    Prices1HrStream,
+)
 
 
 class CryptoListStream(FmpRestStream):
     """Stream for Crypto List API."""
-    
+
     name = "crypto_list"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -44,20 +51,31 @@ class CryptoSymbolPartitionMixin(SymbolPartitionStream):
         )
 
         if query_params_symbol:
-            return [{"symbol": query_params_symbol}] if isinstance(query_params_symbol, str) else query_params_symbol
+            return (
+                [{"symbol": query_params_symbol}]
+                if isinstance(query_params_symbol, str)
+                else query_params_symbol
+            )
         elif other_params_symbols:
-            return [{"symbol": symbol} for symbol in other_params_symbols] if isinstance(other_params_symbols, list) else other_params_symbols
+            return (
+                [{"symbol": symbol} for symbol in other_params_symbols]
+                if isinstance(other_params_symbols, list)
+                else other_params_symbols
+            )
         else:
-            return [{"symbol": c.get("symbol")} for c in self._tap.get_cached_crypto_symbols()]
+            return [
+                {"symbol": c.get("symbol")}
+                for c in self._tap.get_cached_crypto_symbols()
+            ]
 
 
 class FullCryptoQuoteStream(CryptoSymbolPartitionMixin):
     """Stream for Full Crypto Quote API."""
-    
+
     name = "crypto_quotes"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -86,11 +104,11 @@ class FullCryptoQuoteStream(CryptoSymbolPartitionMixin):
 
 class CryptoQuoteShortStream(CryptoSymbolPartitionMixin):
     """Stream for Crypto Quote Short API."""
-    
+
     name = "crypto_quotes_short"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -106,11 +124,11 @@ class CryptoQuoteShortStream(CryptoSymbolPartitionMixin):
 
 class AllCryptoQuotesStream(FmpRestStream):
     """Stream for All Crypto Quotes API."""
-    
+
     name = "all_crypto_quotes"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -124,12 +142,14 @@ class AllCryptoQuotesStream(FmpRestStream):
         return f"{self.url_base}/stable/batch-crypto-quotes"
 
 
-class HistoricalCryptoLightChartStream(CryptoSymbolPartitionMixin, SymbolPartitionTimeSliceStream):
+class HistoricalCryptoLightChartStream(
+    CryptoSymbolPartitionMixin, SymbolPartitionTimeSliceStream
+):
     """Stream for Historical Crypto Light Chart API."""
-    
+
     name = "historical_crypto_light_chart"
     primary_keys = ["symbol", "date"]
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -142,12 +162,14 @@ class HistoricalCryptoLightChartStream(CryptoSymbolPartitionMixin, SymbolPartiti
         return f"{self.url_base}/stable/historical-price-eod/light"
 
 
-class HistoricalCryptoFullChartStream(CryptoSymbolPartitionMixin, SymbolPartitionTimeSliceStream):
+class HistoricalCryptoFullChartStream(
+    CryptoSymbolPartitionMixin, SymbolPartitionTimeSliceStream
+):
     """Stream for Historical Crypto Full Chart API."""
-    
+
     name = "historical_crypto_full_chart"
     primary_keys = ["symbol", "date"]
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -168,14 +190,17 @@ class HistoricalCryptoFullChartStream(CryptoSymbolPartitionMixin, SymbolPartitio
 
 class Crypto1minStream(CryptoSymbolPartitionMixin, Prices1minStream):
     """Stream for 1-Minute Interval Crypto Data API."""
+
     name = "crypto_1min"
 
 
 class Crypto5minStream(CryptoSymbolPartitionMixin, Prices5minStream):
     """Stream for 5-Minute Interval Crypto Data API."""
+
     name = "crypto_5min"
 
 
 class Crypto1HrStream(CryptoSymbolPartitionMixin, Prices1HrStream):
     """Stream for 1-Hour Interval Crypto Data API."""
+
     name = "crypto_1hr"

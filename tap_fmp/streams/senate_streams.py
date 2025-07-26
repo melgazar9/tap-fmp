@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import typing as t
-
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 from tap_fmp.client import FmpRestStream, SymbolPartitionStream
@@ -16,7 +14,7 @@ class BaseSenateStream(FmpRestStream):
     _add_surrogate_key = True
     _paginate = True
     _max_pages = 100
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -36,6 +34,7 @@ class BaseSenateStream(FmpRestStream):
         th.Property("link", th.StringType),
     ).to_dict()
 
+
 class SenateNamePartitionMixin(FmpRestStream):
     """Mixin for Senate streams that need name partitioning."""
 
@@ -50,20 +49,38 @@ class SenateNamePartitionMixin(FmpRestStream):
         )
 
         if query_params_name:
-            return [{"name": query_params_name}] if isinstance(query_params_name, str) else query_params_name
+            return (
+                [{"name": query_params_name}]
+                if isinstance(query_params_name, str)
+                else query_params_name
+            )
         elif other_params_names:
-            return [{"name": name} for name in other_params_names] if isinstance(other_params_names, list) else other_params_names
+            return (
+                [{"name": name} for name in other_params_names]
+                if isinstance(other_params_names, list)
+                else other_params_names
+            )
         else:
-            default_names = ["Nancy", "Chuck", "Mitch", "Kevin", "Alexandria", "Ted", "Elizabeth", "Bernie"]
+            default_names = [
+                "Nancy",
+                "Chuck",
+                "Mitch",
+                "Kevin",
+                "Alexandria",
+                "Ted",
+                "Elizabeth",
+                "Bernie",
+            ]
             return [{"name": name} for name in default_names]
 
     def get_records(self, context: Context | None):
         self.query_params.update(context)
         return super().get_records(context)
 
+
 class LatestSenateDisclosuresStream(BaseSenateStream):
     """Stream for Latest Senate Financial Disclosures API."""
-    
+
     name = "latest_senate_disclosures"
 
     def get_url(self, context: Context | None = None) -> str:
@@ -72,7 +89,7 @@ class LatestSenateDisclosuresStream(BaseSenateStream):
 
 class LatestHouseDisclosuresStream(BaseSenateStream):
     """Stream for Latest House Financial Disclosures API."""
-    
+
     name = "latest_house_disclosures"
 
     def get_url(self, context: Context | None = None) -> str:
@@ -81,11 +98,11 @@ class LatestHouseDisclosuresStream(BaseSenateStream):
 
 class SenateTradingActivityStream(SymbolPartitionStream):
     """Stream for Senate Trading Activity API."""
-    
+
     name = "senate_trading_activity"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -111,11 +128,11 @@ class SenateTradingActivityStream(SymbolPartitionStream):
 
 class SenateTradesByNameStream(SenateNamePartitionMixin):
     """Stream for Senate Trades By Name API."""
-    
+
     name = "senate_trades_by_name"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -141,11 +158,11 @@ class SenateTradesByNameStream(SenateNamePartitionMixin):
 
 class HouseTradesStream(SymbolPartitionStream):
     """Stream for U.S. House Trades API."""
-    
+
     name = "house_trades"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -171,11 +188,11 @@ class HouseTradesStream(SymbolPartitionStream):
 
 class HouseTradesByNameStream(SenateNamePartitionMixin):
     """Stream for House Trades By Name API."""
-    
+
     name = "house_trades_by_name"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),

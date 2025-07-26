@@ -15,6 +15,7 @@ import requests
 from singer_sdk.exceptions import ConfigValidationError
 from tap_fmp.helpers import generate_surrogate_key
 
+
 class FmpRestStream(Stream, ABC):
     """FMP stream class with symbol partitioning support."""
 
@@ -220,7 +221,7 @@ class FmpRestStream(Stream, ABC):
                 record = self.post_process(record)
                 self._check_missing_fields(self.schema, record)
                 yield record
-    
+
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         if self._add_surrogate_key:
             record["surrogate_key"] = generate_surrogate_key(record)
@@ -354,7 +355,11 @@ class TimeSliceStream(FmpRestStream):
         url = self.get_url(context)
 
         time_slices = self.create_time_slice_chunks(context)
-        max_records = self.config.get(self.name, {}).get("other_params", {}).get("max_records_per_request", 4000)
+        max_records = (
+            self.config.get(self.name, {})
+            .get("other_params", {})
+            .get("max_records_per_request", 4000)
+        )
 
         for from_date, to_date in time_slices:
             try:
@@ -390,7 +395,11 @@ class SymbolPartitionTimeSliceStream(TimeSliceStream):
 
         url = self.get_url(context)
         time_slices = self.create_time_slice_chunks(context)
-        max_records = self.config.get(self.name, {}).get("other_params", {}).get("max_records_per_request", 4000)
+        max_records = (
+            self.config.get(self.name, {})
+            .get("other_params", {})
+            .get("max_records_per_request", 4000)
+        )
 
         for from_date, to_date in time_slices:
             try:

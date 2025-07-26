@@ -5,12 +5,16 @@ from __future__ import annotations
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream, SymbolPartitionTimeSliceStream
+from tap_fmp.client import (
+    FmpRestStream,
+    SymbolPartitionStream,
+    SymbolPartitionTimeSliceStream,
+)
 
 
 class IndexListStream(FmpRestStream):
     """Stock Market Indexes List API - Comprehensive list of stock market indexes."""
-    
+
     name = "index_list"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -29,7 +33,7 @@ class IndexListStream(FmpRestStream):
 
 class IndexQuoteStream(SymbolPartitionStream):
     """Index Quote API - Real-time stock index quotes."""
-    
+
     name = "index_quote"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -61,7 +65,7 @@ class IndexQuoteStream(SymbolPartitionStream):
 
 class IndexShortQuoteStream(SymbolPartitionStream):
     """Index Short Quote API - Concise stock index quotes."""
-    
+
     name = "index_short_quote"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -80,7 +84,7 @@ class IndexShortQuoteStream(SymbolPartitionStream):
 
 class AllIndexQuotesStream(FmpRestStream):
     """All Index Quotes API - Real-time quotes for a wide range of stock indexes."""
-    
+
     name = "all_index_quotes"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -99,7 +103,7 @@ class AllIndexQuotesStream(FmpRestStream):
 
 class HistoricalIndexLightChartStream(SymbolPartitionTimeSliceStream):
     """Historical Index Light Chart API - End-of-day historical prices for stock indexes."""
-    
+
     name = "historical_index_light_chart"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -118,7 +122,7 @@ class HistoricalIndexLightChartStream(SymbolPartitionTimeSliceStream):
 
 class HistoricalIndexFullChartStream(SymbolPartitionTimeSliceStream):
     """Historical Index Full Chart API - Full historical end-of-day prices for stock indexes."""
-    
+
     name = "historical_index_full_chart"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -143,7 +147,7 @@ class HistoricalIndexFullChartStream(SymbolPartitionTimeSliceStream):
 
 class Index1MinuteIntervalStream(SymbolPartitionTimeSliceStream):
     """1-Minute Interval Index Price API - 1-minute interval intraday data for stock indexes."""
-    
+
     name = "index_1min"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -165,7 +169,7 @@ class Index1MinuteIntervalStream(SymbolPartitionTimeSliceStream):
 
 class Index5MinuteIntervalStream(Index1MinuteIntervalStream):
     """5-Minute Interval Index Price API - 5-minute interval intraday data for stock indexes."""
-    
+
     name = "index_5min"
 
     def get_url(self, context: Context | None) -> str:
@@ -174,15 +178,16 @@ class Index5MinuteIntervalStream(Index1MinuteIntervalStream):
 
 class Index1HourIntervalStream(Index1MinuteIntervalStream):
     """1-Hour Interval Index Price API - 1-hour interval intraday data for stock indexes."""
-    
+
     name = "index_1hr"
 
     def get_url(self, context: Context | None) -> str:
         return f"{self.url_base}/stable/historical-chart/1hour"
 
+
 class SP500ConstituentStream(FmpRestStream):
     """S&P 500 Index API - Detailed data on the S&P 500 index companies."""
-    
+
     name = "sp500_constituent"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -205,7 +210,7 @@ class SP500ConstituentStream(FmpRestStream):
 
 class NasdaqConstituentStream(SP500ConstituentStream):
     """Nasdaq Index API - Comprehensive data for the Nasdaq index companies."""
-    
+
     name = "nasdaq_constituent"
 
     def get_url(self, context: Context | None) -> str:
@@ -214,7 +219,7 @@ class NasdaqConstituentStream(SP500ConstituentStream):
 
 class DowJonesConstituentStream(SP500ConstituentStream):
     """Dow Jones API - Data on the Dow Jones Industrial Average companies."""
-    
+
     name = "dow_jones_constituent"
 
     def get_url(self, context: Context | None) -> str:
@@ -223,7 +228,7 @@ class DowJonesConstituentStream(SP500ConstituentStream):
 
 class HistoricalSP500ConstituentStream(SP500ConstituentStream):
     """Historical S&P 500 API - Historical data for the S&P 500 index changes."""
-    
+
     name = "historical_sp500_constituent"
 
     def get_url(self, context: Context | None) -> str:
@@ -232,7 +237,7 @@ class HistoricalSP500ConstituentStream(SP500ConstituentStream):
 
 class HistoricalNasdaqConstituentStream(SP500ConstituentStream):
     """Historical Nasdaq API - Historical data for the Nasdaq index changes."""
-    
+
     name = "historical_nasdaq_constituent"
 
     def get_url(self, context: Context | None) -> str:
@@ -241,7 +246,7 @@ class HistoricalNasdaqConstituentStream(SP500ConstituentStream):
 
 class HistoricalDowJonesConstituentStream(SP500ConstituentStream):
     """Historical Dow Jones API - Historical data for the Dow Jones Industrial Average changes."""
-    
+
     name = "historical_dow_jones_constituent"
 
     def get_url(self, context: Context | None) -> str:

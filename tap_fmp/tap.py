@@ -255,6 +255,7 @@ from tap_fmp.streams.sec_filings_streams import (
     AllIndustryClassificationStream,
 )
 
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -302,7 +303,9 @@ class TapFMP(Tap):
                     self._cached_forex_pairs = list(
                         forex_stream.get_records(context=None)
                     )
-                    self.logger.info(f"Cached {len(self._cached_forex_pairs)} forex pairs.")
+                    self.logger.info(
+                        f"Cached {len(self._cached_forex_pairs)} forex pairs."
+                    )
         return self._cached_forex_pairs
 
     def get_forex_stream(self) -> ForexPairsStream:
@@ -321,7 +324,9 @@ class TapFMP(Tap):
                     self._cached_crypto_symbols = list(
                         crypto_stream.get_records(context=None)
                     )
-                    self.logger.info(f"Cached {len(self._cached_crypto_symbols)} crypto.")
+                    self.logger.info(
+                        f"Cached {len(self._cached_crypto_symbols)} crypto."
+                    )
         return self._cached_crypto_symbols
 
     def get_crypto_stream(self) -> CryptoListStream:
@@ -340,7 +345,9 @@ class TapFMP(Tap):
                     self._cached_commodities = list(
                         commodity_stream.get_records(context=None)
                     )
-                    self.logger.info(f"Cached {len(self._cached_commodities)} commodities.")
+                    self.logger.info(
+                        f"Cached {len(self._cached_commodities)} commodities."
+                    )
         return self._cached_commodities
 
     def get_commodity_stream(self) -> CommoditiesListStream:
@@ -349,7 +356,6 @@ class TapFMP(Tap):
             self._commodity_stream_instance = CommoditiesListStream(self)
         return self._commodity_stream_instance
 
-
     def get_cached_sectors(self) -> t.List[dict]:
         """Thread-safe sector caching for parallel execution."""
         if self._cached_sectors is None:
@@ -357,9 +363,7 @@ class TapFMP(Tap):
                 if self._cached_sectors is None:
                     self.logger.info("Fetching and caching sectors...")
                     sector_stream = self.get_sector_stream()
-                    self._cached_sectors = list(
-                        sector_stream.get_records(context=None)
-                    )
+                    self._cached_sectors = list(sector_stream.get_records(context=None))
                     self.logger.info(f"Cached {len(self._cached_sectors)} sectors.")
         return self._cached_sectors
 
@@ -379,7 +383,9 @@ class TapFMP(Tap):
                     self._cached_industries = list(
                         industry_stream.get_records(context=None)
                     )
-                    self.logger.info(f"Cached {len(self._cached_industries)} industries.")
+                    self.logger.info(
+                        f"Cached {len(self._cached_industries)} industries."
+                    )
         return self._cached_industries
 
     def get_industry_stream(self) -> AvailableIndustriesStream:
@@ -387,7 +393,6 @@ class TapFMP(Tap):
             self.logger.info("Creating AvailableIndustriesStream instance...")
             self._industry_stream_instance = AvailableIndustriesStream(self)
         return self._industry_stream_instance
-
 
     config_jsonschema = th.PropertiesList(
         th.Property(
@@ -463,14 +468,14 @@ class TapFMP(Tap):
             self._exchange_stream_instance = AvailableExchangesStream(self)
         return self._exchange_stream_instance
 
-
     def discover_streams(self) -> list:
         """Return a list of discovered streams."""
+        # fmt: off
         return [
             ### Search Streams ###
-
             StockScreenerStream(self),
             ExchangeVariantsStream(self),
+
 
             ### Directory Streams ###
 
@@ -485,6 +490,7 @@ class TapFMP(Tap):
             AvailableSectorsStream(self),
             AvailableIndustriesStream(self),
             AvailableCountriesStream(self),
+
 
             ### Analyst Streams ###
 
@@ -502,6 +508,7 @@ class TapFMP(Tap):
             StockGradeNewsStream(self),
             StockGradeLatestNewsStream(self),
 
+
             ### Calendar Streams ###
 
             DividendsCompanyStream(self),
@@ -514,7 +521,9 @@ class TapFMP(Tap):
             StockSplitDetailsStream(self),
             StockSplitsCalendarStream(self),
 
+
             ### Company Streams ###
+
             CompanyProfileBySymbolStream(self),
             CikProfileStream(self),
             CompanyNotesStream(self),
@@ -533,6 +542,7 @@ class TapFMP(Tap):
             ExecutiveCompensationStream(self),
             ExecutiveCompensationBenchmarkStream(self),
 
+
             ### DCF Streams ###
 
             DcfValuationStream(self),
@@ -540,13 +550,16 @@ class TapFMP(Tap):
             CustomDcfStream(self),
             CustomDcfLeveredStream(self),
 
+
             ### Market Hours Streams ###
 
             ExchangeMarketHoursStream(self),
             HolidaysByExchangeStream(self),
             AllExchangeMarketHoursStream(self),
 
+
             ### Statement Streams ###
+
             IncomeStatementStream(self),
             BalanceSheetStream(self),
             CashFlowStream(self),
@@ -570,6 +583,7 @@ class TapFMP(Tap):
             AsReportedFinancialStatementsStream(self),
             BalanceSheetTtmStream(self),
 
+
             ### Index Streams ###
 
             IndexListStream(self),
@@ -588,6 +602,7 @@ class TapFMP(Tap):
             HistoricalNasdaqConstituentStream(self),
             HistoricalDowJonesConstituentStream(self),
 
+
             ### Insider Trades Streams ###
 
             LatestInsiderTradingStream(self),
@@ -596,6 +611,7 @@ class TapFMP(Tap):
             AllInsiderTransactionTypesStream(self),
             InsiderTradeStatisticsStream(self),
             AcquisitionOwnershipStream(self),
+
 
             ### Market Sector Performance Streams ###
 
@@ -611,6 +627,7 @@ class TapFMP(Tap):
             BiggestStockLosersStream(self),
             TopTradedStocksStream(self),
 
+
             ### Commodity Streams ###
 
             CommoditiesListStream(self),
@@ -623,12 +640,14 @@ class TapFMP(Tap):
             Commodities5minStream(self),
             Commodities1HrStream(self),
 
+
             ### Fundraiser Streams ###
 
             LatestCrowdfundingCampaignsStream(self),
             CrowdfundingByCikStream(self),
             EquityOfferingUpdatesStream(self),
             EquityOfferingByCikStream(self),
+
 
             ### Crypto Streams ###
 
@@ -642,6 +661,7 @@ class TapFMP(Tap):
             Crypto5minStream(self),
             Crypto1HrStream(self),
 
+
             ### Forex Streams ###
 
             ForexPairsStream(self),
@@ -653,6 +673,7 @@ class TapFMP(Tap):
             Forex1minStream(self),
             Forex5minStream(self),
             Forex1HrStream(self),
+
 
             ### News Streams ###
 
@@ -667,6 +688,7 @@ class TapFMP(Tap):
             SearchCryptoNewsStream(self),
             SearchForexNewsStream(self),
 
+
             ### Technical Indicator Streams ###
 
             SimpleMovingAverageStream(self),
@@ -679,6 +701,7 @@ class TapFMP(Tap):
             WilliamsStream(self),
             AverageDirectionalIndexStream(self),
 
+
             ### Senate Streams ###
 
             LatestSenateDisclosuresStream(self),
@@ -687,6 +710,7 @@ class TapFMP(Tap):
             SenateTradesByNameStream(self),
             HouseTradesStream(self),
             HouseTradesByNameStream(self),
+
 
             ### SEC Filings Streams ###
 

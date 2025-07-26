@@ -8,6 +8,7 @@ from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpRestStream
 
+
 class Form13fPartitionStream(FmpRestStream):
     @property
     def partitions(self):
@@ -26,9 +27,10 @@ class Form13fPartitionStream(FmpRestStream):
             for q in quarters
         ]
 
+
 class InstitutionalOwnershipFilingsStream(Form13fPartitionStream):
     """Institutional Ownership Filings API - Latest SEC filings related to institutional ownership."""
-    
+
     name = "institutional_ownership_filings"
     primary_keys = ["surrogate_key"]
     _paginate = True
@@ -52,7 +54,7 @@ class InstitutionalOwnershipFilingsStream(Form13fPartitionStream):
 
 class FilingsExtractStream(Form13fPartitionStream):
     """Filings Extract API - Extract detailed data directly from official SEC filings."""
-    
+
     name = "filings_extract"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -121,11 +123,15 @@ class HolderPerformanceSummaryStream(FmpRestStream):
         th.Property("performance1year_relative_to_s_p500_percentage", th.NumberType),
         th.Property("performance3year_relative_to_s_p500_percentage", th.NumberType),
         th.Property("performance5year_relative_to_s_p500_percentage", th.NumberType),
-        th.Property("performance_since_inception_relative_to_s_p500_percentage", th.NumberType),
+        th.Property(
+            "performance_since_inception_relative_to_s_p500_percentage", th.NumberType
+        ),
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
-        return f"{self.url_base}/stable/institutional-ownership/holder-performance-summary"
+        return (
+            f"{self.url_base}/stable/institutional-ownership/holder-performance-summary"
+        )
 
     @property
     def partitions(self):
@@ -156,7 +162,9 @@ class HolderIndustryBreakdownStream(Form13fPartitionStream):
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
-        return f"{self.url_base}/stable/institutional-ownership/holder-industry-breakdown"
+        return (
+            f"{self.url_base}/stable/institutional-ownership/holder-industry-breakdown"
+        )
 
 
 class PositionsSummaryStream(FmpRestStream):
@@ -207,7 +215,9 @@ class PositionsSummaryStream(FmpRestStream):
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
-        return f"{self.url_base}/stable/institutional-ownership/symbol-positions-summary"
+        return (
+            f"{self.url_base}/stable/institutional-ownership/symbol-positions-summary"
+        )
 
     @property
     def partitions(self):
@@ -254,9 +264,4 @@ class IndustryPerformanceSummaryStream(FmpRestStream):
             years = [str(y) for y in years]
         if quarters is None or quarters == "*":
             quarters = [1, 2, 3, 4]
-        return [
-            {"quarter": q, "year": y}
-            for y in years
-            for q in quarters
-        ]
-
+        return [{"quarter": q, "year": y} for y in years for q in quarters]

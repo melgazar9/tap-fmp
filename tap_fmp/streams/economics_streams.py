@@ -4,7 +4,6 @@ from tap_fmp.client import FmpRestStream, TimeSliceStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
-from tap_fmp.helpers import generate_surrogate_key
 
 class EconomicsStream(TimeSliceStream):
     primary_keys = ["surrogate_key"]
@@ -51,19 +50,40 @@ class EconomicIndicatorsStream(EconomicsStream):
 
     @property
     def partitions(self):
-        indicator_names = ['GDP', 'realGDP', 'nominalPotentialGDP', 'realGDPPerCapita', 'federalFunds', 'CPI',
-                           'inflationRate', 'inflation', 'retailSales', 'consumerSentiment', 'durableGoods',
-                           'unemploymentRate', 'totalNonfarmPayroll', 'initialClaims', 'industrialProductionTotalIndex',
-                           'newPrivatelyOwnedHousingUnitsStartedTotalUnits', 'totalVehicleSales', 'retailMoneyFunds',
-                           'smoothedUSRecessionProbabilities', '3MonthOr90DayRatesAndYieldsCertificatesOfDeposit',
-                           'commercialBankInterestRateOnCreditCardPlansAllAccounts', '30YearFixedRateMortgageAverage',
-                           '15YearFixedRateMortgageAverage']
+        indicator_names = [
+            "GDP",
+            "realGDP",
+            "nominalPotentialGDP",
+            "realGDPPerCapita",
+            "federalFunds",
+            "CPI",
+            "inflationRate",
+            "inflation",
+            "retailSales",
+            "consumerSentiment",
+            "durableGoods",
+            "unemploymentRate",
+            "totalNonfarmPayroll",
+            "initialClaims",
+            "industrialProductionTotalIndex",
+            "newPrivatelyOwnedHousingUnitsStartedTotalUnits",
+            "totalVehicleSales",
+            "retailMoneyFunds",
+            "smoothedUSRecessionProbabilities",
+            "3MonthOr90DayRatesAndYieldsCertificatesOfDeposit",
+            "commercialBankInterestRateOnCreditCardPlansAllAccounts",
+            "30YearFixedRateMortgageAverage",
+            "15YearFixedRateMortgageAverage",
+        ]
 
-        return [{"indicator_name": indicator_name} for indicator_name in indicator_names]
+        return [
+            {"indicator_name": indicator_name} for indicator_name in indicator_names
+        ]
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         self.query_params.update(context.get("indicator_name"))
         yield from super().get_records(context)
+
 
 class EconomicCalendarStream(EconomicsStream):
     name = "economic_calendar"
@@ -84,6 +104,7 @@ class EconomicCalendarStream(EconomicsStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/economic-calendar"
+
 
 class MarketRiskPremiumStream(FmpRestStream):
     name = "market_risk_premium"

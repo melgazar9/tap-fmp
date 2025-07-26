@@ -32,7 +32,9 @@ class PerformanceSnapshotStream(FmpRestStream):
         other_params = self.config.get(self.name, {}).get("other_params", {})
         date_range = other_params.get("date_range")
         if "date" in query_params and "date_range" in other_params:
-            raise ConfigValidationError("Cannot specify both 'date' and 'date_range' in query_params and other_params.")
+            raise ConfigValidationError(
+                "Cannot specify both 'date' and 'date_range' in query_params and other_params."
+            )
         if isinstance(date_range, str):
             date_range = date_range.replace(" ", "").split(",")
             dates = self.create_date_range(date_range)
@@ -42,6 +44,7 @@ class PerformanceSnapshotStream(FmpRestStream):
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         self.query_params.update(context)
         return super().get_records(context)
+
 
 class HistoricalMarketPerformanceStream(TimeSliceStream):
     """Stream for Historical Market Performance API."""
@@ -54,11 +57,12 @@ class HistoricalMarketPerformanceStream(TimeSliceStream):
         self.query_params.update(context)
         return super().get_records(context)
 
+
 class MarketSectorPerformanceSnapshotStream(PerformanceSnapshotStream):
     """Stream for Market Sector Performance Snapshot API."""
-    
+
     name = "market_sector_performance_snapshot"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -68,15 +72,14 @@ class MarketSectorPerformanceSnapshotStream(PerformanceSnapshotStream):
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/sector-performance-snapshot"
 
 
 class IndustryPerformanceSnapshotStream(PerformanceSnapshotStream):
     """Stream for Industry Performance Snapshot API."""
-    
+
     name = "industry_performance_snapshot"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -86,15 +89,14 @@ class IndustryPerformanceSnapshotStream(PerformanceSnapshotStream):
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/industry-performance-snapshot"
 
 
 class HistoricalSectorPerformanceStream(HistoricalMarketPerformanceStream):
     """Stream for Historical Market Sector Performance API."""
-    
+
     name = "historical_sector_performance"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -105,19 +107,17 @@ class HistoricalSectorPerformanceStream(HistoricalMarketPerformanceStream):
 
     @property
     def partitions(self):
-        """Partition by sector."""
         return self._tap.get_cached_sectors()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/historical-sector-performance"
 
 
 class HistoricalIndustryPerformanceStream(HistoricalMarketPerformanceStream):
     """Stream for Historical Industry Performance API."""
-    
+
     name = "historical_industry_performance"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -128,20 +128,19 @@ class HistoricalIndustryPerformanceStream(HistoricalMarketPerformanceStream):
 
     @property
     def partitions(self):
-        """Partition by industry."""
         return self._tap.get_cached_industries()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/historical-industry-performance"
+
 
 class SectorPeSnapshotStream(PerformanceSnapshotStream):
     """Stream for Sector PE Snapshot API."""
-    
+
     name = "sector_pe_snapshot"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -151,16 +150,16 @@ class SectorPeSnapshotStream(PerformanceSnapshotStream):
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/sector-pe-snapshot"
+
 
 class IndustryPeSnapshotStream(PerformanceSnapshotStream):
     """Stream for Industry PE Snapshot API."""
-    
+
     name = "industry_pe_snapshot"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -170,15 +169,14 @@ class IndustryPeSnapshotStream(PerformanceSnapshotStream):
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/industry-pe-snapshot"
 
 
 class HistoricalSectorPeStream(HistoricalMarketPerformanceStream):
     """Stream for Historical Sector PE API."""
-    
+
     name = "historical_sector_pe"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -189,19 +187,17 @@ class HistoricalSectorPeStream(HistoricalMarketPerformanceStream):
 
     @property
     def partitions(self):
-        """Partition by sector."""
         return self._tap.get_cached_sectors()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/historical-sector-pe"
 
 
 class HistoricalIndustryPeStream(HistoricalMarketPerformanceStream):
     """Stream for Historical Industry PE API."""
-    
+
     name = "historical_industry_pe"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -212,21 +208,19 @@ class HistoricalIndustryPeStream(HistoricalMarketPerformanceStream):
 
     @property
     def partitions(self):
-        """Partition by industry."""
         return self._tap.get_cached_industries()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/historical-industry-pe"
 
 
 class BiggestStockGainersStream(FmpRestStream):
     """Stream for Biggest Stock Gainers API."""
-    
+
     name = "biggest_stock_gainers"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -238,17 +232,16 @@ class BiggestStockGainersStream(FmpRestStream):
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/biggest-gainers"
 
 
 class BiggestStockLosersStream(FmpRestStream):
     """Stream for Biggest Stock Losers API."""
-    
+
     name = "biggest_stock_losers"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -260,17 +253,16 @@ class BiggestStockLosersStream(FmpRestStream):
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/biggest-losers"
 
 
 class TopTradedStocksStream(FmpRestStream):
     """Stream for Top Traded Stocks API."""
-    
+
     name = "top_traded_stocks"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -282,5 +274,4 @@ class TopTradedStocksStream(FmpRestStream):
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/most-actives"

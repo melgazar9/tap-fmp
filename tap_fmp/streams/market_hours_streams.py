@@ -1,6 +1,10 @@
 import typing as t
 
-from tap_fmp.client import FmpRestStream, SymbolPartitionTimeSliceStream, TimeSliceStream
+from tap_fmp.client import (
+    FmpRestStream,
+    TimeSliceStream,
+)
+
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
@@ -29,7 +33,10 @@ class ExchangeMarketHoursStream(FmpRestStream):
 
     @property
     def partitions(self):
-        return [{"exchange": exchange_json.get("exchange")} for exchange_json in self._tap.get_cached_exchanges()]
+        return [
+            {"exchange": exchange_json.get("exchange")}
+            for exchange_json in self._tap.get_cached_exchanges()
+        ]
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         self.query_params.update({"exchange": context.get("exchange")})
@@ -54,7 +61,10 @@ class HolidaysByExchangeStream(TimeSliceStream):
 
     @property
     def partitions(self):
-        return [{"exchange": exchange_json.get("exchange")} for exchange_json in self._tap.get_cached_exchanges()]
+        return [
+            {"exchange": exchange_json.get("exchange")}
+            for exchange_json in self._tap.get_cached_exchanges()
+        ]
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/holidays-by-exchange"
@@ -62,6 +72,7 @@ class HolidaysByExchangeStream(TimeSliceStream):
     def get_records(self, context: Context | None) -> Iterable[dict]:
         self.query_params.update(context)
         yield from super().get_records(context)
+
 
 class AllExchangeMarketHoursStream(FmpRestStream):
     name = "all_exchange_market_hours"

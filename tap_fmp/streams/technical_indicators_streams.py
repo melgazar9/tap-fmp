@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import typing as t
-
 from singer_sdk import typing as th
+
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import SymbolPartitionStream
-
 
 
 class BaseTechnicalIndicatorStream(SymbolPartitionStream):
@@ -47,12 +45,16 @@ class BaseTechnicalIndicatorStream(SymbolPartitionStream):
         else:
             symbols = [c.get("symbol") for c in self._tap.get_cached_symbols()]
 
-        timeframes = [query_timeframe] if query_timeframe else (
-            other_timeframes.split(",") if other_timeframes else [None]
+        timeframes = (
+            [query_timeframe]
+            if query_timeframe
+            else (other_timeframes.split(",") if other_timeframes else [None])
         )
 
-        period_lengths = [query_period_length] if query_period_length else (
-            other_period_lengths.split(",") if other_period_lengths else [None]
+        period_lengths = (
+            [query_period_length]
+            if query_period_length
+            else (other_period_lengths.split(",") if other_period_lengths else [None])
         )
 
         if not timeframes:
@@ -79,9 +81,9 @@ class BaseTechnicalIndicatorStream(SymbolPartitionStream):
 
 class SimpleMovingAverageStream(BaseTechnicalIndicatorStream):
     """Stream for Simple Moving Average API."""
-    
+
     name = "simple_moving_average"
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateTimeType, required=True),
@@ -99,9 +101,9 @@ class SimpleMovingAverageStream(BaseTechnicalIndicatorStream):
 
 class ExponentialMovingAverageStream(BaseTechnicalIndicatorStream):
     """Stream for Exponential Moving Average API."""
-    
+
     name = "exponential_moving_average"
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateTimeType, required=True),
@@ -119,9 +121,9 @@ class ExponentialMovingAverageStream(BaseTechnicalIndicatorStream):
 
 class WeightedMovingAverageStream(BaseTechnicalIndicatorStream):
     """Stream for Weighted Moving Average API."""
-    
+
     name = "weighted_moving_average"
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateTimeType, required=True),
@@ -139,9 +141,9 @@ class WeightedMovingAverageStream(BaseTechnicalIndicatorStream):
 
 class DoubleExponentialMovingAverageStream(BaseTechnicalIndicatorStream):
     """Stream for Double Exponential Moving Average API."""
-    
+
     name = "double_exponential_moving_average"
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateTimeType, required=True),
@@ -159,9 +161,9 @@ class DoubleExponentialMovingAverageStream(BaseTechnicalIndicatorStream):
 
 class TripleExponentialMovingAverageStream(BaseTechnicalIndicatorStream):
     """Stream for Triple Exponential Moving Average API."""
-    
+
     name = "triple_exponential_moving_average"
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateTimeType, required=True),
@@ -179,9 +181,9 @@ class TripleExponentialMovingAverageStream(BaseTechnicalIndicatorStream):
 
 class RelativeStrengthIndexStream(BaseTechnicalIndicatorStream):
     """Stream for Relative Strength Index API."""
-    
+
     name = "relative_strength_index"
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateTimeType, required=True),
@@ -199,9 +201,9 @@ class RelativeStrengthIndexStream(BaseTechnicalIndicatorStream):
 
 class StandardDeviationStream(BaseTechnicalIndicatorStream):
     """Stream for Standard Deviation API."""
-    
+
     name = "standard_deviation"
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateTimeType, required=True),
@@ -219,9 +221,9 @@ class StandardDeviationStream(BaseTechnicalIndicatorStream):
 
 class WilliamsStream(BaseTechnicalIndicatorStream):
     """Stream for Williams %R API."""
-    
+
     name = "williams"
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateTimeType, required=True),
@@ -239,9 +241,9 @@ class WilliamsStream(BaseTechnicalIndicatorStream):
 
 class AverageDirectionalIndexStream(BaseTechnicalIndicatorStream):
     """Stream for Average Directional Index API."""
-    
+
     name = "average_directional_index"
-    
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateTimeType, required=True),

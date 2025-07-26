@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
-import typing as t
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpRestStream, SymbolPartitionStream
-from tap_fmp.streams.chart_streams import ChartLightStream, PriceVolumeStream, Prices1minStream, Prices5minStream, Prices1HrStream
+from tap_fmp.streams.chart_streams import (
+    ChartLightStream,
+    PriceVolumeStream,
+    Prices1minStream,
+    Prices5minStream,
+    Prices1HrStream,
+)
 
 
 class ForexPairsStream(FmpRestStream):
     name = "forex_pairs"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -31,7 +36,10 @@ class ForexPairsStream(FmpRestStream):
 class ForexPartitionStream(SymbolPartitionStream):
     @property
     def partitions(self):
-        return [{"symbol": forex_json.get("symbol")} for forex_json in self._tap.get_cached_forex_pairs()]
+        return [
+            {"symbol": forex_json.get("symbol")}
+            for forex_json in self._tap.get_cached_forex_pairs()
+        ]
 
 
 class ForexSymbolPartitionMixin(FmpRestStream):
@@ -46,20 +54,31 @@ class ForexSymbolPartitionMixin(FmpRestStream):
         )
 
         if query_params_symbol:
-            return [{"symbol": query_params_symbol}] if isinstance(query_params_symbol, str) else query_params_symbol
+            return (
+                [{"symbol": query_params_symbol}]
+                if isinstance(query_params_symbol, str)
+                else query_params_symbol
+            )
         elif other_params_symbols:
-            return [{"symbol": symbol} for symbol in other_params_symbols] if isinstance(other_params_symbols, list) else other_params_symbols
+            return (
+                [{"symbol": symbol} for symbol in other_params_symbols]
+                if isinstance(other_params_symbols, list)
+                else other_params_symbols
+            )
         else:
-            return [{"symbol": forex_json.get("symbol")} for forex_json in self._tap.get_cached_forex_pairs()]
+            return [
+                {"symbol": forex_json.get("symbol")}
+                for forex_json in self._tap.get_cached_forex_pairs()
+            ]
 
 
 class ForexQuoteStream(ForexSymbolPartitionMixin, ForexPartitionStream):
     """Stream for Forex Quote API."""
-    
+
     name = "forex_quotes"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -88,11 +107,11 @@ class ForexQuoteStream(ForexSymbolPartitionMixin, ForexPartitionStream):
 
 class ForexQuoteShortStream(ForexSymbolPartitionMixin, ForexPartitionStream):
     """Stream for Forex Short Quote API."""
-    
+
     name = "forex_quotes_short"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -107,11 +126,11 @@ class ForexQuoteShortStream(ForexSymbolPartitionMixin, ForexPartitionStream):
 
 class BatchForexQuotesStream(FmpRestStream):
     """Stream for Batch Forex Quotes API."""
-    
+
     name = "batch_forex_quotes"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
