@@ -6,7 +6,6 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpRestStream, SymbolPartitionStream
-
 from datetime import datetime
 
 
@@ -15,6 +14,11 @@ class LatestInsiderTradingStream(FmpRestStream):
 
     name = "latest_insider_trading"
     primary_keys = ["surrogate_key"]
+    replication_method = "INCREMENTAL"
+    replication_key = "filing_date"
+    _paginate = True
+    _max_pages = 100
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -35,10 +39,6 @@ class LatestInsiderTradingStream(FmpRestStream):
         th.Property("security_name", th.StringType),
         th.Property("url", th.StringType),
     ).to_dict()
-
-    _paginate = True
-    _max_pages = 100
-    _add_surrogate_key = True
 
     def get_url(self, context: Context | None = None) -> str:
         """Get URL for the request."""
@@ -58,6 +58,9 @@ class SearchInsiderTradesStream(SymbolPartitionStream):
 
     name = "insider_trades_search"
     primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
+    _paginate = True
+    _max_pages = 100
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -78,9 +81,6 @@ class SearchInsiderTradesStream(SymbolPartitionStream):
         th.Property("security_name", th.StringType),
         th.Property("url", th.StringType),
     ).to_dict()
-
-    _add_surrogate_key = True
-    _paginate = True
 
     def get_url(self, context: Context | None = None) -> str:
         """Get URL for the request."""
@@ -123,6 +123,7 @@ class InsiderTradeStatisticsStream(SymbolPartitionStream):
 
     name = "insider_trade_statistics"
     primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -141,8 +142,6 @@ class InsiderTradeStatisticsStream(SymbolPartitionStream):
         th.Property("total_sales", th.IntegerType),
     ).to_dict()
 
-    _add_surrogate_key = True
-
     def get_url(self, context: Context | None = None) -> str:
         """Get URL for the request."""
         return f"{self.url_base}/stable/insider-trading/statistics"
@@ -153,6 +152,7 @@ class AcquisitionOwnershipStream(SymbolPartitionStream):
 
     name = "acquisition_ownership"
     primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -172,8 +172,6 @@ class AcquisitionOwnershipStream(SymbolPartitionStream):
         th.Property("type_of_reporting_person", th.StringType),
         th.Property("url", th.StringType),
     ).to_dict()
-
-    _add_surrogate_key = True
 
     def get_url(self, context: Context | None = None) -> str:
         """Get URL for the request."""

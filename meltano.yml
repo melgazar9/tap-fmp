@@ -73,7 +73,7 @@ plugins:
 
       ### Calendar Streams ###
 
-      - dividends_calendar.*
+      - dividends_company.*
       - dividends_calendar.*
       - earnings_report.*
       - earnings_calendar.*
@@ -140,10 +140,10 @@ plugins:
       - financial_reports_form_10k_json.*
       - revenue_product_segmentation.*
       - revenue_geographic_segmentation.*
-      - as_reported_income_statements.*
-      - as_reported_balance_statements.*
-      - as_reported_cashflow_statements.*
-      - as_reported_financial_statements.*
+      - as_reported_income_statement.*
+      - as_reported_balance_statement.*
+      - as_reported_cashflow_statement.*
+      - as_reported_financial_statement.*
 
       ### Form 13F Streams ###
 
@@ -336,7 +336,7 @@ plugins:
 
       ratings_snapshot:
         query_params:
-          limit: 10
+          limit: 10  # max may change depending on plan
 
       historical_ratings:
         query_params:
@@ -354,13 +354,29 @@ plugins:
 
       historical_stock_grades:
         query_params:
-        limit: 100
+          limit: 1000
+
+      price_target_latest_news:
+        query_params:
+          limit: 1000
+
+      stock_grades_latest_news:
+        query_params:
+          limit: 1000
 
       ### Calendar Streams ###
 
       dividends_calendar:
         query_params:
           from: "2025-03-01"
+
+      dividends_company:
+        query_params:
+          limit: 1000
+
+      earnings_report:
+        query_params:
+          limit: 1000
 
       earnings_calendar:
         query_params:
@@ -371,6 +387,10 @@ plugins:
         query_params:
           from: "2025-07-01"
           to: "2025-07-10"
+
+      stock_split_details:
+        query_params:
+          limit: 1000
 
       stock_splits_calendar:
         query_params:
@@ -384,9 +404,30 @@ plugins:
       historical_market_cap:
         query_params:
           from: "2025-03-01"
+          limit: 5000
         other_params:
           time_slice_days: 90
           max_records_per_request: 5000
+
+      delisted_companies:
+        query_params:
+          limit: 100
+
+      company_employee_count:
+        query_params:
+          limit: 10000
+
+      all_shares_float:
+        query_params:
+          limit: 5000
+
+      latest_mergers_and_acquisitions:
+        query_params:
+          limit: 1000
+
+      company_historical_employee_count:
+        query_params:
+          limit: 10000
 
       ### Statement Streams ###
 
@@ -394,17 +435,25 @@ plugins:
         query_params:
           limit: 1000
 
+      balance_sheet:
+        query_params:
+          limit: 1000
+
+      cash_flow:
+        query_params:
+          limit: 1000
+
       income_statement_ttm:
         query_params:
-          limit: 100
+          limit: 1000
 
       balance_sheet_ttm:
         query_params:
-          limit: 100
+          limit: 1000
 
       cash_flow_ttm:
         query_params:
-          limit: 100
+          limit: 1000
 
       latest_financial_statements:
         query_params:
@@ -418,38 +467,81 @@ plugins:
       key_metrics:
         query_params:
           period: annual
+          limit: 1000
+
+      enterprise_values:
+        query_params:
+          limit: 1000
 
       revenue_product_segmentation:
         query_params:
-          period:
-            annual
+          period: annual
+          limit: 1000
 
       revenue_geographic_segmentation:
         query_params:
           period: annual
+          limit: 1000
 
       insider_trades_by_reporting_name_search:
         query_params:
           name: "Zuckerberg Mark"
 
+      balance_sheet_growth:
+        query_params:
+          limit: 1000
+
+      income_statement_growth:
+        query_params:
+          limit: 1000
+
+      cash_flow_growth:
+        query_params:
+          limit: 1000
+
+      as_reported_income_statement:
+        query_params:
+          limit: 1000
+
+      as_reported_balance_statement:
+        query_params:
+          limit: 1000
+
+      as_reported_cashflow_statement:
+        query_params:
+          limit: 1000
+
+      as_reported_financial_statement:
+        query_params:
+          limit: 1000
+
+      ### Insider Trades Streams ###
+
+      latest_insider_trading:
+        query_params:
+          limit: 1000
+
+      insider_trades_search:
+        query_params:
+          limit: 1000
 
       ### Market Performance Streams ###
 
       market_sector_performance_snapshot:
         other_params:
-          date_range: "2025-05-01, 2025-05-10"
+          date_range: ["2025-05-01", "2025-05-10"]
 
       industry_performance_snapshot:
         other_params:
-          date_range: "2025-05-01, 2025-05-10"
+          date_range: ["2025-05-01", "2025-05-10"]
 
       sector_pe_snapshot:
         other_params:
-          date_range: "2025-05-01, 2025-05-10"
+          date_range: ["2025-05-01", "2025-05-10"]
 
       industry_pe_snapshot:
         other_params:
-          date_range: "2025-05-01, 2025-05-10"
+          date_range: ["2025-05-01", "2025-05-10"]
 
       historical_sector_performance:
         query_params:
@@ -638,39 +730,52 @@ plugins:
         query_params:
           from: "2025-01-02"
           to: "2025-01-03"
+          limit: 250
+
+      press_releases:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-03"
+          limit: 250
 
       stock_news:
         query_params:
           from: "2025-01-02"
           to: "2025-01-03"
+          limit: 250
 
       crypto_news:
         query_params:
           from: "2025-01-02"
           to: "2025-01-03"
+          limit: 250
 
       forex_news:
         query_params:
           from: "2025-01-02"
           to: "2025-01-03"
+          limit: 250
 
       search_stock_news:
         query_params:
-          symbols: "AAPL,META"
+          symbols: ["AAPL", "META"]
           from: "2025-01-02"
           to: "2025-01-03"
+          limit: 250
 
       search_crypto_news:
         query_params:
-          symbols: "BTCUSD,ETHUSD"
+          symbols: ["BTCUSD", "ETHUSD"]
           from: "2025-01-02"
-          to: "2025-01-03"
+          to: "2025-01-06"
+          limit: 250
 
       search_forex_news:
         query_params:
           symbols: "EURUSD"
           from: "2025-01-02"
-          to: "2025-01-03"
+          to: "2025-01-06"
+          limit: 250
 
       ### Technical Indicator Streams ###
 
@@ -678,41 +783,41 @@ plugins:
         query_params:
           periodLength: 10
           from: "2025-01-02"
-          to: "2025-01-03"
+          to: "2025-01-06"
         other_params:
-          timeframes: "5min,1hour"
+          timeframes: ["5min", "1hour"]
 
       exponential_moving_average:
         query_params:
           periodLength: 10
           from: "2025-01-02"
-          to: "2025-01-03"
+          to: "2025-01-06"
         other_params:
-          timeframes: "5min,1hour"
+          timeframes: ["5min", "1hour"]
 
       weighted_moving_average:
         query_params:
           periodLength: 10
           from: "2025-01-02"
-          to: "2025-01-03"
+          to: "2025-01-06"
         other_params:
-          timeframes: "5min,1hour"
+          timeframes: ["5min", "1hour"]
 
       double_exponential_moving_average:
         query_params:
           periodLength: 10
           from: "2025-01-02"
-          to: "2025-01-03"
+          to: "2025-01-06"
         other_params:
-          timeframes: "5min,1hour"
+          timeframes: ["5min", "1hour"]
 
       triple_exponential_moving_average:
         query_params:
           periodLength: 10
           from: "2025-01-02"
-          to: "2025-01-03"
+          to: "2025-01-06"
         other_params:
-          timeframes: "5min,1hour"
+          timeframes: ["5min", "1hour"]
 
       relative_strength_index:
         query_params:
@@ -720,31 +825,31 @@ plugins:
           from: "2025-01-02"
           to: "2025-01-03"
         other_params:
-          timeframes: "5min,1hour"
+          timeframes: ["5min", "1hour"]
 
       standard_deviation:
         query_params:
           periodLength: 10
           from: "2025-01-02"
-          to: "2025-01-03"
+          to: "2025-01-06"
         other_params:
-          timeframes: "5min,1hour"
+          timeframes: ["5min", "1hour"]
 
       williams:
         query_params:
           periodLength: 10
           from: "2025-01-02"
-          to: "2025-01-03"
+          to: "2025-01-06"
         other_params:
-          timeframes: "5min,1hour"
+          timeframes: ["5min", "1hour"]
 
       average_directional_index:
         query_params:
           periodLength: 10
           from: "2025-01-02"
-          to: "2025-01-03"
+          to: "2025-01-06"
         other_params:
-          timeframes: "5min,1hour"
+          timeframes: ["5min", "1hour"]
 
       ### Senate Streams ###
 
@@ -770,6 +875,7 @@ plugins:
         query_params:
           from: "2025-01-02"
           to: "2025-01-10"
+          limit: 1000
         other_params:
           form_types: [ "10-K", "10-Q", "8-K" ]
 
@@ -777,17 +883,20 @@ plugins:
         query_params:
           from: "2025-01-02"
           to: "2025-01-10"
+          limit: 1000
 
       sec_filings_by_cik:
         query_params:
           cik: "0000320193"  # Apple
           from: "2025-01-02"
           to: "2025-01-10"
+          limit: 1000
 
       latest_sec_filings:
         query_params:
           from: "2025-01-02"
           to: "2025-01-10"
+          limit: 1000
 
 
   loaders:

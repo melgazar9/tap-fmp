@@ -4,15 +4,17 @@ from __future__ import annotations
 
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
-from tap_fmp.client import FmpRestStream, TimeSliceStream
+from tap_fmp.client import FmpRestStream, TimeSliceStream, SymbolPartitionStream, SymbolPartitionTimeSliceStream
 
 
 class BaseNewsTimeSliceStream(TimeSliceStream):
     replication_key = "published_date"
     replication_method = "INCREMENTAL"
     is_timestamp_replication_key = True
+    primary_keys = ["surrogate_key"]
     _paginate = True
     _add_surrogate_key = True
+    _max_pages = 100
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -27,15 +29,14 @@ class BaseNewsTimeSliceStream(TimeSliceStream):
     ).to_dict()
 
 
-class BaseSearchNewsStream(BaseNewsTimeSliceStream):
+class BaseSearchNewsSymbolPartitionStream(SymbolPartitionTimeSliceStream, TimeSliceStream):
+    replication_key = "published_date"
+    replication_method = "INCREMENTAL"
+    is_timestamp_replication_key = True
+    primary_keys = ["surrogate_key"]
+    _paginate = True
+    _add_surrogate_key = True
     _max_pages = 100
-
-    @property
-    def partitions(self):
-        if "symbols" not in self.query_params:
-            return [{"symbols": s["symbol"]} for s in self._tap.get_cached_symbols()]
-        else:
-            return [{"symbols": s} for s in self.query_params.get("symbols").split(",")]
 
     def get_records(self, context: Context | None):
         self.query_params.update(context)
@@ -46,7 +47,6 @@ class FmpArticlesStream(FmpRestStream):
     """Stream for FMP Articles API."""
 
     name = "fmp_articles"
-    primary_keys = ["surrogate_key"]
     _paginate = True
     _add_surrogate_key = True
 
@@ -111,7 +111,7 @@ class ForexNewsStream(BaseNewsTimeSliceStream):
         return f"{self.url_base}/stable/news/forex-latest"
 
 
-class SearchPressReleasesStream(BaseSearchNewsStream):
+class SearchPressReleasesStream(BaseSearchNewsSymbolPartitionStream):
     """Stream for Search Press Releases API."""
 
     name = "search_press_releases"
@@ -132,7 +132,7 @@ class SearchPressReleasesStream(BaseSearchNewsStream):
         return f"{self.url_base}/stable/news/press-releases"
 
 
-class SearchStockNewsStream(BaseSearchNewsStream):
+class SearchStockNewsStream(BaseSearchNewsSymbolPartitionStream):
     """Stream for Search Stock News API."""
 
     name = "search_stock_news"
@@ -153,13 +153,10 @@ class SearchStockNewsStream(BaseSearchNewsStream):
         return f"{self.url_base}/stable/news/stock"
 
 
-class SearchCryptoNewsStream(BaseSearchNewsStream):
+class SearchCryptoNewsStream(BaseSearchNewsSymbolPartitionStream):
     """Stream for Search Crypto News API."""
 
     name = "search_crypto_news"
-    _paginate = True
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -177,13 +174,10 @@ class SearchCryptoNewsStream(BaseSearchNewsStream):
         return f"{self.url_base}/stable/news/crypto"
 
 
-class SearchForexNewsStream(BaseSearchNewsStream):
+class SearchForexNewsStream(BaseSearchNewsSymbolPartitionStream):
     """Stream for Search Forex News API."""
 
     name = "search_forex_news"
-    _paginate = True
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

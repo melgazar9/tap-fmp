@@ -76,6 +76,7 @@ class FinancialStatementSymbolsStream(FmpRestStream):
 class CikListStream(FmpRestStream):
     name = "cik_list"
     primary_keys = ["cik", "company_name"]
+    _paginate = True
 
     schema = th.PropertiesList(
         th.Property("cik", th.StringType, required=True),

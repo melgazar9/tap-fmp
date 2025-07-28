@@ -226,16 +226,29 @@ class DowJonesConstituentStream(SP500ConstituentStream):
         return f"{self.url_base}/stable/dowjones-constituent"
 
 
-class HistoricalSP500ConstituentStream(SP500ConstituentStream):
+class HistoricalSP500ConstituentStream(FmpRestStream):
     """Historical S&P 500 API - Historical data for the S&P 500 index changes."""
 
     name = "historical_sp500_constituent"
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
+        th.Property("date", th.DateType),
+        th.Property("date_added", th.StringType),
+        th.Property("added_security", th.StringType),
+        th.Property("removed_ticker", th.StringType),
+        th.Property("removed_security", th.StringType),
+        th.Property("reason", th.StringType),
+    ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
         return f"{self.url_base}/stable/historical-sp500-constituent"
 
 
-class HistoricalNasdaqConstituentStream(SP500ConstituentStream):
+class HistoricalNasdaqConstituentStream(HistoricalSP500ConstituentStream):
     """Historical Nasdaq API - Historical data for the Nasdaq index changes."""
 
     name = "historical_nasdaq_constituent"
@@ -244,7 +257,7 @@ class HistoricalNasdaqConstituentStream(SP500ConstituentStream):
         return f"{self.url_base}/stable/historical-nasdaq-constituent"
 
 
-class HistoricalDowJonesConstituentStream(SP500ConstituentStream):
+class HistoricalDowJonesConstituentStream(HistoricalSP500ConstituentStream):
     """Historical Dow Jones API - Historical data for the Dow Jones Industrial Average changes."""
 
     name = "historical_dow_jones_constituent"

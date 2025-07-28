@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-import typing as t
 from singer_sdk.helpers.types import Context
-
 from singer_sdk import typing as th
-
 from datetime import datetime
 
 from tap_fmp.client import FmpRestStream, SymbolPartitionStream, SymbolPartitionPeriodPartitionStream
 
 
 class StatementStream(SymbolPartitionPeriodPartitionStream):
+    _add_surrogate_key = True
+
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         if "fiscal_year" in row:
             row["fiscal_year"] = int(row["fiscal_year"])
@@ -586,6 +585,7 @@ class KeyMetricsTtmStream(SymbolPartitionStream):
     """Key metrics TTM data for companies."""
 
     name = "key_metrics_ttm"
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -649,6 +649,7 @@ class FinancialRatiosTtmStream(SymbolPartitionStream):
     """Financial ratios TTM data for companies."""
 
     name = "financial_ratios_ttm"
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -772,8 +773,6 @@ class FinancialRatiosTtmStream(SymbolPartitionStream):
         th.Property("enterprise_value_multiplettm", th.NumberType),
     ).to_dict()
 
-    _add_surrogate_key = True
-
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ratios-ttm"
 
@@ -787,6 +786,7 @@ class FinancialScoresStream(SymbolPartitionStream):
     """Financial scores data for companies."""
 
     name = "financial_scores"
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -804,8 +804,6 @@ class FinancialScoresStream(SymbolPartitionStream):
         th.Property("altmanz_score", th.NumberType),
     ).to_dict()
 
-    _add_surrogate_key = True
-
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/financial-scores"
 
@@ -814,6 +812,7 @@ class OwnerEarningsStream(SymbolPartitionStream):
     """Owner earnings data for companies."""
 
     name = "owner_earnings"
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -828,8 +827,6 @@ class OwnerEarningsStream(SymbolPartitionStream):
         th.Property("average_ppe", th.NumberType),
         th.Property("growth_capex", th.NumberType),
     ).to_dict()
-
-    _add_surrogate_key = True
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/owner-earnings"
@@ -852,8 +849,6 @@ class EnterpriseValuesStream(StatementStream):
         th.Property("enterprise_value", th.NumberType),
         th.Property("period", th.StringType),
     ).to_dict()
-
-    _add_surrogate_key = True
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/enterprise-values"
@@ -909,8 +904,6 @@ class IncomeStatementGrowthStream(StatementStream):
         th.Property("fiscal_year", th.IntegerType),
         th.Property("reported_currency", th.StringType),
     ).to_dict()
-
-    _add_surrogate_key = True
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/income-statement-growth"
@@ -1042,8 +1035,6 @@ class CashFlowGrowthStream(StatementStream):
         th.Property("growth_interest_paid", th.NumberType),
     ).to_dict()
 
-    _add_surrogate_key = True
-
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/cash-flow-statement-growth"
 
@@ -1108,6 +1099,7 @@ class FinancialStatementReportDatesStream(SymbolPartitionStream):
     """Financial statements report dates."""
 
     name = "financial_report_dates"
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -1118,8 +1110,6 @@ class FinancialStatementReportDatesStream(SymbolPartitionStream):
         th.Property("link_xlsx", th.StringType),
         th.Property("link_json", th.StringType),
     ).to_dict()
-
-    _add_surrogate_key = True
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/financial-reports-dates"
@@ -1353,8 +1343,6 @@ class FinancialReportsForm10kJsonStream(StatementStream):
         th.Property("cybersecurity_risk_management_a", th.ArrayType(th.AnyType())),
     ).to_dict()
 
-    _add_surrogate_key = True
-
     @property
     def partitions(self):
         query_params = self.config.get(self.name, {}).get("query_params", {})
@@ -1412,7 +1400,8 @@ class RevenueGeographicSegmentationStream(RevenueProductSegmentationStream):
 class AsReportedIncomeStatementsStream(StatementStream):
     """As reported income statements."""
 
-    name = "as_reported_income_statements"
+    name = "as_reported_income_statement"
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -1423,8 +1412,6 @@ class AsReportedIncomeStatementsStream(StatementStream):
         th.Property("date", th.DateType, required=True),
         th.Property("data", th.StringType),
     ).to_dict()
-
-    _add_surrogate_key = True
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/income-statement-as-reported"
@@ -1438,7 +1425,7 @@ class AsReportedIncomeStatementsStream(StatementStream):
 class AsReportedBalanceStatementsStream(AsReportedIncomeStatementsStream):
     """As reported balance statements."""
 
-    name = "as_reported_balance_statements"
+    name = "as_reported_balance_statement"
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/balance-sheet-statement-as-reported"
@@ -1447,7 +1434,7 @@ class AsReportedBalanceStatementsStream(AsReportedIncomeStatementsStream):
 class AsReportedCashflowStatementsStream(AsReportedIncomeStatementsStream):
     """As reported cash flow statements."""
 
-    name = "as_reported_cashflow_statements"
+    name = "as_reported_cashflow_statement"
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/cash-flow-statement-as-reported"
@@ -1456,7 +1443,7 @@ class AsReportedCashflowStatementsStream(AsReportedIncomeStatementsStream):
 class AsReportedFinancialStatementsStream(AsReportedIncomeStatementsStream):
     """As reported financial statements (all combined)."""
 
-    name = "as_reported_financial_statements"
+    name = "as_reported_financial_statement"
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/financial-statement-full-as-reported"

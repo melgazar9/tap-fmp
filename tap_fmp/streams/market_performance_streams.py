@@ -31,12 +31,12 @@ class PerformanceSnapshotStream(FmpRestStream):
         query_params = self.config.get(self.name, {}).get("query_params", {})
         other_params = self.config.get(self.name, {}).get("other_params", {})
         date_range = other_params.get("date_range")
+        assert isinstance(date_range, list) or date_range is None, "date_range must be a list"
         if "date" in query_params and "date_range" in other_params:
             raise ConfigValidationError(
                 "Cannot specify both 'date' and 'date_range' in query_params and other_params."
             )
-        if isinstance(date_range, str):
-            date_range = date_range.replace(" ", "").split(",")
+        if isinstance(date_range, list):
             dates = self.create_date_range(date_range)
             return [{"date": d} for d in dates]
         return None
@@ -49,7 +49,6 @@ class PerformanceSnapshotStream(FmpRestStream):
 class HistoricalMarketPerformanceStream(TimeSliceStream):
     """Stream for Historical Market Performance API."""
 
-    name = "historical_market_performance"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
 

@@ -163,6 +163,7 @@ class PriceTargetLatestNewsStream(FmpRestStream):
 
     name = "price_target_latest_news"
     _paginate = True
+    _max_pages = 100
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -285,6 +286,7 @@ class StockGradeLatestNewsStream(FmpRestStream):
     name = "stock_grades_latest_news"
     _add_surrogate_key = True
     _paginate = True
+    _max_pages = 100
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

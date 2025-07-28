@@ -6,10 +6,10 @@ from singer_sdk import typing as th
 
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.client import SymbolPartitionStream
+from tap_fmp.client import SymbolPartitionTimeSliceStream
 
 
-class BaseTechnicalIndicatorStream(SymbolPartitionStream):
+class BaseTechnicalIndicatorStream(SymbolPartitionTimeSliceStream):
     """Base class for technical indicator streams."""
 
     primary_keys = ["symbol", "date"]
@@ -41,24 +41,24 @@ class BaseTechnicalIndicatorStream(SymbolPartitionStream):
         if query_symbol:
             symbols = [query_symbol] if isinstance(query_symbol, str) else query_symbol
         elif other_symbols:
-            symbols = other_symbols.split(",")
+            symbols = other_symbols
         else:
             symbols = [c.get("symbol") for c in self._tap.get_cached_symbols()]
 
         timeframes = (
             [query_timeframe]
             if query_timeframe
-            else (other_timeframes.split(",") if other_timeframes else [None])
+            else other_timeframes
         )
 
         period_lengths = (
             [query_period_length]
             if query_period_length
-            else (other_period_lengths.split(",") if other_period_lengths else [None])
+            else (other_period_lengths if other_period_lengths else [None])
         )
 
         if not timeframes:
-            timeframes = "1min,5min,15min,30min,1hour,4hour,1day".split(",")
+            timeframes = ["1min", "5min", "15min", "30min", "1hour", "4hour", "1day"]
         if not period_lengths:
             period_lengths = [10]
 
