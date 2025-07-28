@@ -23,6 +23,7 @@ class FmpRestStream(Stream, ABC):
     _paginate = False
     _add_surrogate_key = False
     _max_pages = 10000  # prevent infinite loops
+    _paginate_key = "page"
 
     def __init__(self, tap: Tap) -> None:
         super().__init__(tap)
@@ -138,7 +139,7 @@ class FmpRestStream(Stream, ABC):
     ) -> list[dict]:
         """Centralized API call with retry logic."""
         if page is not None:
-            query_params["page"] = page
+            query_params[self._paginate_key] = page
         log_url = self.redact_api_key(url)
         log_params = {
             k: ("<REDACTED>" if k == "apikey" else v) for k, v in query_params.items()
@@ -166,7 +167,8 @@ class FmpRestStream(Stream, ABC):
 
             error_message = self.redact_api_key(
                 error_message
-            )  # This redacts any key in the message string
+            )
+
             raise requests.exceptions.HTTPError(
                 error_message,
                 response=e.response,
@@ -258,6 +260,40 @@ class SymbolPartitionStream(FmpRestStream):
                 record = self.post_process(record)
                 self._check_missing_fields(self.schema, record)
                 yield record
+
+class SymbolPartitionPeriodPartitionStream(FmpRestStream):
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
+
+    @staticmethod
+    def _get_periods(periods):
+        if periods is None or periods == "*":
+            periods = ["Q1", "Q2", "Q3", "Q4", "FY", "annual", "quarter"]
+        return periods
+
+    @property
+    def partitions(self):
+        config = self.config.get(self.name, {})
+        periods = (
+                config.get("query_params", {}).get("period")
+                or config.get("other_params", {}).get("periods")
+        )
+
+        periods = self._get_periods(periods)
+        symbols = self._tap.get_cached_symbols()
+
+        if not periods:
+            return [{"symbol": s["symbol"]} for s in symbols]
+
+        return [
+            {"symbol": s["symbol"], "period": period}
+            for s in symbols
+            for period in periods
+        ]
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        self.query_params.update(context)
+        return super().get_records(context)
 
 
 class TimeSliceStream(FmpRestStream):

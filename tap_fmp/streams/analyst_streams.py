@@ -1,12 +1,12 @@
-from tap_fmp.client import SymbolPartitionStream
+from tap_fmp.client import SymbolPartitionStream, SymbolPartitionPeriodPartitionStream, FmpRestStream
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 
-class AnalystEstimatesAnnualStream(SymbolPartitionStream):
+class AnalystEstimatesAnnualStream(SymbolPartitionPeriodPartitionStream):
     """Stream for analyst estimates."""
 
-    name = "analyst_estimates_annual"
+    name = "analyst_estimates"
     _paginate = True
 
     schema = th.PropertiesList(
@@ -34,15 +34,15 @@ class AnalystEstimatesAnnualStream(SymbolPartitionStream):
         th.Property("num_analysts_eps", th.IntegerType),
     ).to_dict()
 
+    @staticmethod
+    def _get_periods(periods):
+        if periods is None or periods == "*":
+            periods = ["annual", "quarter"]
+        return periods
+
     def get_url(self, context: Context):
         url = f"{self.url_base}/stable/analyst-estimates"
         return url
-
-
-class AnalystEstimatesQuarterlyStream(AnalystEstimatesAnnualStream):
-    name = "analyst_estimates_quarterly"
-    # Only need to change query_params in meltano.yml --> set period to quarterly for this stream.
-
 
 class RatingSnapshotStream(SymbolPartitionStream):
     name = "rating_snapshot"
@@ -158,10 +158,26 @@ class PriceTargetNewsStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/price-target-news"
 
 
-class PriceTargetLatestNewsStream(PriceTargetNewsStream):
+class PriceTargetLatestNewsStream(FmpRestStream):
     """Stream for price target latest news."""
 
     name = "price_target_latest_news"
+    _paginate = True
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("published_date", th.DateTimeType),
+        th.Property("news_url", th.StringType),
+        th.Property("news_title", th.StringType),
+        th.Property("analyst_name", th.StringType),
+        th.Property("price_target", th.NumberType),
+        th.Property("adj_price_target", th.NumberType),
+        th.Property("price_when_posted", th.NumberType),
+        th.Property("news_publisher", th.StringType),
+        th.Property("news_base_url", th.StringType),
+        th.Property("analyst_company", th.StringType),
+    ).to_dict()
 
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/price-target-latest-news"
@@ -263,10 +279,27 @@ class StockGradeNewsStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/grades-news"
 
 
-class StockGradeLatestNewsStream(StockGradeNewsStream):
+class StockGradeLatestNewsStream(FmpRestStream):
     """Stream for stock grade latest news."""
 
     name = "stock_grades_latest_news"
+    _add_surrogate_key = True
+    _paginate = True
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType, required=True),
+        th.Property("published_date", th.DateTimeType),
+        th.Property("news_url", th.StringType),
+        th.Property("news_title", th.StringType),
+        th.Property("news_base_url", th.StringType),
+        th.Property("news_publisher", th.StringType),
+        th.Property("new_grade", th.StringType),
+        th.Property("previous_grade", th.StringType),
+        th.Property("grading_company", th.StringType),
+        th.Property("action", th.StringType),
+        th.Property("price_when_posted", th.NumberType),
+    ).to_dict()
 
     def get_url(self, context: Context) -> str:
         return f"{self.url_base}/stable/grades-latest-news"

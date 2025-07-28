@@ -12,6 +12,7 @@ class PartitionedBulkStream(FmpRestStream):
     """Base class for bulk streams that need partitioning by part parameter."""
 
     _paginate = True
+    _paginate_key = "part"
 
     # TODO: Update client.py to have self.page_key as a param so we can pass "part" instead of page. This file is just a
     # placeholder for now. Need to test these streams as a follow-up --> cannot query these streams with starter plan.

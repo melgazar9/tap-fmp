@@ -122,7 +122,6 @@ class CikProfileStream(FmpRestStream):
 
 class CompanyNotesStream(CompanySymbolPartitionStream):
     name = "company_notes"
-    primary_keys = ["surrogate_key"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -246,7 +245,6 @@ class HistoricalMarketCapStream(SymbolPartitionTimeSliceStream):
 
 class CompanyShareAndLiquidityFloatStream(CompanySymbolPartitionStream):
     name = "company_share_and_liquidity_float"
-    primary_keys = ["surrogate_key"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -284,6 +282,8 @@ class AllSharesFloatStream(FmpRestStream):
 class LatestMergersAndAcquisitionsStream(FmpRestStream):
     name = "latest_mergers_and_acquisitions"
     primary_keys = ["surrogate_key"]
+    _paginate = True
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -297,9 +297,6 @@ class LatestMergersAndAcquisitionsStream(FmpRestStream):
         th.Property("accepted_date", th.DateTimeType),
         th.Property("link", th.StringType),
     ).to_dict()
-
-    _add_surrogate_key = True
-    _paginate = True
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/mergers-acquisitions-latest"
@@ -318,7 +315,6 @@ class SearchMergersAndAcquisitionsStream(LatestMergersAndAcquisitionsStream):
 
 class CompanyExecutiveStream(CompanySymbolPartitionStream):
     name = "company_executives"
-    primary_keys = ["surrogate_key"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -337,7 +333,6 @@ class CompanyExecutiveStream(CompanySymbolPartitionStream):
 
 class ExecutiveCompensationStream(CompanySymbolPartitionStream):
     name = "executive_compensation"
-    primary_keys = ["surrogate_key"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -364,7 +359,6 @@ class ExecutiveCompensationStream(CompanySymbolPartitionStream):
 
 class ExecutiveCompensationBenchmarkStream(CompanySymbolPartitionStream):
     name = "executive_compensation_benchmark"
-    primary_keys = ["surrogate_key"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

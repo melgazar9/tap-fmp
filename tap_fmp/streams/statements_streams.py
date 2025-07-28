@@ -4,32 +4,15 @@ from __future__ import annotations
 
 import typing as t
 from singer_sdk.helpers.types import Context
+
 from singer_sdk import typing as th
+
 from datetime import datetime
 
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream
+from tap_fmp.client import FmpRestStream, SymbolPartitionStream, SymbolPartitionPeriodPartitionStream
 
 
-class StatementStream(FmpRestStream):
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
-
-    @property
-    def partitions(self):
-        query_params = self.config.get(self.name, {}).get("query_params", {})
-        periods = query_params.get("period")
-        if periods is None or periods == "*":
-            periods = ["Q1", "Q2", "Q3", "Q4", "FY", "annual", "quarter"]
-        return [
-            {"symbol": s["symbol"], "period": p}
-            for s in self._tap.get_cached_symbols()
-            for p in periods
-        ]
-
-    def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        self.query_params.update(context)
-        yield from super().get_records(context)
-
+class StatementStream(SymbolPartitionPeriodPartitionStream):
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         if "fiscal_year" in row:
             row["fiscal_year"] = int(row["fiscal_year"])
@@ -599,7 +582,7 @@ class FinancialRatiosStream(StatementStream):
         return f"{self.url_base}/stable/ratios"
 
 
-class KeyMetricsTtmStream(TtmStream):
+class KeyMetricsTtmStream(SymbolPartitionStream):
     """Key metrics TTM data for companies."""
 
     name = "key_metrics_ttm"
@@ -662,7 +645,7 @@ class KeyMetricsTtmStream(TtmStream):
         return super().post_process(row, context)
 
 
-class FinancialRatiosTtmStream(TtmStream):
+class FinancialRatiosTtmStream(SymbolPartitionStream):
     """Financial ratios TTM data for companies."""
 
     name = "financial_ratios_ttm"

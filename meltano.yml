@@ -352,6 +352,10 @@ plugins:
           to: "2025-03-15"
           limit: 100
 
+      historical_stock_grades:
+        query_params:
+        limit: 100
+
       ### Calendar Streams ###
 
       dividends_calendar:
