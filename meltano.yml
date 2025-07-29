@@ -304,6 +304,10 @@ plugins:
           - "0001045810"  # NVDA
           - "0001326801"  # META
 
+      exchanges:
+        select_exchanges:
+          - "*"
+
       ### Search Streams ###
 
       stock_screener:

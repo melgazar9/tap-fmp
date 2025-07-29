@@ -38,20 +38,17 @@ class CompanySymbolsStream(SymbolFetcher):
             return selected_symbols
         return None
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/stock-list"
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        """Get symbol records - no partitions, handles all symbols directly."""
         selected_symbols = self.get_symbol_list()
-
         if not selected_symbols:
             self.logger.info("No specific symbols selected, fetching all symbols...")
             symbol_records = self.fetch_all_symbols()
         else:
             self.logger.info(f"Processing selected symbols: {selected_symbols}")
             symbol_records = self.fetch_specific_symbols(selected_symbols)
-
         for record in symbol_records:
             yield record
 
@@ -67,7 +64,7 @@ class FinancialStatementSymbolsStream(FmpRestStream):
         th.Property("reporting_currency", th.StringType),
     ).to_dict()
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/financial-statement-symbol-list"
 
 
@@ -98,7 +95,7 @@ class CikListStream(CikFetcher):
             return selected_ciks
         return None
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/cik-list"
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
@@ -127,7 +124,7 @@ class SymbolChangesStream(FmpRestStream):
         th.Property("new_symbol", th.StringType, required=True),
     ).to_dict()
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/symbol-change"
 
 
@@ -140,7 +137,7 @@ class ETFSymbolStream(FmpRestStream):
         th.Property("name", th.StringType, required=True),
     ).to_dict()
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/etf-list"
 
 
@@ -153,7 +150,7 @@ class ActivelyTradingStream(FmpRestStream):
         th.Property("name", th.StringType, required=True),
     ).to_dict()
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/actively-trading-list"
 
 
@@ -167,35 +164,41 @@ class EarningsTranscriptStream(FmpRestStream):
         th.Property("no_of_transcripts", th.NumberType),
     ).to_dict()
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/earnings-transcript-list"
 
+class AvailableExchangesStream(ExchangeFetcher):
+    """Stream for pulling all exchanges."""
 
-class AvailableExchangesStream(FmpRestStream):
     name = "available_exchanges"
     primary_keys = ["exchange", "name"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("exchange", th.StringType, required=True),
         th.Property("name", th.StringType, required=True),
-        th.Property("country_name", th.StringType),
-        th.Property("country_code", th.StringType),
-        th.Property("symbol_suffix", th.StringType),
-        th.Property("delay", th.StringType),
+        th.Property("opening_hour", th.StringType),
+        th.Property("closing_hour", th.StringType),
+        th.Property("timezone", th.StringType),
+        th.Property("is_market_open", th.BooleanType),
+        th.Property("closing_additional", th.StringType),
+        th.Property("opening_additional", th.StringType),
     ).to_dict()
-
-    _add_surrogate_key = True
 
     def get_exchange_list(self) -> list[str] | None:
         """Get a list of selected exchanges from config."""
+
         exchanges_config = self.config.get("exchanges", {})
         selected_exchanges = exchanges_config.get("select_exchanges")
 
         if not selected_exchanges or selected_exchanges in ("*", ["*"]):
             return None
 
-        if isinstance(selected_exchanges, str):
+        if isinstance(selected_exchanges, str) and selected_exchanges != "*":
             return selected_exchanges.split(",")
+        elif selected_exchanges == "*":
+            return None
 
         if isinstance(selected_exchanges, list):
             if selected_exchanges == ["*"]:
@@ -203,28 +206,19 @@ class AvailableExchangesStream(FmpRestStream):
             return selected_exchanges
         return None
 
-    def get_url(self, context: Context):
-        return f"{self.url_base}/stable/all-exchange-market-hours"
-
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        """Get exchange records - no partitions, handles all exchanges directly."""
         selected_exchanges = self.get_exchange_list()
 
         if not selected_exchanges:
-            self.logger.info(
-                "No specific exchanges selected, fetching all exchanges..."
-            )
-            exchange_fetcher = ExchangeFetcher(self.config)
-            exchange_records = exchange_fetcher.fetch_all_exchanges()
+            self.logger.info("No specific exchanges selected, fetching all exchanges...")
+            exchange_records = self.fetch_all_exchanges()
         else:
             self.logger.info(f"Processing selected exchanges: {selected_exchanges}")
-            exchange_fetcher = ExchangeFetcher(self.config)
-            exchange_records = exchange_fetcher.fetch_specific_exchanges(
-                selected_exchanges
-            )
+            exchange_records = self.fetch_specific_exchanges(selected_exchanges)
 
         for record in exchange_records:
             record = self.post_process(record)
+            self._check_missing_fields(self.schema, record)
             yield record
 
 
@@ -236,7 +230,7 @@ class AvailableSectorsStream(FmpRestStream):
         th.Property("sector", th.StringType, required=True),
     ).to_dict()
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/available-sectors"
 
 
@@ -248,7 +242,7 @@ class AvailableIndustriesStream(FmpRestStream):
         th.Property("industry", th.StringType, required=True),
     ).to_dict()
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/available-industries"
 
 
@@ -260,5 +254,5 @@ class AvailableCountriesStream(FmpRestStream):
         th.Property("country", th.StringType, required=True),
     ).to_dict()
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/available-countries"

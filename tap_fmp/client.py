@@ -506,17 +506,17 @@ class CikFetcher(FmpRestStream):
         ]
 
 
-class ExchangeFetcher:
+class ExchangeFetcher(FmpRestStream):
     """
     Fetch and cache FMP exchanges in memory for the duration of a Meltano tap run.
     """
 
-    def __init__(self, config: MappingProxyType):
-        self.config = config
+    def get_url(self, context: Context | None = None) -> str:
+        return f"{self.url_base}/stable/all-exchange-market-hours"
 
-    def fetch_all_exchanges(self) -> list[dict]:
-        endpoint = f"{self.config.get('base_url')}/stable/all-exchange-market-hours"
-        response = requests.get(endpoint)
+    def fetch_all_exchanges(self, context: Context | None = None) -> list[dict]:
+        url = self.get_url(context)
+        response = requests.get(url, params=self.query_params)
         response.raise_for_status()
         exchanges = response.json()
         exchanges = clean_json_keys(exchanges)
