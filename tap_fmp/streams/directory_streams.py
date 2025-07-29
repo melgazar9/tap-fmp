@@ -2,15 +2,15 @@ import typing as t
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.client import FmpRestStream
-from tap_fmp.helpers import (
+from tap_fmp.client import (
+    FmpRestStream,
     SymbolFetcher,
     CikFetcher,
     ExchangeFetcher,
 )
 
 
-class CompanySymbolsStream(FmpRestStream):
+class CompanySymbolsStream(SymbolFetcher):
     """Stream for pulling all company symbols."""
 
     name = "company_symbols"
@@ -39,7 +39,7 @@ class CompanySymbolsStream(FmpRestStream):
         return None
 
     def get_url(self, context: Context):
-        return f"{self.url_base}/stable/stock-list?apikey={self.config.get('api_key')}"
+        return f"{self.url_base}/stable/stock-list"
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         """Get symbol records - no partitions, handles all symbols directly."""
@@ -47,12 +47,10 @@ class CompanySymbolsStream(FmpRestStream):
 
         if not selected_symbols:
             self.logger.info("No specific symbols selected, fetching all symbols...")
-            symbol_fetcher = SymbolFetcher(self.config)
-            symbol_records = symbol_fetcher.fetch_all_symbols()
+            symbol_records = self.fetch_all_symbols()
         else:
             self.logger.info(f"Processing selected symbols: {selected_symbols}")
-            symbol_fetcher = SymbolFetcher(self.config)
-            symbol_records = symbol_fetcher.fetch_specific_symbols(selected_symbols)
+            symbol_records = self.fetch_specific_symbols(selected_symbols)
 
         for record in symbol_records:
             yield record
@@ -73,7 +71,7 @@ class FinancialStatementSymbolsStream(FmpRestStream):
         return f"{self.url_base}/stable/financial-statement-symbol-list"
 
 
-class CikListStream(FmpRestStream):
+class CikListStream(CikFetcher):
     name = "cik_list"
     primary_keys = ["cik", "company_name"]
     _paginate = True
@@ -109,12 +107,10 @@ class CikListStream(FmpRestStream):
 
         if not selected_ciks:
             self.logger.info("No specific CIKs selected, fetching all CIKs...")
-            cik_fetcher = CikFetcher(self.config)
-            cik_records = cik_fetcher.fetch_all_ciks()
+            cik_records = self.fetch_all_ciks(context)
         else:
             self.logger.info(f"Processing selected CIKs: {selected_ciks}")
-            cik_fetcher = CikFetcher(self.config)
-            cik_records = cik_fetcher.fetch_specific_ciks(selected_ciks)
+            cik_records = self.fetch_specific_ciks(selected_ciks)
 
         for record in cik_records:
             yield record
