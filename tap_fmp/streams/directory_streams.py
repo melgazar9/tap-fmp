@@ -224,7 +224,7 @@ class AvailableExchangesStream(ExchangeFetcher):
 
 class AvailableSectorsStream(FmpRestStream):
     name = "available_sectors"
-    primary_keys = ["sectors"]
+    primary_keys = ["sector"]
 
     schema = th.PropertiesList(
         th.Property("sector", th.StringType, required=True),
