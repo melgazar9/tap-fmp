@@ -36,7 +36,7 @@ class IncomeStatementStream(StatementStream):
     name = "income_statement"
 
     schema = th.PropertiesList(
-        th.Property("surrogate_key", th.DateType, required=True),
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("reported_currency", th.StringType),
@@ -86,7 +86,7 @@ class BalanceSheetStream(StatementStream):
     name = "balance_sheet"
 
     schema = th.PropertiesList(
-        th.Property("surrogate_key", th.DateType, required=True),
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("reported_currency", th.StringType),
@@ -218,7 +218,7 @@ class LatestFinancialStatementsStream(FmpRestStream):
     _add_surrogate_key = True
 
     schema = th.PropertiesList(
-        th.Property("surrogate_key", th.DateType, required=True),
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("calendar_year", th.IntegerType),
@@ -234,7 +234,7 @@ class IncomeStatementTtmStream(TtmStream):
     name = "income_statement_ttm"
 
     schema = th.PropertiesList(
-        th.Property("surrogate_key", th.DateType, required=True),
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("symbol", th.StringType),
         th.Property("reported_currency", th.StringType),
@@ -284,7 +284,7 @@ class BalanceSheetTtmStream(TtmStream):
     name = "balance_sheet_ttm"
 
     schema = th.PropertiesList(
-        th.Property("surrogate_key", th.DateType, required=True),
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("symbol", th.StringType),
         th.Property("reported_currency", th.StringType),
