@@ -25,7 +25,7 @@ class DividendsCompanyStream(CalendarStream):
         th.Property("date", th.DateType),
         th.Property("record_date", th.DateType),
         th.Property("payment_date", th.DateType),
-        th.Property("declaration_date", th.DateType),
+        th.Property("declaration_date", th.CustomType({"type": ["string", "null"]})),
         th.Property("adj_dividend", th.NumberType),
         th.Property("dividend", th.NumberType),
         th.Property("yield", th.NumberType),
@@ -47,7 +47,7 @@ class DividendsCalendarStream(TimeSliceCalendarStream):
         th.Property("date", th.DateType),
         th.Property("record_date", th.StringType),
         th.Property("payment_date", th.StringType),
-        th.Property("declaration_date", th.StringType),
+        th.Property("declaration_date", th.CustomType({"type": ["string", "null"]})),
         th.Property("adj_dividend", th.NumberType),
         th.Property("dividend", th.NumberType),
         th.Property("yield", th.NumberType),
@@ -155,8 +155,21 @@ class IPOsProspectusStream(TimeSliceCalendarStream):
         th.Property("url", th.StringType),
     ).to_dict()
 
+    @staticmethod
+    def _normalize_ipo_date(raw_date: str) -> str:
+        assert isinstance(raw_date, str)
+        if raw_date.isdigit() and len(raw_date) == 4:
+            return f"{raw_date}-01-01"
+        else:
+            return raw_date
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ipos-prospectus"
+
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        if "ipo_date" in record:
+            record["ipo_date"] = self._normalize_ipo_date(record["ipo_date"])
+        return super().post_process(record, context)
 
 
 class StockSplitDetailsStream(CalendarStream):

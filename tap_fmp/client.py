@@ -14,7 +14,6 @@ import logging
 import requests
 from singer_sdk.exceptions import ConfigValidationError
 from tap_fmp.helpers import generate_surrogate_key
-from types import MappingProxyType
 
 
 class FmpRestStream(Stream, ABC):

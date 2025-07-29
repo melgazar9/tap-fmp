@@ -31,7 +31,7 @@ class BaseSecFilingTimeSliceStream(TimeSliceStream):
         th.Property("period_ending", th.DateType),
         th.Property("company_name", th.StringType),
         th.Property("form_type", th.StringType),
-        th.Property("filing_date", th.DateType),
+        th.Property("filing_date", th.DateTimeType),
         th.Property("ticker", th.StringType),
         th.Property("exchange", th.StringType),
         th.Property("filename", th.StringType),
@@ -127,6 +127,7 @@ class SecFilingsBySymbolStream(SymbolPartitionTimeSliceStream):
     _paginate = True
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.StringType),
@@ -154,12 +155,12 @@ class SecFilingsByCikStream(TimeSliceStream):
         th.Property("symbol", th.StringType),
         th.Property("cik", th.StringType),
         th.Property("acceptance_time", th.DateTimeType),
-        th.Property("final_link", th.DateTimeType),
+        th.Property("final_link", th.StringType),
         th.Property("accepted_date", th.DateTimeType),
         th.Property("period_ending", th.DateType),
         th.Property("company_name", th.StringType),
         th.Property("form_type", th.StringType),
-        th.Property("filing_date", th.DateType),
+        th.Property("filing_date", th.DateTimeType),
         th.Property("ticker", th.StringType),
         th.Property("exchange", th.StringType),
         th.Property("filename", th.StringType),
@@ -184,6 +185,7 @@ class SecFilingsByNameStream(FmpRestStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
+        th.Property("company", th.StringType),
         th.Property("name", th.StringType),
         th.Property("cik", th.StringType),
         th.Property("sic_code", th.StringType),
@@ -215,6 +217,7 @@ class SecFilingsCompanySearchBySymbolStream(SymbolPartitionStream):
     _add_surrogate_key = True
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("name", th.StringType),
         th.Property("cik", th.StringType),

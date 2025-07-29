@@ -14,9 +14,11 @@ class CompanySymbolsStream(SymbolFetcher):
     """Stream for pulling all company symbols."""
 
     name = "company_symbols"
-    primary_keys = ["symbol", "company_name"]
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("company_name", th.StringType),
     ).to_dict()
@@ -50,15 +52,19 @@ class CompanySymbolsStream(SymbolFetcher):
             self.logger.info(f"Processing selected symbols: {selected_symbols}")
             symbol_records = self.fetch_specific_symbols(selected_symbols)
         for record in symbol_records:
+            record = self.post_process(record)
+            self._check_missing_fields(self.schema, record)
             yield record
 
 
 class FinancialStatementSymbolsStream(FmpRestStream):
     name = "financial_statement_symbols"
-    primary_keys = ["symbol", "company_name"]
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
-        th.Property("symbol", th.StringType, required=True),
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
         th.Property("company_name", th.StringType),
         th.Property("trading_currency", th.StringType),
         th.Property("reporting_currency", th.StringType),
@@ -70,10 +76,12 @@ class FinancialStatementSymbolsStream(FmpRestStream):
 
 class CikListStream(CikFetcher):
     name = "cik_list"
-    primary_keys = ["cik", "company_name"]
+    primary_keys = ["surrogate_key"]
     _paginate = True
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("cik", th.StringType, required=True),
         th.Property("company_name", th.StringType),
     ).to_dict()
@@ -110,18 +118,22 @@ class CikListStream(CikFetcher):
             cik_records = self.fetch_specific_ciks(selected_ciks)
 
         for record in cik_records:
+            record = self.post_process(record)
+            self._check_missing_fields(self.schema, record)
             yield record
 
 
 class SymbolChangesStream(FmpRestStream):
     name = "symbol_changes"
-    primary_keys = ["date", "company_name", "old_symbol", "new_symbol"]
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType, required=True),
-        th.Property("company_name", th.StringType, required=True),
-        th.Property("old_symbol", th.StringType, required=True),
-        th.Property("new_symbol", th.StringType, required=True),
+        th.Property("company_name", th.StringType),
+        th.Property("old_symbol", th.StringType),
+        th.Property("new_symbol", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
@@ -156,9 +168,11 @@ class ActivelyTradingStream(FmpRestStream):
 
 class EarningsTranscriptStream(FmpRestStream):
     name = "earnings_transcript_list"
-    primary_keys = ["symbol", "company_name", "no_of_transcripts"]
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("company_name", th.StringType),
         th.Property("no_of_transcripts", th.NumberType),
@@ -166,6 +180,7 @@ class EarningsTranscriptStream(FmpRestStream):
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/earnings-transcript-list"
+
 
 class AvailableExchangesStream(ExchangeFetcher):
     """Stream for pulling all exchanges."""
@@ -210,7 +225,9 @@ class AvailableExchangesStream(ExchangeFetcher):
         selected_exchanges = self.get_exchange_list()
 
         if not selected_exchanges:
-            self.logger.info("No specific exchanges selected, fetching all exchanges...")
+            self.logger.info(
+                "No specific exchanges selected, fetching all exchanges..."
+            )
             exchange_records = self.fetch_all_exchanges()
         else:
             self.logger.info(f"Processing selected exchanges: {selected_exchanges}")

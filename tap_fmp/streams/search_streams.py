@@ -72,7 +72,7 @@ class ExchangeVariantsStream(SymbolPartitionStream):
         th.Property("dcf_diff", th.NumberType),
         th.Property("dcf", th.NumberType),
         th.Property("image", th.StringType),
-        th.Property("ipo_date", th.DateTimeType),
+        th.Property("ipo_date", th.CustomType({"type": ["string", "null"]})),
         th.Property("default_image", th.BooleanType),
         th.Property("is_etf", th.BooleanType),
         th.Property("is_actively_trading", th.BooleanType),
