@@ -226,7 +226,11 @@ class EquityOfferingUpdatesStream(FmpRestStream):
 
     @property
     def partitions(self):
-        if self.config.get(self.name, {}).get("other_params", {}).get("use_cached_ciks"):
+        if (
+            self.config.get(self.name, {})
+            .get("other_params", {})
+            .get("use_cached_ciks")
+        ):
             return [{"cik": c["cik"]} for c in self._tap.get_cached_ciks()]
         return {}
 

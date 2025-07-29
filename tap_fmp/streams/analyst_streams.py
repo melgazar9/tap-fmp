@@ -1,4 +1,8 @@
-from tap_fmp.client import SymbolPartitionStream, SymbolPartitionPeriodPartitionStream, FmpRestStream
+from tap_fmp.client import (
+    SymbolPartitionStream,
+    SymbolPartitionPeriodPartitionStream,
+    FmpRestStream,
+)
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
@@ -43,6 +47,7 @@ class AnalystEstimatesAnnualStream(SymbolPartitionPeriodPartitionStream):
     def get_url(self, context: Context):
         url = f"{self.url_base}/stable/analyst-estimates"
         return url
+
 
 class RatingSnapshotStream(SymbolPartitionStream):
     name = "rating_snapshot"

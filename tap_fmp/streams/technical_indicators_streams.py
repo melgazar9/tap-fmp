@@ -45,11 +45,7 @@ class BaseTechnicalIndicatorStream(SymbolPartitionTimeSliceStream):
         else:
             symbols = [c.get("symbol") for c in self._tap.get_cached_symbols()]
 
-        timeframes = (
-            [query_timeframe]
-            if query_timeframe
-            else other_timeframes
-        )
+        timeframes = [query_timeframe] if query_timeframe else other_timeframes
 
         period_lengths = (
             [query_period_length]

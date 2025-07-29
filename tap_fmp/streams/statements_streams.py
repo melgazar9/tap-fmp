@@ -6,7 +6,11 @@ from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 from datetime import datetime
 
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream, SymbolPartitionPeriodPartitionStream
+from tap_fmp.client import (
+    FmpRestStream,
+    SymbolPartitionStream,
+    SymbolPartitionPeriodPartitionStream,
+)
 
 
 class StatementStream(SymbolPartitionPeriodPartitionStream):
@@ -639,7 +643,11 @@ class KeyMetricsTtmStream(SymbolPartitionStream):
 
     def post_process(self, row: dict, context: Context = None) -> dict:
         row = {
-            (k[:-3].rstrip('_') + '_ttm') if (k.lower().endswith('ttm') and not k.lower().endswith('_ttm')) else k: v
+            (
+                (k[:-3].rstrip("_") + "_ttm")
+                if (k.lower().endswith("ttm") and not k.lower().endswith("_ttm"))
+                else k
+            ): v
             for k, v in row.items()
         }
         return super().post_process(row, context)

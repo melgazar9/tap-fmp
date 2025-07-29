@@ -165,9 +165,7 @@ class FmpRestStream(Stream, ABC):
                 else str(e)
             )
 
-            error_message = self.redact_api_key(
-                error_message
-            )
+            error_message = self.redact_api_key(error_message)
 
             raise requests.exceptions.HTTPError(
                 error_message,
@@ -261,6 +259,7 @@ class SymbolPartitionStream(FmpRestStream):
                 self._check_missing_fields(self.schema, record)
                 yield record
 
+
 class SymbolPartitionPeriodPartitionStream(FmpRestStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -274,10 +273,9 @@ class SymbolPartitionPeriodPartitionStream(FmpRestStream):
     @property
     def partitions(self):
         config = self.config.get(self.name, {})
-        periods = (
-                config.get("query_params", {}).get("period")
-                or config.get("other_params", {}).get("periods")
-        )
+        periods = config.get("query_params", {}).get("period") or config.get(
+            "other_params", {}
+        ).get("periods")
 
         periods = self._get_periods(periods)
         symbols = self._tap.get_cached_symbols()

@@ -47,6 +47,7 @@ class Form13fCikPartitionStream(FmpRestStream):
         self.query_params.update(context)
         return super().get_records(context)
 
+
 class Form13fSymbolPartitionStream(FmpRestStream):
     @property
     def partitions(self):
@@ -214,7 +215,9 @@ class Form13fFilingExtractsWithAnalytics(Form13fSymbolPartitionStream):
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
-        return f"{self.url_base}/stable/institutional-ownership/extract-analytics/holder"
+        return (
+            f"{self.url_base}/stable/institutional-ownership/extract-analytics/holder"
+        )
 
 
 class HolderPerformanceSummaryStream(FmpRestStream):
@@ -265,7 +268,9 @@ class HolderPerformanceSummaryStream(FmpRestStream):
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
-        return f"{self.url_base}/stable/institutional-ownership/holder-performance-summary"
+        return (
+            f"{self.url_base}/stable/institutional-ownership/holder-performance-summary"
+        )
 
     @property
     def partitions(self):
@@ -300,7 +305,9 @@ class HolderIndustryBreakdownStream(Form13fCikPartitionStream):
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
-        return f"{self.url_base}/stable/institutional-ownership/holder-industry-breakdown"
+        return (
+            f"{self.url_base}/stable/institutional-ownership/holder-industry-breakdown"
+        )
 
 
 class PositionsSummaryStream(Form13fSymbolPartitionStream):
@@ -351,7 +358,9 @@ class PositionsSummaryStream(Form13fSymbolPartitionStream):
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
-        return f"{self.url_base}/stable/institutional-ownership/symbol-positions-summary"
+        return (
+            f"{self.url_base}/stable/institutional-ownership/symbol-positions-summary"
+        )
 
 
 class IndustryPerformanceSummaryStream(FmpRestStream):
@@ -375,8 +384,9 @@ class IndustryPerformanceSummaryStream(FmpRestStream):
         query_params = cfg.get("query_params", {})
         other_params = cfg.get("other_params", {})
 
-        if ("year" in query_params or "quarter" in query_params) and \
-                ("years" in other_params or "quarters" in other_params):
+        if ("year" in query_params or "quarter" in query_params) and (
+            "years" in other_params or "quarters" in other_params
+        ):
             raise ValueError(
                 "Configuration error: Specify year/quarter in query_params OR years/quarters in other_params, not both."
             )

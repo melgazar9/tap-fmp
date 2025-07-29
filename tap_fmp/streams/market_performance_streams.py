@@ -31,7 +31,9 @@ class PerformanceSnapshotStream(FmpRestStream):
         query_params = self.config.get(self.name, {}).get("query_params", {})
         other_params = self.config.get(self.name, {}).get("other_params", {})
         date_range = other_params.get("date_range")
-        assert isinstance(date_range, list) or date_range is None, "date_range must be a list"
+        assert (
+            isinstance(date_range, list) or date_range is None
+        ), "date_range must be a list"
         if "date" in query_params and "date_range" in other_params:
             raise ConfigValidationError(
                 "Cannot specify both 'date' and 'date_range' in query_params and other_params."

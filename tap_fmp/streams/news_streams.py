@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
-from tap_fmp.client import FmpRestStream, TimeSliceStream, SymbolPartitionStream, SymbolPartitionTimeSliceStream
+from tap_fmp.client import (
+    FmpRestStream,
+    TimeSliceStream,
+    SymbolPartitionTimeSliceStream,
+)
 
 
 class BaseNewsTimeSliceStream(TimeSliceStream):
@@ -29,7 +33,9 @@ class BaseNewsTimeSliceStream(TimeSliceStream):
     ).to_dict()
 
 
-class BaseSearchNewsSymbolPartitionStream(SymbolPartitionTimeSliceStream, TimeSliceStream):
+class BaseSearchNewsSymbolPartitionStream(
+    SymbolPartitionTimeSliceStream, TimeSliceStream
+):
     replication_key = "published_date"
     replication_method = "INCREMENTAL"
     is_timestamp_replication_key = True
