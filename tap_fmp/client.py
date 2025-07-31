@@ -130,9 +130,16 @@ class FmpRestStream(Stream, ABC):
     @backoff.on_exception(
         backoff.expo,
         (requests.exceptions.RequestException,),
+        base=60,
+        max_value=120,
+        jitter=backoff.full_jitter,
         max_tries=8,
         max_time=300,
-        jitter=backoff.full_jitter,
+        giveup=lambda e: (
+            isinstance(e, requests.exceptions.HTTPError)
+            and e.response is not None
+            and e.response.status_code != 429
+        ),
     )
     def _fetch_with_retry(
         self, url: str, query_params: dict, page: int | None = None
@@ -164,9 +171,7 @@ class FmpRestStream(Stream, ABC):
                 if e.response and e.request
                 else str(e)
             )
-
             error_message = self.redact_api_key(error_message)
-
             raise requests.exceptions.HTTPError(
                 error_message,
                 response=e.response,
