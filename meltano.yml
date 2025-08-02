@@ -93,7 +93,7 @@ plugins:
       - company_employee_count.*
       - company_historical_employee_count.*
       - company_market_cap.*
-      - company_batch_market_cap.*
+#      - company_batch_market_cap.*
       - historical_market_cap.*
       - company_share_and_liquidity_float.*
       - all_shares_float.*
