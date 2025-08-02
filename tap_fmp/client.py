@@ -14,6 +14,9 @@ import logging
 import requests
 from singer_sdk.exceptions import ConfigValidationError
 from tap_fmp.helpers import generate_surrogate_key
+import threading
+import time
+import random
 
 
 class FmpRestStream(Stream, ABC):
@@ -29,6 +32,10 @@ class FmpRestStream(Stream, ABC):
         super().__init__(tap)
         self._all_symbols = None
         self.parse_config_params()
+
+        self._min_interval = float(self.config.get("min_backoff_seconds", 3.0))
+        self._throttle_lock = threading.Lock()
+        self._last_call_ts = 0.0
 
     def _get_stream_config(self) -> dict:
         """Get configuration for this specific stream."""
@@ -127,18 +134,26 @@ class FmpRestStream(Stream, ABC):
     def redact_api_key(msg):
         return re.sub(r"(apikey=)[^&\s]+", r"\1<REDACTED>", msg)
 
+    def _throttle(self) -> None:
+        with self._throttle_lock:
+            now = time.time()
+            wait = self._last_call_ts + self._min_interval - now
+            if wait > 0:
+                time.sleep(wait + random.uniform(0, 0.1))
+            self._last_call_ts = now
+
     @backoff.on_exception(
         backoff.expo,
         (requests.exceptions.RequestException,),
-        base=60,
-        max_value=120,
+        base=5,
+        max_value=180,
         jitter=backoff.full_jitter,
         max_tries=8,
-        max_time=300,
+        max_time=1000,
         giveup=lambda e: (
-            isinstance(e, requests.exceptions.HTTPError)
-            and e.response is not None
-            and e.response.status_code != 429
+                isinstance(e, requests.exceptions.HTTPError)
+                and e.response is not None
+                and e.response.status_code not in (429, 500, 502, 503, 504)
         ),
     )
     def _fetch_with_retry(
@@ -154,6 +169,7 @@ class FmpRestStream(Stream, ABC):
         logging.info(f"Requesting: {log_url} with params: {log_params}")
         query_params = {} if query_params is None else query_params
         try:
+            self._throttle()
             response = requests.get(url, params=query_params)
             response.raise_for_status()
             records = response.json()
@@ -273,7 +289,11 @@ class SymbolPartitionPeriodPartitionStream(FmpRestStream):
     def _get_periods(periods):
         if periods is None or periods == "*":
             periods = ["Q1", "Q2", "Q3", "Q4", "FY", "annual", "quarter"]
-        return periods
+        if isinstance(periods, str):
+            periods = [periods]
+        if isinstance(periods, (list, tuple, set)):
+            return list(periods)
+        raise ConfigValidationError("period(s) must be a string, list/tuple/set, or '*'")
 
     @property
     def partitions(self):
@@ -520,11 +540,7 @@ class ExchangeFetcher(FmpRestStream):
 
     def fetch_all_exchanges(self, context: Context | None = None) -> list[dict]:
         url = self.get_url(context)
-        response = requests.get(url, params=self.query_params)
-        response.raise_for_status()
-        exchanges = response.json()
-        exchanges = clean_json_keys(exchanges)
-        return exchanges
+        return self._fetch_with_retry(url, self.query_params)
 
     @staticmethod
     def fetch_specific_exchanges(exchange_list: list[str]) -> list[dict]:
