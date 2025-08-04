@@ -359,7 +359,7 @@ class ExecutiveCompensationStream(CompanySymbolPartitionStream):
 
 class ExecutiveCompensationBenchmarkStream(FmpRestStream):
     name = "executive_compensation_benchmark"
-    replication_key = "year"  # Issue here because the replication key is the same as the partition key
+    replication_key = "year"
     replication_method = "INCREMENTAL"
     _add_surrogate_key = True
 
