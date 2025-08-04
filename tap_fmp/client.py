@@ -174,7 +174,7 @@ class FmpRestStream(Stream, ABC):
         query_params = {} if query_params is None else query_params
         try:
             self._throttle()
-            response = requests.get(url, params=query_params)
+            response = requests.get(url, params=query_params, timeout=(20, 60))
             response.raise_for_status()
             records = response.json()
             if isinstance(records, dict) and len(records):
