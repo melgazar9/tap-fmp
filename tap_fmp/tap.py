@@ -28,8 +28,7 @@ from tap_fmp.streams.directory_streams import (
 )
 
 from tap_fmp.streams.analyst_streams import (
-    AnalystEstimatesAnnualStream,
-    # AnalystEstimatesQuarterlyStream,
+    AnalystEstimatesStream,
     RatingSnapshotStream,
     HistoricalRatingsStream,
     PriceTargetSummaryStream,
@@ -494,8 +493,7 @@ class TapFMP(Tap):
 
             ### Analyst Streams ###
 
-            AnalystEstimatesAnnualStream(self),
-            # AnalystEstimatesQuarterlyStream(self),
+            AnalystEstimatesStream(self),
             RatingSnapshotStream(self),
             HistoricalRatingsStream(self),
             PriceTargetSummaryStream(self),

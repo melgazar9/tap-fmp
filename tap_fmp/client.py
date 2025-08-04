@@ -27,6 +27,8 @@ class FmpRestStream(Stream, ABC):
     _add_surrogate_key = False
     _max_pages = 10000  # prevent infinite loops
     _paginate_key = "page"
+    _replication_key_starting_name = "from"
+    _replication_key_ending_name = "to"
 
     def __init__(self, tap: Tap) -> None:
         super().__init__(tap)
@@ -118,13 +120,15 @@ class FmpRestStream(Stream, ABC):
         if self.replication_method == "INCREMENTAL":
             state = self.get_context_state(context)
             if state.get("replication_key_value"):
-                return state["replication_key_value"]
+                return self._format_replication_key(state["replication_key_value"])
             elif state.get("starting_replication_value"):
-                return state["starting_replication_value"]
+                return self._format_replication_key(state["starting_replication_value"])
             else:
                 stream_config = self.config.get(self.name)
                 if stream_config:
-                    starting_timestamp = stream_config.get("from")
+                    starting_timestamp = stream_config.get(
+                        self._replication_key_starting_name
+                    )
                 else:
                     starting_timestamp = self.config.get("start_date")
                 return starting_timestamp
@@ -151,9 +155,9 @@ class FmpRestStream(Stream, ABC):
         max_tries=8,
         max_time=1000,
         giveup=lambda e: (
-                isinstance(e, requests.exceptions.HTTPError)
-                and e.response is not None
-                and e.response.status_code not in (429, 500, 502, 503, 504)
+            isinstance(e, requests.exceptions.HTTPError)
+            and e.response is not None
+            and e.response.status_code not in (429, 500, 502, 503, 504)
         ),
     )
     def _fetch_with_retry(
@@ -230,6 +234,10 @@ class FmpRestStream(Stream, ABC):
                 f"Reached maximum pages ({self._max_pages}). Some data may be missing."
             )
 
+    @staticmethod
+    def _format_replication_key(replication_key_value):
+        return replication_key_value
+
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         url = self.get_url(context)
         query_params = self.query_params.copy()
@@ -293,7 +301,9 @@ class SymbolPartitionPeriodPartitionStream(FmpRestStream):
             periods = [periods]
         if isinstance(periods, (list, tuple, set)):
             return list(periods)
-        raise ConfigValidationError("period(s) must be a string, list/tuple/set, or '*'")
+        raise ConfigValidationError(
+            "period(s) must be a string, list/tuple/set, or '*'"
+        )
 
     @property
     def partitions(self):
@@ -337,7 +347,9 @@ class TimeSliceStream(FmpRestStream):
         window_days = int(stream_cfg.get("time_slice_days", 90))
 
         query_params = stream_cfg.get("query_params", {})
-        start_date_cfg = query_params.get("from") or tap_cfg.get("start_date")
+        start_date_cfg = query_params.get(
+            self._replication_key_starting_name
+        ) or tap_cfg.get("start_date")
 
         end_date = query_params.get("to") or (
             datetime.now() + timedelta(days=90)
@@ -374,8 +386,8 @@ class TimeSliceStream(FmpRestStream):
         Recursively fetch all records for a window, splitting if we hit the max_records limit.
         """
         query_params = query_params.copy()
-        query_params["from"] = from_date
-        query_params["to"] = to_date
+        query_params[self._replication_key_starting_name] = from_date
+        query_params[self._replication_key_ending_name] = to_date
 
         records = self._fetch_with_retry(url, query_params)
         if len(records) < max_records:
@@ -427,7 +439,8 @@ class TimeSliceStream(FmpRestStream):
                 )
             except Exception as e:
                 logging.error(
-                    f"Failed to fetch records for symbol={context['symbol']} from={from_date} to={to_date}: {e}"
+                    f"Failed to fetch records for symbol={context['symbol']}"
+                    f"{self._replication_key_starting_name}={from_date} {self._replication_key_ending_name}={to_date}: {e}"
                 )
                 continue
 
@@ -467,7 +480,8 @@ class SymbolPartitionTimeSliceStream(TimeSliceStream):
                 )
             except Exception as e:
                 logging.error(
-                    f"Failed to fetch records for symbol={context['symbol']} from={from_date} to={to_date}: {e}"
+                    f"Failed to fetch records for symbol={context['symbol']}"
+                    f"{self._replication_key_starting_name}={from_date} {self._replication_key_ending_name}={to_date}: {e}"
                 )
                 continue
 

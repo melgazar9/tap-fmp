@@ -7,11 +7,11 @@ from tap_fmp.client import (
 )
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
+from datetime import datetime
 
 
 class CompanySymbolPartitionStream(SymbolPartitionStream):
     primary_keys = ["surrogate_key"]
-
     _add_surrogate_key = True
 
 
@@ -357,8 +357,11 @@ class ExecutiveCompensationStream(CompanySymbolPartitionStream):
         return f"{self.url_base}/stable/governance-executive-compensation"
 
 
-class ExecutiveCompensationBenchmarkStream(CompanySymbolPartitionStream):
+class ExecutiveCompensationBenchmarkStream(FmpRestStream):
     name = "executive_compensation_benchmark"
+    replication_key = "year"  # Issue here because the replication key is the same as the partition key
+    replication_method = "INCREMENTAL"
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -367,5 +370,46 @@ class ExecutiveCompensationBenchmarkStream(CompanySymbolPartitionStream):
         th.Property("average_compensation", th.NumberType),
     ).to_dict()
 
+    def _format_replication_key(self, replication_key_value):
+        if (
+            isinstance(replication_key_value, int)
+            and len(str(replication_key_value)) == 4
+        ):
+            return replication_key_value
+        elif isinstance(replication_key_value, str):
+            try:
+                output_value = datetime.strptime(replication_key_value, "%Y-%m-%d").year
+            except ValueError:
+                output_value = datetime.fromisoformat(replication_key_value).year
+            return output_value
+        else:
+            raise ValueError(f"Could not format replication key for stream {self.name}")
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/executive-compensation-benchmark"
+
+    @property
+    def partitions(self) -> list[dict] | None:
+        if "year" in self.query_params:
+            return [{"year": self.query_params.get("year")}]
+
+        other_params = self.config.get(self.name, {}).get("other_params", {})
+        all_years = [{"year": y} for y in range(1973, datetime.today().date().year + 1)]
+        cfg_start_year = datetime.fromisoformat(self.config.get("start_date")).year
+        all_available_years = [d for d in all_years if d["year"] >= cfg_start_year]
+
+        if other_params:
+            years = other_params.get("years")
+            if years == "*":
+                return all_available_years
+            elif isinstance(years, list):
+                return years
+            else:
+                raise ValueError(f"Could not set partitions for stream {self.name}")
+        else:
+            raise ValueError(f"Could not set partitions for stream {self.name}")
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        self.get_starting_timestamp(context)
+        self.query_params.update(context)
+        return super().get_records(context)

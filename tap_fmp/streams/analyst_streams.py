@@ -7,7 +7,7 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 
-class AnalystEstimatesAnnualStream(SymbolPartitionPeriodPartitionStream):
+class AnalystEstimatesStream(SymbolPartitionPeriodPartitionStream):
     """Stream for analyst estimates."""
 
     name = "analyst_estimates"
