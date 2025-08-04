@@ -388,8 +388,7 @@ class ExecutiveCompensationBenchmarkStream(FmpRestStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/executive-compensation-benchmark"
 
-    @property
-    def partitions(self) -> list[dict] | None:
+    def _get_years_dict(self):
         if "year" in self.query_params:
             return [{"year": self.query_params.get("year")}]
 
@@ -410,6 +409,9 @@ class ExecutiveCompensationBenchmarkStream(FmpRestStream):
             raise ValueError(f"Could not set partitions for stream {self.name}")
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        self.get_starting_timestamp(context)
-        self.query_params.update(context)
-        return super().get_records(context)
+        years_dict = self._get_years_dict()
+        starting_year = self.get_starting_timestamp(context)
+        filtered_years = [d for d in years_dict if d["year"] >= starting_year]
+        for year in filtered_years:
+            self.query_params.update(year)
+            yield from super().get_records(context)
