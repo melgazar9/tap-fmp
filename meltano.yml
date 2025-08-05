@@ -111,7 +111,7 @@ plugins:
 #      - unadjusted_price.*
 #      - dividend_adjusted_prices.*
 #      - prices_1min.*  # Only available for Premium plans and up
-#      - prices_5min.*
+      - prices_5min.*
 #      - prices_15min.*
 #      - prices_30min.*
 #      - prices_1hr.*
@@ -302,8 +302,14 @@ plugins:
       - all_industry_classification.*
 
 
+      ### COT Streams ###
+
+      - cot_report.*
+      - cot_analysis_by_date.*
+      - cot_report_list.*
+
     config:
-      start_date: '2010-01-01T00:00:00Z'
+      start_date: '2025-01-01T00:00:00Z'
       api_key: ${FMP_API_KEY}
       base_url: https://financialmodelingprep.com
       min_backoff_seconds: 3

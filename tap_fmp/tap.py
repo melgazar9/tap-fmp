@@ -254,6 +254,12 @@ from tap_fmp.streams.sec_filings_streams import (
     AllIndustryClassificationStream,
 )
 
+from tap_fmp.streams.commitment_of_traders_streams import (
+    CotReportListStream,
+    CotReportStream,
+    CotAnalysisByDateStream,
+)
+
 
 class TapFMP(Tap):
     """FMP tap class."""
@@ -291,6 +297,10 @@ class TapFMP(Tap):
     _cached_forex_pairs: t.List[dict] | None = None
     _forex_stream_instance: ForexPairsStream | None = None
     _forex_lock = threading.Lock()
+
+    _cached_cot_symbols: t.List[dict] | None = None
+    _cot_symbols_stream_instance: CotReportListStream | None = None
+    _cot_symbols_lock = threading.Lock()
 
     def get_cached_forex_pairs(self) -> t.List[dict]:
         """Thread-safe forex caching for parallel execution."""
@@ -466,6 +476,25 @@ class TapFMP(Tap):
             self.logger.info("Creating AvailableExchangesStream instance...")
             self._exchange_stream_instance = AvailableExchangesStream(self)
         return self._exchange_stream_instance
+
+    def get_cached_cot_symbols(self) -> t.List[dict]:
+        """Thread-safe COT symbols caching for parallel execution."""
+        if self._cached_cot_symbols is None:
+            with self._cot_symbols_lock:
+                if self._cached_cot_symbols is None:
+                    self.logger.info("Fetching and caching COT symbols...")
+                    cot_symbols_stream = self.get_cot_symbols_stream()
+                    self._cached_cot_symbols = list(
+                        cot_symbols_stream.get_records(context=None)
+                    )
+                    self.logger.info(f"Cached {len(self._cached_cot_symbols)} COT symbols.")
+        return self._cached_cot_symbols
+
+    def get_cot_symbols_stream(self) -> CotReportListStream:
+        if self._cot_symbols_stream_instance is None:
+            self.logger.info("Creating CotReportListStream instance...")
+            self._cot_symbols_stream_instance = CotReportListStream(self)
+        return self._cot_symbols_stream_instance
 
     def discover_streams(self) -> list:
         """Return a list of discovered streams."""
@@ -724,6 +753,12 @@ class TapFMP(Tap):
             IndustryClassificationListStream(self),
             IndustryClassificationSearchStream(self),
             AllIndustryClassificationStream(self),
+
+            ### Commitment of Traders Streams ###
+
+            CotReportStream(self),
+            CotAnalysisByDateStream(self),
+            CotReportListStream(self),
         ]
 
 

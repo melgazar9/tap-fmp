@@ -3,7 +3,13 @@ from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
 
-class CotReportStream(SymbolPartitionTimeSliceStream):
+class CotPartitionStream(SymbolPartitionTimeSliceStream):
+    @property
+    def partitions(self):
+        return [{"symbol": s["symbol"]} for s in self._tap.get_cached_cot_symbols()]
+
+
+class CotReportStream(CotPartitionStream):
     name = "cot_report"
 
     schema = th.PropertiesList(
@@ -143,8 +149,7 @@ class CotReportStream(SymbolPartitionTimeSliceStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/commitment-of-traders-report"
 
-
-class CotAnalysisByDateStream(SymbolPartitionTimeSliceStream):
+class CotAnalysisByDateStream(CotPartitionStream):
     name = "cot_analysis_by_date"
 
     schema = th.PropertiesList(
