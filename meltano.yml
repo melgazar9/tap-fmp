@@ -928,6 +928,18 @@ plugins:
           to: "2025-01-10"
           limit: 1000
 
+      ### COT Streams ###
+
+      cot_report:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      cot_analysis_by_date:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-10"
+
 
   loaders:
   - name: target-jsonl
