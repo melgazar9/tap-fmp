@@ -131,6 +131,26 @@ class MutualFundAndEtfDisclosureStream(EtfStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/etf/disclosure-holders-latest"
 
+    @property
+    def partitions(self):
+        other_params = self.config.get(self.name, {}).get("other_params", {})
+        
+        quarters = other_params.get("quarters", [1, 2, 3, 4])
+        
+        start_year = other_params.get("start_year", 2000)
+        if isinstance(start_year, str) and (start_year.startswith("19") or start_year.startswith("20")):
+            start_year = int(start_year[:4])
+        
+        years = [i for i in range(start_year, datetime.today().year + 1)]
+        
+        partitions = [
+            {"quarter": str(q), "year": str(y)}
+            for q in quarters
+            for y in years
+        ]
+        return partitions
+        
+
 
 class MutualFundDisclosuresStream(FmpRestStream):
     name = "mutual_fund_disclosures"

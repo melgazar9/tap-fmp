@@ -267,6 +267,18 @@ from tap_fmp.streams.economics_streams import (
     MarketRiskPremiumStream,
 )
 
+from tap_fmp.streams.etf_and_mutual_funds_streams import (
+    EtfAndFundHoldingsStream,
+    EtfAndMutualFundInformationStream,
+    EtfAndFundCountryAllocationStream,
+    EtfAssetExposureStream,
+    EtfSectorWeightingStream,
+    MutualFundAndEtfDisclosureStream,
+    MutualFundDisclosuresStream,
+    MutualFundAndEtfDisclosureNameSearchStream,
+    FundAndEtfDisclosuresByDateStream,
+)
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -773,7 +785,19 @@ class TapFMP(Tap):
             EconomicIndicatorsStream(self),
             EconomicCalendarStream(self),
             MarketRiskPremiumStream(self),
-            
+
+            ### ETF and Mutual Fund Streams ###
+
+            EtfAndFundHoldingsStream(self),
+            EtfAndMutualFundInformationStream(self),
+            EtfAndFundCountryAllocationStream(self),
+            EtfAssetExposureStream(self),
+            EtfSectorWeightingStream(self),
+            MutualFundAndEtfDisclosureStream(self),
+            MutualFundDisclosuresStream(self),
+            MutualFundAndEtfDisclosureNameSearchStream(self),
+            FundAndEtfDisclosuresByDateStream(self),
+
         ]
 
 
