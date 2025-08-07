@@ -315,6 +315,12 @@ plugins:
       - economic_calendar.*
       - market_risk_premium.*
 
+      ### ESG Data Streams (Premium) ###
+
+      - esg_scores.*
+      - esg_benchmark.*
+      - esg_investment_search.*
+
       ### ETF and Mutual Fund Streams ###
 
 #      - etf_and_fund_holdings.*
@@ -977,6 +983,20 @@ plugins:
         query_params:
           from: "2025-01-02"
           to: "2025-01-10"
+
+      ### ESG Data Streams (Premium) ###
+
+      esg_scores:
+        query_params:
+          limit: 5000
+
+      esg_benchmark:
+        query_params:
+          limit: 5000
+
+      esg_investment_search:
+        query_params:
+          limit: 1000
 
       ### ETF and Mutual Fund Streams ###
 
