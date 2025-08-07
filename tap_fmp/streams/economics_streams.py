@@ -40,7 +40,7 @@ class EconomicIndicatorsStream(EconomicsStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("name", th.NumberType),
+        th.Property("name", th.StringType),
         th.Property("date", th.DateType, required=True),
         th.Property("value", th.NumberType),
     ).to_dict()
@@ -50,38 +50,44 @@ class EconomicIndicatorsStream(EconomicsStream):
 
     @property
     def partitions(self):
-        indicator_names = [
-            "GDP",
-            "realGDP",
-            "nominalPotentialGDP",
-            "realGDPPerCapita",
-            "federalFunds",
-            "CPI",
-            "inflationRate",
-            "inflation",
-            "retailSales",
-            "consumerSentiment",
-            "durableGoods",
-            "unemploymentRate",
-            "totalNonfarmPayroll",
-            "initialClaims",
-            "industrialProductionTotalIndex",
-            "newPrivatelyOwnedHousingUnitsStartedTotalUnits",
-            "totalVehicleSales",
-            "retailMoneyFunds",
-            "smoothedUSRecessionProbabilities",
-            "3MonthOr90DayRatesAndYieldsCertificatesOfDeposit",
-            "commercialBankInterestRateOnCreditCardPlansAllAccounts",
-            "30YearFixedRateMortgageAverage",
-            "15YearFixedRateMortgageAverage",
-        ]
+        cfg_indicator_names = self.config.get(self.name, {}).get("other_params", {}).get("indicator_names")
+        if cfg_indicator_names:
+            indicator_names = cfg_indicator_names
+        else:
+            indicator_names = [
+                "GDP",
+                "realGDP",
+                "nominalPotentialGDP",
+                "realGDPPerCapita",
+                "federalFunds",
+                "CPI",
+                "inflationRate",
+                "inflation",
+                "retailSales",
+                "consumerSentiment",
+                "durableGoods",
+                "unemploymentRate",
+                "totalNonfarmPayroll",
+                "initialClaims",
+                "industrialProductionTotalIndex",
+                "newPrivatelyOwnedHousingUnitsStartedTotalUnits",
+                "totalVehicleSales",
+                "retailMoneyFunds",
+                "smoothedUSRecessionProbabilities",
+                "3MonthOr90DayRatesAndYieldsCertificatesOfDeposit",
+                "commercialBankInterestRateOnCreditCardPlansAllAccounts",
+                "30YearFixedRateMortgageAverage",
+                "15YearFixedRateMortgageAverage",
+            ]
 
         return [
-            {"indicator_name": indicator_name} for indicator_name in indicator_names
+            {"name": indicator_name} for indicator_name in indicator_names
         ]
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        self.query_params.update(context.get("indicator_name"))
+        indicator_name = context.get("name") if context else None
+        if indicator_name:
+            self.query_params["name"] = indicator_name
         yield from super().get_records(context)
 
 
@@ -100,6 +106,7 @@ class EconomicCalendarStream(EconomicsStream):
         th.Property("change", th.NumberType),
         th.Property("impact", th.StringType),
         th.Property("change_percentage", th.NumberType),
+        th.Property("unit", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
@@ -108,12 +115,13 @@ class EconomicCalendarStream(EconomicsStream):
 
 class MarketRiskPremiumStream(FmpRestStream):
     name = "market_risk_premium"
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("country", th.StringType),
         th.Property("continent", th.StringType),
-        th.Property("country_risk_premium", th.StringType),
+        th.Property("country_risk_premium", th.NumberType),
         th.Property("total_equity_risk_premium", th.NumberType),
     ).to_dict()
 

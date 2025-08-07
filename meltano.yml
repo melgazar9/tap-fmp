@@ -308,6 +308,13 @@ plugins:
       - cot_analysis_by_date.*
       - cot_report_list.*
 
+      ### Economic Streams ###
+
+      - treasury_rates.*
+      - economic_indicators.*
+      - economic_calendar.*
+      - market_risk_premium.*
+
     config:
       start_date: '2025-01-01T00:00:00Z'
       api_key: ${FMP_API_KEY}
@@ -940,6 +947,24 @@ plugins:
           from: "2025-01-02"
           to: "2025-01-10"
 
+      ### Economic Streams ###
+
+      economic_indicators:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-10"
+        other_params:
+          indicator_names: ["realGDP", "retailMoneyFunds"]
+
+      economic_calendar:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-10"
+
+      treasury_rates:
+        query_params:
+          from: "2025-01-02"
+          to: "2025-01-10"
 
   loaders:
   - name: target-jsonl

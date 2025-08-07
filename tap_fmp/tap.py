@@ -260,6 +260,12 @@ from tap_fmp.streams.commitment_of_traders_streams import (
     CotAnalysisByDateStream,
 )
 
+from tap_fmp.streams.economics_streams import (
+    TreasuryRatesStream,
+    EconomicIndicatorsStream,
+    EconomicCalendarStream,
+    MarketRiskPremiumStream,
+)
 
 class TapFMP(Tap):
     """FMP tap class."""
@@ -501,6 +507,7 @@ class TapFMP(Tap):
         # fmt: off
         return [
             ### Search Streams ###
+
             StockScreenerStream(self),
             ExchangeVariantsStream(self),
 
@@ -759,6 +766,14 @@ class TapFMP(Tap):
             CotReportStream(self),
             CotAnalysisByDateStream(self),
             CotReportListStream(self),
+
+            ### Economic Streams ###
+
+            TreasuryRatesStream(self),
+            EconomicIndicatorsStream(self),
+            EconomicCalendarStream(self),
+            MarketRiskPremiumStream(self),
+            
         ]
 
 
