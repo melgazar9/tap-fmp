@@ -179,12 +179,12 @@ plugins:
 #      - index_1min.*
       - index_5min.*
       - index_1hr.*
-#      - sp500_constituent.*
-#      - nasdaq_constituent.*
-#      - dow_jones_constituent.*
-#      - historical_sp500_constituent.*
-#      - historical_nasdaq_constituent.*
-#      - historical_dow_jones_constituent.*
+      - sp500_constituent.*
+      - nasdaq_constituent.*
+      - dow_jones_constituent.*
+      - historical_sp500_constituent.*
+      - historical_nasdaq_constituent.*
+      - historical_dow_jones_constituent.*
 
       ### Insider Trades Streams ###
 
