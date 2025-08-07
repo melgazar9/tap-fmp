@@ -14,43 +14,64 @@ from tap_fmp.client import FmpRestStream, TimeSliceStream
 
 class PerformanceSnapshotStream(FmpRestStream):
     primary_keys = ["surrogate_key"]
+    replication_key = "date"
+    replication_method = "INCREMENTAL"
     _add_surrogate_key = True
 
-    @staticmethod
-    def create_date_range(date_range):
-        all_dates = []
-        current_date = datetime.fromisoformat(date_range[0])
-        end_date = datetime.fromisoformat(date_range[-1])
-        while current_date <= end_date:
-            all_dates.append(current_date.strftime("%Y-%m-%d"))
-            current_date += timedelta(days=1)
-        return all_dates
+    def _format_replication_key(self, replication_key_value):
+        if isinstance(replication_key_value, str):
+            try:
+                # Try parsing as date string and return as YYYY-MM-DD
+                if 'T' in replication_key_value or 'Z' in replication_key_value:
+                    # ISO format with time
+                    output_value = datetime.fromisoformat(replication_key_value.replace('Z', '+00:00')).strftime("%Y-%m-%d")
+                else:
+                    # Already in YYYY-MM-DD format
+                    output_value = replication_key_value
+                return output_value
+            except ValueError:
+                pass
+        raise ValueError(f"Could not format replication key for stream {self.name}")
 
-    @property
-    def partitions(self):
+    def _get_dates_dict(self):
+        if "date" in self.query_params:
+            return [{"date": self.query_params.get("date")}]
+
         query_params = self.config.get(self.name, {}).get("query_params", {})
         other_params = self.config.get(self.name, {}).get("other_params", {})
         date_range = other_params.get("date_range")
-
-        assert (
-            isinstance(date_range, list) or date_range is None
-        ), "date_range must be a list"
-
-        if len(date_range) == 1 or date_range[-1] == "today":
-            date_range = date_range + [datetime.today().date().strftime("%Y-%m-%d")]
 
         if "date" in query_params and "date_range" in other_params:
             raise ConfigValidationError(
                 "Cannot specify both 'date' and 'date_range' in query_params and other_params."
             )
-        if isinstance(date_range, list):
-            dates = self.create_date_range(date_range)
-            return [{"date": d} for d in dates]
-        return None
+
+        if not date_range:
+            return [{"date": datetime.today().date().strftime("%Y-%m-%d")}]
+
+        assert isinstance(date_range, list), "date_range must be a list"
+
+        if len(date_range) == 1 or date_range[-1] == "today":
+            date_range = date_range + [datetime.today().date().strftime("%Y-%m-%d")]
+
+        # Generate all dates in range
+        all_dates = []
+        current_date = datetime.fromisoformat(date_range[0])
+        end_date = datetime.fromisoformat(date_range[-1])
+        while current_date <= end_date:
+            all_dates.append({"date": current_date.strftime("%Y-%m-%d")})
+            current_date += timedelta(days=1)
+        
+        return all_dates
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        self.query_params.update(context)
-        return super().get_records(context)
+        dates_dict = self._get_dates_dict()
+        starting_date = self.get_starting_timestamp(context)
+        filtered_dates = [d for d in dates_dict if d["date"] >= starting_date]
+        
+        for date_dict in filtered_dates:
+            self.query_params.update(date_dict)
+            yield from super().get_records(context)
 
 
 class HistoricalMarketPerformanceStream(TimeSliceStream):
