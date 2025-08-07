@@ -14,6 +14,7 @@ class AnalystEstimatesStream(SymbolPartitionPeriodPartitionStream):
     _paginate = True
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType, required=True),
         th.Property("revenue_low", th.NumberType),
