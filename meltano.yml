@@ -584,11 +584,11 @@ plugins:
 
       market_sector_performance_snapshot:
         other_params:
-          date_range: ["2025-05-01", "2025-05-10"]
+          date_range: ["2025-08-01", "today"]
 
       industry_performance_snapshot:
         other_params:
-          date_range: ["2025-05-01", "2025-05-10"]
+          date_range: ["2025-08-01"]
 
       sector_pe_snapshot:
         other_params:
