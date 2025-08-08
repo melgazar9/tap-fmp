@@ -155,11 +155,11 @@ class ETFSymbolStream(FmpRestStream):
 
 class ActivelyTradingStream(FmpRestStream):
     name = "actively_trading"
-    primary_keys = ["symbol", "name"]
+    primary_keys = ["symbol"]
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
-        th.Property("name", th.StringType, required=True),
+        th.Property("name", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:

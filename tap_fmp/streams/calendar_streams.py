@@ -194,8 +194,8 @@ class StockSplitsCalendarStream(TimeSliceCalendarStream):
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
-        th.Property("numerator", th.IntegerType),
-        th.Property("denominator", th.IntegerType),
+        th.Property("numerator", th.NumberType),
+        th.Property("denominator", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
