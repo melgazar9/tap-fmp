@@ -150,14 +150,18 @@ class FmpRestStream(Stream, ABC):
         backoff.expo,
         (requests.exceptions.RequestException,),
         base=5,
-        max_value=180,
+        max_value=300,
         jitter=backoff.full_jitter,
-        max_tries=8,
-        max_time=1000,
+        max_tries=12,
+        max_time=1800,
         giveup=lambda e: (
             isinstance(e, requests.exceptions.HTTPError)
             and e.response is not None
             and e.response.status_code not in (429, 500, 502, 503, 504)
+        ),
+        on_backoff=lambda details: logging.warning(
+            f"API request failed, retrying in {details['wait']:.1f}s "
+            f"(attempt {details['tries']}/{details['max_tries']}): {details['exception']}"
         ),
     )
     def _fetch_with_retry(
@@ -170,7 +174,7 @@ class FmpRestStream(Stream, ABC):
         log_params = {
             k: ("<REDACTED>" if k == "apikey" else v) for k, v in query_params.items()
         }
-        logging.info(f"Requesting: {log_url} with params: {log_params}")
+        logging.info(f"Stream {self.name}: Requesting: {log_url} with params: {log_params}")
         query_params = {} if query_params is None else query_params
         try:
             self._throttle()
@@ -181,7 +185,7 @@ class FmpRestStream(Stream, ABC):
                 records = [records]
             records = clean_json_keys(records)
             logging.info(
-                f"Records returned: {len(records) if isinstance(records, list) else 'not a list'}"
+                f"Stream {self.name}: Records returned: {len(records) if isinstance(records, list) else 'not a list'}"
             )
             return records
         except requests.exceptions.RequestException as e:
