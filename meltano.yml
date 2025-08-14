@@ -47,7 +47,7 @@ plugins:
       - symbol_changes.*
       - etf_symbols.*
       - actively_trading.*
-      # - earnings_transcripts.*  # limited to Premium, build or enterprise plans
+      - earnings_transcripts.*  # limited to Premium, build or enterprise plans
       - available_exchanges.*
       - available_sectors.*
       - available_industries.*
@@ -136,9 +136,9 @@ plugins:
       - balance_sheet.*
       - cash_flow.*
       - latest_financial_statements.*
-#      - income_statement_ttm.*
-#      - balance_sheet_ttm.*
-#      - cash_flow_ttm.*
+      - income_statement_ttm.*
+      - balance_sheet_ttm.*
+      - cash_flow_ttm.*
       - key_metrics.*
       - financial_ratios.*
       - key_metrics_ttm.*
@@ -161,12 +161,12 @@ plugins:
 
       ### Form 13F Streams ###
 
-#      - institutional_ownership_filings.*
-#      - filings_extract.*
-#      - holder_performance_summary.*
-#      - holder_industry_breakdown.*
-#      - positions_summary.*
-#      - industry_performance_summary.*
+      - institutional_ownership_filings.*
+      - filings_extract.*
+      - holder_performance_summary.*
+      - holder_industry_breakdown.*
+      - positions_summary.*
+      - industry_performance_summary.*
 
       ### Index Streams ###
 
@@ -256,7 +256,7 @@ plugins:
 
       - fmp_articles.*
       - general_news.*
-#      - press_releases.*
+      - press_releases.*
       - stock_news.*
       - crypto_news.*
       - forex_news.*
@@ -323,15 +323,15 @@ plugins:
 
       ### ETF and Mutual Fund Streams ###
 
-#      - etf_and_fund_holdings.*
+      - etf_and_fund_holdings.*
       - etf_and_mutual_fund_holdings.*
       - etf_and_fund_country_allocation.*
-#      - etf_asset_exposure.*
+      - etf_asset_exposure.*
       - etf_sector_weighting.*
-#      - mutual_fund_and_etf_disclosure.*
-#      - mutual_fund_disclosures.*
-#      - mutual_fund_and_etf_disclosure_name_search.*
-#      - fund_and_etf_disclosures_by_date.*
+      - mutual_fund_and_etf_disclosure.*
+      - mutual_fund_disclosures.*
+      - mutual_fund_and_etf_disclosure_name_search.*
+      - fund_and_etf_disclosures_by_date.*
 
     config:
       start_date: '2025-01-01T00:00:00Z'
@@ -345,11 +345,16 @@ plugins:
           - "NVDA"
           - "AP"
 
+      etf_symbols:
+        select_etf_symbols:
+          - "SPY"
+          - "QQQ"
+
       ciks:
         select_ciks:
           - "0000320193"  # AAPL
-          - "0001045810"  # NVDA
           - "0001326801"  # META
+          - "0001067983"  # Berkshire Hathaway Inc (institutional investor)
 
       exchanges:
         select_exchanges:
@@ -366,6 +371,16 @@ plugins:
           exchanges: ["NASDAQ", "NYSE", "AMEX", "TSX", "LSE", "NEO"]
 
       ### Directory Streams ###
+
+      # Earnings Transcript Streams (Premium and above)
+      latest_earning_transcripts:
+        query_params:
+          limit: 100
+
+      earnings_transcripts:
+        other_params:
+          quarters: [3]
+          years: ["2023"]
 
       cik_list:
         query_params:
@@ -569,6 +584,41 @@ plugins:
       as_reported_financial_statement:
         query_params:
           limit: 1000
+
+      ### Form 13F Streams ###
+
+      institutional_ownership_filings:
+        other_params:
+          quarters: [3]
+          years: ["2023"]
+          page: 0
+
+      filings_extract:
+        other_params:
+          quarters: [3]
+          years: ["2023"]
+
+      holder_performance_summary:
+        query_params:
+          page: 0
+        other_params:
+          quarters: [3]
+          years: ["2023"]
+
+      holder_industry_breakdown:
+        other_params:
+          quarters: [2]
+          years: ["2023"]
+
+      positions_summary:
+        other_params:
+          quarters: [3]
+          years: ["2023"]
+
+      industry_performance_summary:
+        other_params:
+          quarters: [3]
+          years: ["2023"]
 
       ### Insider Trades Streams ###
 
@@ -999,6 +1049,10 @@ plugins:
           limit: 1000
 
       ### ETF and Mutual Fund Streams ###
+
+      mutual_fund_and_etf_disclosure_name_search:
+        query_params:
+          name: "Federated Hermes Government Income Securities, Inc."
 
   loaders:
   - name: target-jsonl

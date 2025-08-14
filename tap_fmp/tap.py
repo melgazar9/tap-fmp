@@ -20,7 +20,6 @@ from tap_fmp.streams.directory_streams import (
     SymbolChangesStream,
     ETFSymbolStream,
     ActivelyTradingStream,
-    # EarningsTranscriptStream,
     AvailableExchangesStream,
     AvailableSectorsStream,
     AvailableIndustriesStream,
@@ -93,6 +92,9 @@ from tap_fmp.streams.statements_streams import (
     CashFlowStream,
     KeyMetricsStream,
     FinancialRatiosStream,
+    IncomeStatementTtmStream,
+    BalanceSheetTtmStream,
+    CashFlowTtmStream,
     KeyMetricsTtmStream,
     FinancialRatiosTtmStream,
     FinancialScoresStream,
@@ -112,14 +114,14 @@ from tap_fmp.streams.statements_streams import (
     BalanceSheetTtmStream,
 )
 
-# from tap_fmp.streams.form_13f_streams import (
-#     InstitutionalOwnershipFilingsStream,
-#     FilingsExtractStream,
-#     HolderPerformanceSummaryStream,
-#     HolderIndustryBreakdownStream,
-#     PositionsSummaryStream,
-#     IndustryPerformanceSummaryStream,
-# )
+from tap_fmp.streams.form_13f_streams import (
+    InstitutionalOwnershipFilingsStream,
+    FilingsExtractStream,
+    HolderPerformanceSummaryStream,
+    HolderIndustryBreakdownStream,
+    PositionsSummaryStream,
+    IndustryPerformanceSummaryStream,
+)
 
 from tap_fmp.streams.indexes_streams import (
     IndexListStream,
@@ -279,6 +281,13 @@ from tap_fmp.streams.etf_and_mutual_funds_streams import (
     FundAndEtfDisclosuresByDateStream,
 )
 
+from tap_fmp.streams.earnings_transcript_streams import (
+    LatestEarningTranscriptsStream,
+    EarningsTranscriptStream,
+    TranscriptsDatesBySymbolStream,
+    AvailableTranscriptSymbolsStream,
+)
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -319,6 +328,11 @@ class TapFMP(Tap):
     _cached_cot_symbols: t.List[dict] | None = None
     _cot_symbols_stream_instance: CotReportListStream | None = None
     _cot_symbols_lock = threading.Lock()
+
+    _cached_etf_symbols: t.List[dict] | None = None
+    _etf_symbols_stream_instance: ETFSymbolStream | None = None
+    _etf_symbols_lock = threading.Lock()
+
 
     def get_cached_forex_pairs(self) -> t.List[dict]:
         """Thread-safe forex caching for parallel execution."""
@@ -514,6 +528,27 @@ class TapFMP(Tap):
             self._cot_symbols_stream_instance = CotReportListStream(self)
         return self._cot_symbols_stream_instance
 
+    def get_cached_etf_symbols(self) -> t.List[dict]:
+        """Thread-safe ETF symbols caching for parallel execution."""
+        if self._cached_etf_symbols is None:
+            with self._etf_symbols_lock:
+                if self._cached_etf_symbols is None:
+                    self.logger.info("Fetching and caching ETF symbols...")
+                    etf_symbols_stream = self.get_etf_symbols_stream()
+                    self._cached_etf_symbols = list(
+                        etf_symbols_stream.get_records(context=None)
+                    )
+                    self.logger.info(
+                        f"Cached {len(self._cached_etf_symbols)} ETF symbols."
+                    )
+        return self._cached_etf_symbols
+
+    def get_etf_symbols_stream(self) -> ETFSymbolStream:
+        if self._etf_symbols_stream_instance is None:
+            self.logger.info("Creating ETFSymbolStream instance...")
+            self._etf_symbols_stream_instance = ETFSymbolStream(self)
+        return self._etf_symbols_stream_instance
+
     def discover_streams(self) -> list:
         """Return a list of discovered streams."""
         # fmt: off
@@ -532,7 +567,6 @@ class TapFMP(Tap):
             SymbolChangesStream(self),
             ETFSymbolStream(self),
             ActivelyTradingStream(self),
-            # EarningsTranscriptStream(self),
             AvailableExchangesStream(self),
             AvailableSectorsStream(self),
             AvailableIndustriesStream(self),
@@ -611,6 +645,8 @@ class TapFMP(Tap):
             CashFlowStream(self),
             KeyMetricsStream(self),
             FinancialRatiosStream(self),
+            IncomeStatementTtmStream(self),
+            CashFlowTtmStream(self),
             KeyMetricsTtmStream(self),
             FinancialRatiosTtmStream(self),
             FinancialScoresStream(self),
@@ -628,6 +664,16 @@ class TapFMP(Tap):
             AsReportedCashflowStatementsStream(self),
             AsReportedFinancialStatementsStream(self),
             BalanceSheetTtmStream(self),
+
+
+            ### Form 13F Streams ###
+
+            InstitutionalOwnershipFilingsStream(self),
+            FilingsExtractStream(self),
+            HolderPerformanceSummaryStream(self),
+            HolderIndustryBreakdownStream(self),
+            PositionsSummaryStream(self),
+            IndustryPerformanceSummaryStream(self),
 
 
             ### Index Streams ###
@@ -797,6 +843,13 @@ class TapFMP(Tap):
             MutualFundDisclosuresStream(self),
             MutualFundAndEtfDisclosureNameSearchStream(self),
             FundAndEtfDisclosuresByDateStream(self),
+
+            ### Earnings Transcript Streams ###
+
+            LatestEarningTranscriptsStream(self),
+            EarningsTranscriptStream(self),
+            TranscriptsDatesBySymbolStream(self),
+            AvailableTranscriptSymbolsStream(self),
 
         ]
 

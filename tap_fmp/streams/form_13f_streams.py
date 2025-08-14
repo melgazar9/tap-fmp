@@ -258,13 +258,11 @@ class HolderPerformanceSummaryStream(FmpRestStream):
         th.Property("performance_percentage5year", th.NumberType),
         th.Property("performance_since_inception", th.NumberType),
         th.Property("performance_since_inception_percentage", th.NumberType),
-        th.Property("performance_relative_to_s_p500_percentage", th.NumberType),
-        th.Property("performance1year_relative_to_s_p500_percentage", th.NumberType),
-        th.Property("performance3year_relative_to_s_p500_percentage", th.NumberType),
-        th.Property("performance5year_relative_to_s_p500_percentage", th.NumberType),
-        th.Property(
-            "performance_since_inception_relative_to_s_p500_percentage", th.NumberType
-        ),
+        th.Property("performance_relative_to_sp500_percentage", th.NumberType),
+        th.Property("performance1year_relative_to_sp500_percentage", th.NumberType),
+        th.Property("performance3year_relative_to_sp500_percentage", th.NumberType),
+        th.Property("performance5year_relative_to_sp500_percentage", th.NumberType),
+        th.Property("performance_since_inception_relative_to_sp500_percentage", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
@@ -322,6 +320,8 @@ class PositionsSummaryStream(Form13fSymbolPartitionStream):
         th.Property("symbol", th.StringType),
         th.Property("cik", th.StringType),
         th.Property("date", th.DateType),
+        th.Property("year", th.StringType),
+        th.Property("quarter", th.IntegerType),
         th.Property("investors_holding", th.IntegerType),
         th.Property("last_investors_holding", th.IntegerType),
         th.Property("investors_holding_change", th.IntegerType),
@@ -412,3 +412,8 @@ class IndustryPerformanceSummaryStream(FmpRestStream):
             quarters = [int(quarters)]
 
         return [{"year": y, "quarter": q} for y in years for q in quarters]
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        if context:
+            self.query_params.update(context)
+        return super().get_records(context)

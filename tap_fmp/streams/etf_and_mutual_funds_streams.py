@@ -12,6 +12,11 @@ from datetime import datetime
 class EtfStream(SymbolPartitionStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
+    
+    @property
+    def partitions(self):
+        # Use ETF symbols instead of regular stock symbols
+        return [{"symbol": s["symbol"]} for s in self._tap.get_cached_etf_symbols()]
 
 
 class EtfAndFundHoldingsStream(EtfStream):
@@ -120,6 +125,7 @@ class MutualFundAndEtfDisclosureStream(EtfStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType, required=True),
         th.Property("cik", th.StringType, required=True),
         th.Property("holder", th.StringType),
         th.Property("shares", th.NumberType),
@@ -129,32 +135,17 @@ class MutualFundAndEtfDisclosureStream(EtfStream):
     ).to_dict()
 
     def get_url(self, context: Context):
-        return f"{self.url_base}/stable/etf/disclosure-holders-latest"
+        return f"{self.url_base}/stable/funds/disclosure-holders-latest"
 
-    @property
-    def partitions(self):
-        other_params = self.config.get(self.name, {}).get("other_params", {})
-        
-        quarters = other_params.get("quarters", [1, 2, 3, 4])
-        
-        start_year = other_params.get("start_year", 2000)
-        if isinstance(start_year, str) and (start_year.startswith("19") or start_year.startswith("20")):
-            start_year = int(start_year[:4])
-        
-        years = [i for i in range(start_year, datetime.today().year + 1)]
-        
-        partitions = [
-            {"quarter": str(q), "year": str(y)}
-            for q in quarters
-            for y in years
-        ]
-        return partitions
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        if record and context:
+            record["symbol"] = context.get("symbol")
+        return super().post_process(record, context)
         
 
 
-class MutualFundDisclosuresStream(FmpRestStream):
+class MutualFundDisclosuresStream(EtfStream):
     name = "mutual_fund_disclosures"
-    _use_cached_symbols_default = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -184,32 +175,37 @@ class MutualFundDisclosuresStream(FmpRestStream):
     ).to_dict()
 
     def get_url(self, context: Context):
-        return f"{self.url_base}/stable/etf/disclosure"
+        return f"{self.url_base}/stable/funds/disclosure"
 
     @property
     def partitions(self):
         quarters = [1, 2, 3, 4]
-        years = [i + 1 for i in range(2015, datetime.today().year)]
-        symbols = self._tap.get_cached_symbols()
+        years = [str(y) for y in range(2020, datetime.today().year + 1)]
+        etf_symbols = self._tap.get_cached_etf_symbols()
         mutual_fund_partitions = [
-            {"quarter": str(q), "year": str(y), "symbol": s}
+            {"quarter": str(q), "year": str(y), "symbol": s["symbol"]}
             for q in quarters
             for y in years
-            for s in symbols
+            for s in etf_symbols
         ]
         return mutual_fund_partitions
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        self.query_params.update(
-            context.get("quarter"), context.get("year"), context.get("symbol")
-        )
+        if context:
+            self.query_params.update({
+                "quarter": context.get("quarter"),
+                "year": context.get("year"), 
+                "symbol": context.get("symbol")
+            })
         yield from super().get_records(context)
 
 
 class MutualFundAndEtfDisclosureNameSearchStream(FmpRestStream):
-    """Ignore for now, just keep as a placeholder. Need to supply 'name' as a query parameter."""
+    """Search for mutual fund and ETF disclosure information by name."""
 
     name = "mutual_fund_and_etf_disclosure_name_search"
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -229,7 +225,7 @@ class MutualFundAndEtfDisclosureNameSearchStream(FmpRestStream):
     ).to_dict()
 
     def get_url(self, context: Context):
-        return f"{self.url_base}/stable/etf/disclosure-holders-search"
+        return f"{self.url_base}/stable/funds/disclosure-holders-search"
 
 
 class FundAndEtfDisclosuresByDateStream(EtfStream):
@@ -239,15 +235,9 @@ class FundAndEtfDisclosuresByDateStream(EtfStream):
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.StringType, required=True),
-        th.Property("year", th.StringType),
-        th.Property("quarter", th.StringType),
+        th.Property("year", th.IntegerType),
+        th.Property("quarter", th.IntegerType),
     ).to_dict()
 
     def get_url(self, context: Context):
-        return f"{self.url_base}/stable/etf/holdings"
-
-    def post_process(
-        self, row: dict, context: Context | None = None
-    ) -> Generator[Any, None, None]:
-        row["symbol"] = context.get("symbol")
-        yield from super().post_process(row, context)
+        return f"{self.url_base}/stable/funds/disclosure-dates"

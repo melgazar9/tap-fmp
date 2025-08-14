@@ -149,8 +149,57 @@ class ETFSymbolStream(FmpRestStream):
         th.Property("name", th.StringType, required=True),
     ).to_dict()
 
+    def get_etf_list(self) -> list[str] | None:
+        """Get a list of selected ETF symbols from config."""
+        etf_symbols_config = self.config.get("etf_symbols", {})
+        selected_etf_symbols = etf_symbols_config.get("select_etf_symbols")
+
+        if not selected_etf_symbols or selected_etf_symbols in ("*", ["*"]):
+            return None
+
+        if isinstance(selected_etf_symbols, str):
+            return selected_etf_symbols.split(",")
+
+        if isinstance(selected_etf_symbols, list):
+            if selected_etf_symbols == ["*"]:
+                return None
+            return selected_etf_symbols
+        return None
+
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/etf-list"
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        selected_etf_symbols = self.get_etf_list()
+
+        if not selected_etf_symbols:
+            self.logger.info("No specific ETF symbols selected, fetching all ETF symbols...")
+            etf_symbol_records = self.fetch_all_etf_symbols(context)
+        else:
+            self.logger.info(f"Processing selected ETF symbols: {selected_etf_symbols}")
+            etf_symbol_records = self.fetch_specific_etf_symbols(selected_etf_symbols)
+
+        for record in etf_symbol_records:
+            record = self.post_process(record)
+            self._check_missing_fields(self.schema, record)
+            yield record
+
+    def fetch_all_etf_symbols(self, context: Context | None = None) -> list[dict]:
+        url = self.get_url(context)
+        return self._fetch_with_retry(url, self.query_params)
+
+    @staticmethod
+    def fetch_specific_etf_symbols(etf_symbol_list: list[str]) -> list[dict]:
+        """Create ETF symbol records for a specific list of ETF symbols."""
+        if isinstance(etf_symbol_list, str):
+            return [{"symbol": etf_symbol_list.upper(), "name": None}]
+        return [
+            {
+                "symbol": etf_symbol.upper(),
+                "name": None,
+            }
+            for etf_symbol in etf_symbol_list
+        ]
 
 
 class ActivelyTradingStream(FmpRestStream):
@@ -166,7 +215,7 @@ class ActivelyTradingStream(FmpRestStream):
         return f"{self.url_base}/stable/actively-trading-list"
 
 
-class EarningsTranscriptStream(FmpRestStream):
+class EarningsTranscriptListStream(FmpRestStream):
     name = "earnings_transcript_list"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True

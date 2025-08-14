@@ -351,7 +351,7 @@ class BalanceSheetTtmStream(TtmStream):
     _add_surrogate_key = True
 
     def get_url(self, context: Context):
-        return f"{self.url_base}/stable/income-statement-ttm"
+        return f"{self.url_base}/stable/balance-sheet-statement-ttm"
 
 
 class CashFlowTtmStream(TtmStream):
