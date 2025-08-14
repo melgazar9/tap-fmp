@@ -142,11 +142,13 @@ class SymbolChangesStream(FmpRestStream):
 
 class ETFSymbolStream(FmpRestStream):
     name = "etf_symbols"
-    primary_keys = ["symbol", "name"]
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
-        th.Property("name", th.StringType, required=True),
+        th.Property("name", th.StringType),
     ).to_dict()
 
     def get_etf_list(self) -> list[str] | None:
