@@ -167,6 +167,7 @@ plugins:
       - holder_industry_breakdown.*
       - positions_summary.*
       - industry_performance_summary.*
+      - form_13f_filings_extracts_with_analytics.*
 
       ### Index Streams ###
 
@@ -619,6 +620,13 @@ plugins:
         other_params:
           quarters: [3]
           years: ["2023"]
+
+      form_13f_filings_extracts_with_analytics:
+        query_params:
+          limit: 10
+          quarter: 1
+          year: 2020
+          page: 0
 
       ### Insider Trades Streams ###
 

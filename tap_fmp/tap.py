@@ -121,6 +121,7 @@ from tap_fmp.streams.form_13f_streams import (
     HolderIndustryBreakdownStream,
     PositionsSummaryStream,
     IndustryPerformanceSummaryStream,
+    Form13fFilingExtractsWithAnalytics,
 )
 
 from tap_fmp.streams.indexes_streams import (
@@ -674,6 +675,7 @@ class TapFMP(Tap):
             HolderIndustryBreakdownStream(self),
             PositionsSummaryStream(self),
             IndustryPerformanceSummaryStream(self),
+            Form13fFilingExtractsWithAnalytics(self),
 
 
             ### Index Streams ###

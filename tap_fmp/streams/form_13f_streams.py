@@ -34,7 +34,7 @@ class Form13fCikPartitionStream(FmpRestStream):
 
         if not years or years == ["*"]:
             current_year = datetime.today().year
-            years = [str(y) for y in range(2023, current_year + 1)]
+            years = [y for y in range(2020, current_year + 1)]
 
         return [
             {"cik": c["cik"], "year": y, "quarter": q}
@@ -72,7 +72,7 @@ class Form13fSymbolPartitionStream(FmpRestStream):
 
         if not years or years == ["*"]:
             current_year = datetime.today().year
-            years = [str(y) for y in range(2023, current_year + 1)]
+            years = [y for y in range(2020, current_year + 1)]
 
         return [
             {"symbol": s["symbol"], "year": y, "quarter": q}
@@ -172,7 +172,7 @@ class Form13fFilingExtractsWithAnalytics(Form13fSymbolPartitionStream):
     _add_surrogate_key = True
 
     schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType),
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.DateType),
@@ -212,12 +212,17 @@ class Form13fFilingExtractsWithAnalytics(Form13fSymbolPartitionStream):
         th.Property("last_performance", th.NumberType),
         th.Property("change_in_performance", th.NumberType),
         th.Property("is_counted_for_performance", th.BooleanType),
+        th.Property("year", th.IntegerType),
+        th.Property("quarter", th.IntegerType),
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
-        return (
-            f"{self.url_base}/stable/institutional-ownership/extract-analytics/holder"
-        )
+        return f"{self.url_base}/stable/institutional-ownership/extract-analytics/holder"
+
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        if "year" in record:
+            record["year"] = int(record["year"])
+        return super().post_process(record, context)
 
 
 class HolderPerformanceSummaryStream(FmpRestStream):
@@ -320,7 +325,7 @@ class PositionsSummaryStream(Form13fSymbolPartitionStream):
         th.Property("symbol", th.StringType),
         th.Property("cik", th.StringType),
         th.Property("date", th.DateType),
-        th.Property("year", th.StringType),
+        th.Property("year", th.IntegerType),
         th.Property("quarter", th.IntegerType),
         th.Property("investors_holding", th.IntegerType),
         th.Property("last_investors_holding", th.IntegerType),

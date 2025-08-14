@@ -198,29 +198,26 @@ class FmpRestStream(Stream, ABC):
                 request=e.request,
             )
 
-    def _handle_pagination(self, url: str, query_params: dict) -> t.Iterable[dict]:
-        # Check for configured page in both query_params and other_params
-        configured_page = None
+    def _set_configured_page(self):
+        self.configured_page = None
         if self._paginate_key in self.query_params:
-            configured_page = self.query_params[self._paginate_key]
+            self.configured_page = self.query_params[self._paginate_key]
         elif self._paginate_key in self.other_params:
-            configured_page = self.other_params[self._paginate_key]
-            
-        if configured_page is not None:
-            logging.info(f"Using configured page {configured_page} for stream {self.name}")
-            records = self._fetch_with_retry(url, query_params, configured_page)
-            if isinstance(records, list):
-                for record in records:
-                    record = self.post_process(record)
-                    self._check_missing_fields(self.schema, record)
-                    yield record
-            return
-        
-        page = 0
+            self.configured_page = self.other_params[self._paginate_key]
+
+        if self.configured_page is not None:
+            logging.info(f"Using configured page {self.configured_page} for stream {self.name}")
+        return self
+
+    def _handle_pagination(self, url: str, query_params: dict) -> t.Iterable[dict]:
+        self._set_configured_page()
+        page = self.configured_page if self.configured_page is not None else 0
         consecutive_empty_pages = 0
         max_consecutive_empty = 2
 
-        while page < self._max_pages:
+        max_page = self.configured_page + 1 if self.configured_page is not None else self._max_pages
+
+        while page < max_page:
             records = self._fetch_with_retry(url, query_params, page)
 
             if not isinstance(records, list):
