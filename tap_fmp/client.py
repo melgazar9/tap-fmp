@@ -161,7 +161,7 @@ class FmpRestStream(Stream, ABC):
         ),
         on_backoff=lambda details: logging.warning(
             f"API request failed, retrying in {details['wait']:.1f}s "
-            f"(attempt {details['tries']}/{details['max_tries']}): {details['exception']}"
+            f"(attempt {details['tries']}): {details['exception']}"
         ),
     )
     def _fetch_with_retry(

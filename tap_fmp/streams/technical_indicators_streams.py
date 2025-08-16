@@ -22,7 +22,7 @@ class BaseTechnicalIndicatorStream(SymbolPartitionTimeSliceStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
     ).to_dict()
 
     @property
@@ -87,7 +87,7 @@ class SimpleMovingAverageStream(BaseTechnicalIndicatorStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
         th.Property("sma", th.NumberType),
     ).to_dict()
 
@@ -107,7 +107,7 @@ class ExponentialMovingAverageStream(BaseTechnicalIndicatorStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
         th.Property("ema", th.NumberType),
     ).to_dict()
 
@@ -127,7 +127,7 @@ class WeightedMovingAverageStream(BaseTechnicalIndicatorStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
         th.Property("wma", th.NumberType),
     ).to_dict()
 
@@ -147,7 +147,7 @@ class DoubleExponentialMovingAverageStream(BaseTechnicalIndicatorStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
         th.Property("dema", th.NumberType),
     ).to_dict()
 
@@ -167,7 +167,7 @@ class TripleExponentialMovingAverageStream(BaseTechnicalIndicatorStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
         th.Property("tema", th.NumberType),
     ).to_dict()
 
@@ -187,7 +187,7 @@ class RelativeStrengthIndexStream(BaseTechnicalIndicatorStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
         th.Property("rsi", th.NumberType),
     ).to_dict()
 
@@ -207,7 +207,7 @@ class StandardDeviationStream(BaseTechnicalIndicatorStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
         th.Property("standard_deviation", th.NumberType),
     ).to_dict()
 
@@ -227,7 +227,7 @@ class WilliamsStream(BaseTechnicalIndicatorStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
         th.Property("williams", th.NumberType),
     ).to_dict()
 
@@ -247,7 +247,7 @@ class AverageDirectionalIndexStream(BaseTechnicalIndicatorStream):
         th.Property("high", th.NumberType),
         th.Property("low", th.NumberType),
         th.Property("close", th.NumberType),
-        th.Property("volume", th.IntegerType),
+        th.Property("volume", th.NumberType),
         th.Property("adx", th.NumberType),
     ).to_dict()
 
