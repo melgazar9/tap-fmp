@@ -217,7 +217,9 @@ class Form13fFilingExtractsWithAnalytics(Form13fSymbolPartitionStream):
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
-        return f"{self.url_base}/stable/institutional-ownership/extract-analytics/holder"
+        return (
+            f"{self.url_base}/stable/institutional-ownership/extract-analytics/holder"
+        )
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         if "year" in record:
@@ -267,7 +269,9 @@ class HolderPerformanceSummaryStream(FmpRestStream):
         th.Property("performance1year_relative_to_sp500_percentage", th.NumberType),
         th.Property("performance3year_relative_to_sp500_percentage", th.NumberType),
         th.Property("performance5year_relative_to_sp500_percentage", th.NumberType),
-        th.Property("performance_since_inception_relative_to_sp500_percentage", th.NumberType),
+        th.Property(
+            "performance_since_inception_relative_to_sp500_percentage", th.NumberType
+        ),
     ).to_dict()
 
     def get_url(self, context: Context | None) -> str:

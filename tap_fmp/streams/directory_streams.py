@@ -175,7 +175,9 @@ class ETFSymbolStream(FmpRestStream):
         selected_etf_symbols = self.get_etf_list()
 
         if not selected_etf_symbols:
-            self.logger.info("No specific ETF symbols selected, fetching all ETF symbols...")
+            self.logger.info(
+                "No specific ETF symbols selected, fetching all ETF symbols..."
+            )
             etf_symbol_records = self.fetch_all_etf_symbols(context)
         else:
             self.logger.info(f"Processing selected ETF symbols: {selected_etf_symbols}")

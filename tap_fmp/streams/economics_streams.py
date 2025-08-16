@@ -50,7 +50,11 @@ class EconomicIndicatorsStream(EconomicsStream):
 
     @property
     def partitions(self):
-        cfg_indicator_names = self.config.get(self.name, {}).get("other_params", {}).get("indicator_names")
+        cfg_indicator_names = (
+            self.config.get(self.name, {})
+            .get("other_params", {})
+            .get("indicator_names")
+        )
         if cfg_indicator_names:
             indicator_names = cfg_indicator_names
         else:
@@ -80,9 +84,7 @@ class EconomicIndicatorsStream(EconomicsStream):
                 "15YearFixedRateMortgageAverage",
             ]
 
-        return [
-            {"name": indicator_name} for indicator_name in indicator_names
-        ]
+        return [{"name": indicator_name} for indicator_name in indicator_names]
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         indicator_name = context.get("name") if context else None

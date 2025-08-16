@@ -32,8 +32,8 @@ from tap_fmp.streams.analyst_streams import (
     HistoricalRatingsStream,
     PriceTargetSummaryStream,
     PriceTargetConsensusStream,
-    # PriceTargetNewsStream,
-    # PriceTargetLatestNewsStream,
+    PriceTargetNewsStream,
+    PriceTargetLatestNewsStream,
     StockGradesStream,
     HistoricalStockGradesStream,
     StockGradesConsensusStream,
@@ -111,7 +111,6 @@ from tap_fmp.streams.statements_streams import (
     AsReportedBalanceStatementsStream,
     AsReportedCashflowStatementsStream,
     AsReportedFinancialStatementsStream,
-    BalanceSheetTtmStream,
 )
 
 from tap_fmp.streams.form_13f_streams import (
@@ -289,6 +288,28 @@ from tap_fmp.streams.earnings_transcript_streams import (
     AvailableTranscriptSymbolsStream,
 )
 
+from tap_fmp.streams.bulk_streams import (
+    CompanyProfileBulkStream,
+    StockRatingBulkStream,
+    DcfValuationsBulkStream,
+    FinancialScoresBulkStream,
+    PriceTargetSummaryBulkStream,
+    EtfHolderBulkStream,
+    UpgradesDowngradesConsensusBulkStream,
+    KeyMetricsTtmBulkStream,
+    RatiosTtmBulkStream,
+    StockPeersBulkStream,
+    EarningsSurprisesBulkStream,
+    IncomeStatementBulkStream,
+    IncomeStatementGrowthBulkStream,
+    BalanceSheetStatementBulkStream,
+    BalanceSheetStatementGrowthBulkStream,
+    CashFlowStatementBulkStream,
+    CashFlowStatementGrowthBulkStream,
+    EodBulkStream,
+)
+
+
 class TapFMP(Tap):
     """FMP tap class."""
 
@@ -333,7 +354,6 @@ class TapFMP(Tap):
     _cached_etf_symbols: t.List[dict] | None = None
     _etf_symbols_stream_instance: ETFSymbolStream | None = None
     _etf_symbols_lock = threading.Lock()
-
 
     def get_cached_forex_pairs(self) -> t.List[dict]:
         """Thread-safe forex caching for parallel execution."""
@@ -520,7 +540,9 @@ class TapFMP(Tap):
                     self._cached_cot_symbols = list(
                         cot_symbols_stream.get_records(context=None)
                     )
-                    self.logger.info(f"Cached {len(self._cached_cot_symbols)} COT symbols.")
+                    self.logger.info(
+                        f"Cached {len(self._cached_cot_symbols)} COT symbols."
+                    )
         return self._cached_cot_symbols
 
     def get_cot_symbols_stream(self) -> CotReportListStream:
@@ -581,8 +603,8 @@ class TapFMP(Tap):
             HistoricalRatingsStream(self),
             PriceTargetSummaryStream(self),
             PriceTargetConsensusStream(self),
-            # PriceTargetNewsStream(self),
-            # PriceTargetLatestNewsStream(self),
+            PriceTargetNewsStream(self),
+            PriceTargetLatestNewsStream(self),
             StockGradesStream(self),
             HistoricalStockGradesStream(self),
             StockGradesConsensusStream(self),
@@ -852,6 +874,27 @@ class TapFMP(Tap):
             EarningsTranscriptStream(self),
             TranscriptsDatesBySymbolStream(self),
             AvailableTranscriptSymbolsStream(self),
+
+            ### Bulk Streams ###
+
+            CompanyProfileBulkStream(self),
+            StockRatingBulkStream(self),
+            DcfValuationsBulkStream(self),
+            FinancialScoresBulkStream(self),
+            PriceTargetSummaryBulkStream(self),
+            EtfHolderBulkStream(self),
+            UpgradesDowngradesConsensusBulkStream(self),
+            KeyMetricsTtmBulkStream(self),
+            RatiosTtmBulkStream(self),
+            StockPeersBulkStream(self),
+            EarningsSurprisesBulkStream(self),
+            IncomeStatementBulkStream(self),
+            IncomeStatementGrowthBulkStream(self),
+            BalanceSheetStatementBulkStream(self),
+            BalanceSheetStatementGrowthBulkStream(self),
+            CashFlowStatementBulkStream(self),
+            CashFlowStatementGrowthBulkStream(self),
+            EodBulkStream(self),
 
         ]
 

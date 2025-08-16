@@ -7,13 +7,13 @@ from datetime import datetime
 
 class LatestEarningTranscriptsStream(FmpRestStream):
     """Stream for pulling latest earning transcripts."""
-    
+
     name = "latest_earning_transcripts"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
     _paginate = True
     _paginate_key = "page"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
@@ -21,17 +21,17 @@ class LatestEarningTranscriptsStream(FmpRestStream):
         th.Property("fiscal_year", th.NumberType),
         th.Property("date", th.DateType),
     ).to_dict()
-    
+
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/earning-call-transcript-latest"
 
 
 class EarningsTranscriptSymbolYearQuarterPartitionStream(FmpRestStream):
     """Base class for streams that partition by symbol, year, and quarter."""
-    
+
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     @property
     def partitions(self):
         config = self.config.get(self.name, {})
@@ -72,9 +72,9 @@ class EarningsTranscriptSymbolYearQuarterPartitionStream(FmpRestStream):
 
 class EarningsTranscriptStream(EarningsTranscriptSymbolYearQuarterPartitionStream):
     """Stream for pulling earnings transcripts by symbol, year, and quarter."""
-    
+
     name = "earnings_transcripts"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
@@ -84,18 +84,18 @@ class EarningsTranscriptStream(EarningsTranscriptSymbolYearQuarterPartitionStrea
         th.Property("date", th.DateType),
         th.Property("content", th.StringType),
     ).to_dict()
-    
+
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/earning-call-transcript"
 
 
 class TranscriptsDatesBySymbolStream(SymbolPartitionStream):
     """Stream for pulling transcript dates by symbol."""
-    
+
     name = "transcripts_dates_by_symbol"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
@@ -103,7 +103,7 @@ class TranscriptsDatesBySymbolStream(SymbolPartitionStream):
         th.Property("fiscal_year", th.NumberType),
         th.Property("date", th.DateType),
     ).to_dict()
-    
+
     def get_url(self, context: Context | None = None) -> str:
         symbol = context.get("symbol") if context else None
         return f"{self.url_base}/stable/earning-call-transcript-dates?symbol={symbol}"
@@ -111,17 +111,17 @@ class TranscriptsDatesBySymbolStream(SymbolPartitionStream):
 
 class AvailableTranscriptSymbolsStream(FmpRestStream):
     """Stream for pulling available transcript symbols."""
-    
+
     name = "available_transcript_symbols"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("company_name", th.StringType),
         th.Property("no_of_transcripts", th.StringType),
     ).to_dict()
-    
+
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/earnings-transcript-list"

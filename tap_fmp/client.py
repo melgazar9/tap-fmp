@@ -17,6 +17,8 @@ from tap_fmp.helpers import generate_surrogate_key
 import threading
 import time
 import random
+import csv
+import io
 
 
 class FmpRestStream(Stream, ABC):
@@ -29,6 +31,7 @@ class FmpRestStream(Stream, ABC):
     _paginate_key = "page"
     _replication_key_starting_name = "from"
     _replication_key_ending_name = "to"
+    _expect_csv = False
 
     def __init__(self, tap: Tap) -> None:
         super().__init__(tap)
@@ -168,21 +171,40 @@ class FmpRestStream(Stream, ABC):
         self, url: str, query_params: dict, page: int | None = None
     ) -> list[dict]:
         """Centralized API call with retry logic."""
+
         if page is not None:
             query_params[self._paginate_key] = page
         log_url = self.redact_api_key(url)
         log_params = {
             k: ("<REDACTED>" if k == "apikey" else v) for k, v in query_params.items()
         }
-        logging.info(f"Stream {self.name}: Requesting: {log_url} with params: {log_params}")
+        logging.info(
+            f"Stream {self.name}: Requesting: {log_url} with params: {log_params}"
+        )
         query_params = {} if query_params is None else query_params
         try:
             self._throttle()
-            response = requests.get(url, params=query_params, timeout=(20, 60))
+
+            if self._expect_csv:
+                timeout = (
+                    10000,
+                    12000,
+                )  # allow significant increase in request timeout for bulk requests
+            else:
+                timeout = (20, 60)
+
+            response = requests.get(url, params=query_params, timeout=timeout)
             response.raise_for_status()
-            records = response.json()
+
+            if self._expect_csv:
+                reader = csv.DictReader(io.StringIO(response.text))
+                records = [row for row in reader]
+            else:
+                records = response.json()
+
             if isinstance(records, dict) and len(records):
                 records = [records]
+
             records = clean_json_keys(records)
             logging.info(
                 f"Stream {self.name}: Records returned: {len(records) if isinstance(records, list) else 'not a list'}"
@@ -210,7 +232,9 @@ class FmpRestStream(Stream, ABC):
             self.configured_page = self.other_params[self._paginate_key]
 
         if self.configured_page is not None:
-            logging.info(f"Using configured page {self.configured_page} for stream {self.name}")
+            logging.info(
+                f"Using configured page {self.configured_page} for stream {self.name}"
+            )
         return self
 
     def _handle_pagination(self, url: str, query_params: dict) -> t.Iterable[dict]:
@@ -219,7 +243,11 @@ class FmpRestStream(Stream, ABC):
         consecutive_empty_pages = 0
         max_consecutive_empty = 2
 
-        max_page = self.configured_page + 1 if self.configured_page is not None else self._max_pages
+        max_page = (
+            self.configured_page + 1
+            if self.configured_page is not None
+            else self._max_pages
+        )
 
         while page < max_page:
             records = self._fetch_with_retry(url, query_params, page)
@@ -307,7 +335,7 @@ class SymbolPartitionStream(FmpRestStream):
                 yield record
 
 
-class SymbolPartitionPeriodPartitionStream(FmpRestStream):
+class SymbolPeriodPartitionStream(FmpRestStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
 
@@ -588,3 +616,67 @@ class ExchangeFetcher(FmpRestStream):
             }
             for exchange in exchange_list
         ]
+
+
+class IncrementalDateStream(FmpRestStream):
+    primary_keys = ["surrogate_key"]
+    replication_key = "date"
+    replication_method = "INCREMENTAL"
+    _add_surrogate_key = True
+
+    def _format_replication_key(self, replication_key_value):
+        if isinstance(replication_key_value, str):
+            try:
+                # Try parsing as date string and return as YYYY-MM-DD
+                if "T" in replication_key_value or "Z" in replication_key_value:
+                    # ISO format with time
+                    output_value = datetime.fromisoformat(
+                        replication_key_value.replace("Z", "+00:00")
+                    ).strftime("%Y-%m-%d")
+                else:
+                    # Already in YYYY-MM-DD format
+                    output_value = replication_key_value
+                return output_value
+            except ValueError:
+                pass
+        raise ValueError(f"Could not format replication key for stream {self.name}")
+
+    def _get_dates_dict(self):
+        if "date" in self.query_params:
+            return [{"date": self.query_params.get("date")}]
+
+        query_params = self.config.get(self.name, {}).get("query_params", {})
+        other_params = self.config.get(self.name, {}).get("other_params", {})
+        date_range = other_params.get("date_range")
+
+        if "date" in query_params and "date_range" in other_params:
+            raise ConfigValidationError(
+                "Cannot specify both 'date' and 'date_range' in query_params and other_params."
+            )
+
+        if not date_range:
+            return [{"date": datetime.today().date().strftime("%Y-%m-%d")}]
+
+        assert isinstance(date_range, list), "date_range must be a list"
+
+        if len(date_range) == 1 or date_range[-1] == "today":
+            date_range = date_range + [datetime.today().date().strftime("%Y-%m-%d")]
+
+        # Generate all dates in range
+        all_dates = []
+        current_date = datetime.fromisoformat(date_range[0])
+        end_date = datetime.fromisoformat(date_range[-1])
+        while current_date <= end_date:
+            all_dates.append({"date": current_date.strftime("%Y-%m-%d")})
+            current_date += timedelta(days=1)
+
+        return all_dates
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        dates_dict = self._get_dates_dict()
+        starting_date = self.get_starting_timestamp(context)
+        filtered_dates = [d for d in dates_dict if d["date"] >= starting_date]
+
+        for date_dict in filtered_dates:
+            self.query_params.update(date_dict)
+            yield from super().get_records(context)

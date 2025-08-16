@@ -1,7 +1,6 @@
 """ESG (Environmental, Social, and Governance) Streams."""
 
 import typing as t
-from typing import Any, Generator
 
 from tap_fmp.client import SymbolPartitionStream, FmpRestStream
 from singer_sdk.helpers.types import Context
@@ -12,7 +11,7 @@ from datetime import datetime
 class EtfStream(SymbolPartitionStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-    
+
     @property
     def partitions(self):
         # Use ETF symbols instead of regular stock symbols
@@ -141,7 +140,6 @@ class MutualFundAndEtfDisclosureStream(EtfStream):
         if record and context:
             record["symbol"] = context.get("symbol")
         return super().post_process(record, context)
-        
 
 
 class MutualFundDisclosuresStream(EtfStream):
@@ -192,11 +190,13 @@ class MutualFundDisclosuresStream(EtfStream):
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         if context:
-            self.query_params.update({
-                "quarter": context.get("quarter"),
-                "year": context.get("year"), 
-                "symbol": context.get("symbol")
-            })
+            self.query_params.update(
+                {
+                    "quarter": context.get("quarter"),
+                    "year": context.get("year"),
+                    "symbol": context.get("symbol"),
+                }
+            )
         yield from super().get_records(context)
 
 

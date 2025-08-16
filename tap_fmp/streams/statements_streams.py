@@ -9,11 +9,11 @@ from datetime import datetime
 from tap_fmp.client import (
     FmpRestStream,
     SymbolPartitionStream,
-    SymbolPartitionPeriodPartitionStream,
+    SymbolPeriodPartitionStream,
 )
 
 
-class StatementStream(SymbolPartitionPeriodPartitionStream):
+class StatementStream(SymbolPeriodPartitionStream):
     _add_surrogate_key = True
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:

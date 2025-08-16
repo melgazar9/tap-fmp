@@ -1,13 +1,13 @@
 from tap_fmp.client import (
     SymbolPartitionStream,
-    SymbolPartitionPeriodPartitionStream,
+    SymbolPeriodPartitionStream,
     FmpRestStream,
 )
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 
-class AnalystEstimatesStream(SymbolPartitionPeriodPartitionStream):
+class AnalystEstimatesStream(SymbolPeriodPartitionStream):
     """Stream for analyst estimates."""
 
     name = "analyst_estimates"

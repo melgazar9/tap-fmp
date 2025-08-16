@@ -149,6 +149,7 @@ class CotReportStream(CotPartitionStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/commitment-of-traders-report"
 
+
 class CotAnalysisByDateStream(CotPartitionStream):
     name = "cot_analysis_by_date"
 
