@@ -309,6 +309,21 @@ from tap_fmp.streams.bulk_streams import (
     EodBulkStream,
 )
 
+from tap_fmp.streams.quote_streams import (
+    StockQuoteStream,
+    StockQuoteShortStream,
+    AftermarketTradeStream,
+    AftermarketQuoteStream,
+    StockPriceChangeStream,
+    StockBatchStream,
+    StockBatchQuoteStream,
+    StockBatchQuoteShortStream,
+    BatchAftermarketTradeStream,
+    BatchAftermarketQuoteStream,
+    MutualFundPriceQuotesStream,
+    ETFPriceQuotesStream,
+)
+
 
 class TapFMP(Tap):
     """FMP tap class."""
@@ -895,6 +910,21 @@ class TapFMP(Tap):
             CashFlowStatementBulkStream(self),
             CashFlowStatementGrowthBulkStream(self),
             EodBulkStream(self),
+
+            ### Quote Streams ###
+
+            StockQuoteStream(self),
+            StockQuoteShortStream(self),
+            AftermarketTradeStream(self),
+            AftermarketQuoteStream(self),
+            StockPriceChangeStream(self),
+            StockBatchStream(self),
+            StockBatchQuoteStream(self),
+            StockBatchQuoteShortStream(self),
+            BatchAftermarketTradeStream(self),
+            BatchAftermarketQuoteStream(self),
+            MutualFundPriceQuotesStream(self),
+            ETFPriceQuotesStream(self),
 
         ]
 

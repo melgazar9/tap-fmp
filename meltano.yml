@@ -355,6 +355,21 @@ plugins:
       - cash_flow_statement_growth_bulk.*
       - eod_bulk.*
 
+      ### Quote Streams ###
+
+      - stock_quote.*
+      - stock_quote_short.*
+      - aftermarket_trade.*
+      - aftermarket_quote.*
+      - stock_price_change.*
+      - stock_batch.*
+      - stock_batch_quote.*
+      - stock_batch_quote_short.*
+      - batch_aftermarket_trade.*
+      - batch_aftermarket_quote.*
+      - mutual_fund_price_quotes.*
+      - etf_price_quotes.*
+
     config:
       start_date: '2025-01-01T00:00:00Z'
       api_key: ${FMP_API_KEY}
@@ -1130,6 +1145,56 @@ plugins:
       eod_bulk:
         other_params:
           dates: ["2023-10-22"]
+
+      ### Quote Streams ###
+
+      stock_quote:
+        symbols:
+          select_symbols: ["AAPL", "MSFT", "GOOGL"]
+
+      stock_quote_short:
+        symbols:
+          select_symbols: ["AAPL", "MSFT", "GOOGL"]
+
+      stock_price_change:
+        symbols:
+          select_symbols: ["AAPL", "MSFT", "GOOGL"]
+
+      stock_batch:
+        symbols:
+          select_symbols: ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"]
+
+      stock_batch_quote:
+        symbols:
+          select_symbols: ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"]
+
+      stock_batch_quote_short:
+        symbols:
+          select_symbols: ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"]
+
+      aftermarket_trade:
+        symbols:
+          select_symbols: ["AAPL", "MSFT"]
+
+      aftermarket_quote:
+        symbols:
+          select_symbols: ["AAPL", "MSFT"]
+
+      batch_aftermarket_trade:
+        symbols:
+          select_symbols: ["AAPL", "MSFT", "GOOGL"]
+
+      batch_aftermarket_quote:
+        symbols:
+          select_symbols: ["AAPL", "MSFT", "GOOGL"]
+
+      etf_price_quotes:
+        symbols:
+          select_symbols: ["SPY", "QQQ", "IWM"]
+
+      mutual_fund_price_quotes:
+        symbols:
+          select_symbols: ["VFINX", "FXAIX"]
 
   loaders:
   - name: target-jsonl
