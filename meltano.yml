@@ -1086,8 +1086,8 @@ plugins:
       ### Bulk Streams ###
 
       company_profile_bulk:
-        query_params:
-          part: 0
+        other_params:
+          parts: [0, 1]
 
       etf_holder_bulk:
         query_params:

@@ -40,11 +40,54 @@ class PaginatedBulkStream(BaseBulkStream):
     """Base class for bulk streams that need partitioning by part parameter."""
 
     replication_key = "_part"
+    replication_method = "INCREMENTAL"
     _paginate = True
     _paginate_key = "part"
 
+    def _get_parts(self):
+        if "part" in self.query_params:
+            return [self.query_params.get("part")]
+
+        other_params = self.config.get(self.name, {}).get("other_params", {})
+        parts = other_params.get("parts")
+
+        if "part" in self.query_params and "parts" in other_params:
+            raise ConfigValidationError(
+                "Cannot specify both 'part' in query_params and 'parts' in other_params."
+            )
+
+        if not parts or parts == "*" or parts == ["*"]:
+            return None
+
+        if isinstance(parts, (str, int)):
+            parts = [parts]
+
+        parts = [int(part) for part in parts]
+
+        if self.replication_method == "INCREMENTAL":
+            state = self.get_context_state(context=None)
+            if state.get("replication_key_value"):
+                min_part = int(state["replication_key_value"])
+                parts = [part for part in parts if part >= min_part]
+
+        return parts
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        parts = self._get_parts()
+        if parts:
+            for part in parts:
+                self.query_params.update({"part": part})
+                yield from super().get_records(context)
+        else:
+            if self.replication_method == "INCREMENTAL":
+                state = self.get_context_state(context)
+                if state.get("replication_key_value"):
+                    starting_part = int(state["replication_key_value"])
+                    self.query_params["part"] = starting_part
+            yield from super().get_records(context)
+
     def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["_part"] = self.query_params.get("part")
+        row["_part"] = self.query_params["part"]
         return super().post_process(row, context)
 
 
@@ -64,7 +107,7 @@ class IncrementalYearPeriodStream(BaseBulkStream):
             )
 
         if not year_range:
-            return [datetime.today().year]
+            return [y for y in range(1990, datetime.today().year + 1)]
 
         assert isinstance(year_range, list), "date_range must be a list"
 
@@ -97,7 +140,7 @@ class IncrementalYearPeriodStream(BaseBulkStream):
         starting_date = self.get_starting_timestamp(context)
 
         filtered_years = [
-            y for y in year_range if y >= datetime.fromisoformat(starting_date).year
+            y for y in year_range if y >= max(datetime.fromisoformat(starting_date).year, 1990)
         ]
 
         periods = self._get_periods()
@@ -643,9 +686,7 @@ class EarningsSurprisesBulkStream(BaseBulkStream):
             )
 
         if not years:
-            raise ValueError(
-                f"Stream {self.name}: Must specify either 'year' in query_params or 'years' in other_params."
-            )
+            years = [y for y in range(1990, datetime.today().year + 1)]
 
         if isinstance(years, (str, int)):
             years = [years]

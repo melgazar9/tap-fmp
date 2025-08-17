@@ -286,12 +286,11 @@ class FmpRestStream(Stream, ABC):
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         url = self.get_url(context)
-        query_params = self.query_params.copy()
 
         if self._paginate:
-            yield from self._handle_pagination(url, query_params)
+            yield from self._handle_pagination(url, self.query_params)
         else:
-            records = self._fetch_with_retry(url, query_params)
+            records = self._fetch_with_retry(url, self.query_params)
             for record in records:
                 record = self.post_process(record)
                 self._check_missing_fields(self.schema, record)
@@ -655,7 +654,7 @@ class IncrementalDateStream(FmpRestStream):
             )
 
         if not date_range:
-            return [{"date": datetime.today().date().strftime("%Y-%m-%d")}]
+            date_range = ["1990-01-01", datetime.today().date().strftime("%Y-%m-%d")]
 
         assert isinstance(date_range, list), "date_range must be a list"
 
