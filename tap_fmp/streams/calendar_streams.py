@@ -10,7 +10,6 @@ class CalendarStream(SymbolPartitionStream):
 
 class TimeSliceCalendarStream(TimeSliceStream):
     primary_keys = ["surrogate_key"]
-    replication_key = "date"
     is_timestamp_replication_key = True
     is_sorted = False  # cannot assume data is sorted across all pages
     _add_surrogate_key = True
@@ -38,8 +37,6 @@ class DividendsCompanyStream(CalendarStream):
 
 class DividendsCalendarStream(TimeSliceCalendarStream):
     name = "dividends_calendar"
-    replication_key = "date"
-    replication_method = "INCREMENTAL"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -96,7 +93,6 @@ class EarningsCalendarStream(TimeSliceCalendarStream):
 
 class IPOsCalendarStream(TimeSliceCalendarStream):
     name = "ipos_calendar"
-    replication_key = "date"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

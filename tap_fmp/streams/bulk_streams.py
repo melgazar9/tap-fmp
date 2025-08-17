@@ -93,6 +93,7 @@ class PaginatedBulkStream(BaseBulkStream):
 
 class IncrementalYearPeriodStream(BaseBulkStream):
     replication_key = "date"
+    replication_method = "INCREMENTAL"
 
     def _get_year_range(self):
         if "year" in self.query_params:
