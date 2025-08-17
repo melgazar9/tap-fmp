@@ -281,6 +281,12 @@ from tap_fmp.streams.etf_and_mutual_funds_streams import (
     FundAndEtfDisclosuresByDateStream,
 )
 
+from tap_fmp.streams.esg_streams import (
+    EsgDisclosuresStream,
+    EsgRatingsStream,
+    EsgBenchmarkStream,
+)
+
 from tap_fmp.streams.earnings_transcript_streams import (
     LatestEarningTranscriptsStream,
     EarningsTranscriptStream,
@@ -870,6 +876,12 @@ class TapFMP(Tap):
             EconomicIndicatorsStream(self),
             EconomicCalendarStream(self),
             MarketRiskPremiumStream(self),
+
+            ### ESG Data Streams (Premium) ###
+
+            EsgDisclosuresStream(self),
+            EsgRatingsStream(self),
+            EsgBenchmarkStream(self),
 
             ### ETF and Mutual Fund Streams ###
 

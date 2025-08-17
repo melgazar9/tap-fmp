@@ -318,9 +318,9 @@ plugins:
 
       ### ESG Data Streams (Premium) ###
 
-      - esg_scores.*
+      - esg_disclosures.*
+      - esg_ratings.*
       - esg_benchmark.*
-      - esg_investment_search.*
 
       ### ETF and Mutual Fund Streams ###
 
@@ -1080,18 +1080,6 @@ plugins:
 
       ### ESG Data Streams (Premium) ###
 
-      esg_scores:
-        query_params:
-          limit: 5000
-
-      esg_benchmark:
-        query_params:
-          limit: 5000
-
-      esg_investment_search:
-        query_params:
-          limit: 1000
-
       ### ETF and Mutual Fund Streams ###
 
       mutual_fund_and_etf_disclosure_name_search:
@@ -1195,6 +1183,12 @@ plugins:
       mutual_fund_price_quotes:
         symbols:
           select_symbols: ["VFINX", "FXAIX"]
+
+      ### ESG Streams ###
+
+      esg_benchmark:
+        other_params:
+          years: [2021, 2022]
 
   loaders:
   - name: target-jsonl
