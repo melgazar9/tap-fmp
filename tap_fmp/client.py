@@ -38,7 +38,7 @@ class FmpRestStream(Stream, ABC):
         self._all_symbols = None
         self.parse_config_params()
 
-        self._min_interval = float(self.config.get("min_backoff_seconds", 3.0))
+        self._min_interval = float(self.config.get("min_throttle_seconds", 0.01))
         self._throttle_lock = threading.Lock()
         self._last_call_ts = 0.0
 
