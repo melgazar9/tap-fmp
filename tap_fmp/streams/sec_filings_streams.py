@@ -311,7 +311,7 @@ class SecCompanyFullProfileStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/sec-profile"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
-        if "employees" in row:
+        if "employees" in row and row["employees"]:
             row["employees"] = int(row["employees"])
         return super().post_process(row, context)
 
