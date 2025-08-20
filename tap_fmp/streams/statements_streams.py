@@ -844,7 +844,7 @@ class OwnerEarningsStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/owner-earnings"
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
-        if "fiscal_year" in record:
+        if "fiscal_year" in record and record["fiscal_year"]:
             record["fiscal_year"] = int(record["fiscal_year"])
         return super().post_process(record, context)
 
