@@ -19,6 +19,7 @@ class BaseBulkStream(FmpRestStream):
     _float_fields = None
     _integer_fields = None
     _date_fields = None
+    _datetime_fields = None
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         field_converters = [
@@ -26,6 +27,7 @@ class BaseBulkStream(FmpRestStream):
             (self._float_fields, float),
             (self._integer_fields, int),
             (self._date_fields, lambda x: datetime.fromisoformat(x).date()),
+            (self._date_fields, lambda x: datetime.fromisoformat(x)),
         ]
         
         for fields, converter in field_converters:
@@ -760,6 +762,7 @@ class IncomeStatementBulkStream(IncrementalYearPeriodStream):
     ]
 
     _date_fields = ["filing_date"]
+    _datetime_fields = ["accepted_date"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
