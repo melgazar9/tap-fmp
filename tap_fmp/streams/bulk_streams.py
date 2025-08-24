@@ -27,7 +27,7 @@ class BaseBulkStream(FmpRestStream):
             (self._float_fields, float),
             (self._integer_fields, int),
             (self._date_fields, lambda x: datetime.fromisoformat(x).date()),
-            (self._date_fields, lambda x: datetime.fromisoformat(x)),
+            (self._datetime_fields, lambda x: datetime.fromisoformat(x)),
         ]
         
         for fields, converter in field_converters:
