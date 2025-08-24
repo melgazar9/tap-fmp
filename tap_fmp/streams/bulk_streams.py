@@ -8,31 +8,33 @@ from singer_sdk.helpers.types import Context
 from tap_fmp.client import FmpRestStream, IncrementalDateStream
 from datetime import datetime
 from singer_sdk.exceptions import ConfigValidationError
-
+from decimal import Decimal
 
 class BaseBulkStream(FmpRestStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
     _expect_csv = True
 
+    _decimal_fields = None
     _float_fields = None
     _integer_fields = None
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
-        if self._float_fields:
-            for col in self._float_fields:
-                value = record.get(col)
-                if value in (None, ""):
-                    record[col] = None
-                else:
-                    record[col] = float(value)
-        if self._integer_fields:
-            for col in self._integer_fields:
-                value = record.get(col)
-                if value in (None, ""):
-                    record[col] = None
-                else:
-                    record[col] = int(value)
+        field_converters = [
+            (self._decimal_fields, lambda v: Decimal(str(v))),
+            (self._float_fields, float),
+            (self._integer_fields, int),
+        ]
+        
+        for fields, converter in field_converters:
+            if fields:
+                assert isinstance(fields, (tuple, list))
+                for col in fields:
+                    value = record.get(col)
+                    if value in (None, ""):
+                        record[col] = None
+                    else:
+                        record[col] = converter(value)
         return super().post_process(record, context)
 
 
@@ -173,12 +175,15 @@ class CompanyProfileBulkStream(PaginatedBulkStream):
 
     name = "company_profile_bulk"
 
-    _float_fields = [
+    _decimal_fields = [
         "price",
         "market_cap",
-        "beta",
         "last_dividend",
         "change",
+    ]
+
+    _float_fields = [
+        "beta",
         "change_percentage",
         "volume",
         "average_volume",
@@ -267,7 +272,7 @@ class DcfValuationsBulkStream(BaseBulkStream):
 
     name = "dcf_valuations_bulk"
 
-    _float_fields = ["dcf", "stock_price"]
+    _decimal_fields = ["dcf", "stock_price"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -286,8 +291,7 @@ class FinancialScoresBulkStream(BaseBulkStream):
 
     name = "financial_scores_bulk"
 
-    _float_fields = [
-        "altman_z_score",
+    _decimal_fields = [
         "working_capital",
         "total_assets",
         "retained_earnings",
@@ -296,6 +300,8 @@ class FinancialScoresBulkStream(BaseBulkStream):
         "total_liabilities",
         "revenue",
     ]
+    
+    _float_fields = ["altman_z_score"]
 
     _integer_fields = ["piotroski_score"]
 
@@ -323,7 +329,7 @@ class PriceTargetSummaryBulkStream(BaseBulkStream):
 
     name = "price_target_summary_bulk"
 
-    _float_fields = [
+    _decimal_fields = [
         "last_month_avg_price_target",
         "last_quarter_avg_price_target",
         "last_year_avg_price_target",
@@ -359,7 +365,9 @@ class EtfHolderBulkStream(PaginatedBulkStream):
 
     name = "etf_holder_bulk"
 
-    _float_fields = ["weight_percentage", "market_value", "shares_number"]
+    _decimal_fields = ["market_value"]
+    
+    _float_fields = ["weight_percentage", "shares_number"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -412,9 +420,23 @@ class KeyMetricsTtmBulkStream(TtmBulkStream):
 
     name = "key_metrics_ttm_bulk"
 
-    _float_fields = [
+    _decimal_fields = [
         "market_cap",
-        "enterprise_value_ttm",
+        "enterprise_value_ttm", 
+        "graham_number_ttm",
+        "graham_net_net_ttm",
+        "working_capital_ttm",
+        "invested_capital_ttm",
+        "average_receivables_ttm",
+        "average_payables_ttm", 
+        "average_inventory_ttm",
+        "free_cash_flow_to_equity_ttm",
+        "free_cash_flow_to_firm_ttm",
+        "tangible_asset_value_ttm",
+        "net_current_asset_value_ttm",
+    ]
+
+    _float_fields = [
         "ev_to_sales_ttm",
         "ev_to_operating_cash_flow_ttm",
         "ev_to_free_cash_flow_ttm",
@@ -422,12 +444,8 @@ class KeyMetricsTtmBulkStream(TtmBulkStream):
         "net_debt_to_ebitda_ttm",
         "current_ratio_ttm",
         "income_quality_ttm",
-        "graham_number_ttm",
-        "graham_net_net_ttm",
         "tax_burden_ttm",
         "interest_burden_ttm",
-        "working_capital_ttm",
-        "invested_capital_ttm",
         "return_on_assets_ttm",
         "operating_return_on_assets_ttm",
         "return_on_tangible_assets_ttm",
@@ -443,18 +461,11 @@ class KeyMetricsTtmBulkStream(TtmBulkStream):
         "research_and_developement_to_revenue_ttm",
         "stock_based_compensation_to_revenue_ttm",
         "intangibles_to_total_assets_ttm",
-        "average_receivables_ttm",
-        "average_payables_ttm",
-        "average_inventory_ttm",
         "days_of_sales_outstanding_ttm",
         "days_of_payables_outstanding_ttm",
         "days_of_inventory_outstanding_ttm",
         "operating_cycle_ttm",
         "cash_conversion_cycle_ttm",
-        "free_cash_flow_to_equity_ttm",
-        "free_cash_flow_to_firm_ttm",
-        "tangible_asset_value_ttm",
-        "net_current_asset_value_ttm",
     ]
 
     schema = th.PropertiesList(
@@ -663,7 +674,7 @@ class EarningsSurprisesBulkStream(BaseBulkStream):
 
     name = "earnings_surprises_bulk"
 
-    _float_fields = ["eps_actual", "eps_estimated"]
+    _decimal_fields = ["eps_actual", "eps_estimated"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -1348,6 +1359,10 @@ class EodBulkStream(IncrementalDateStream):
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         for col in ["open", "high", "low", "close", "adj_close", "volume"]:
-            if col in record and not isinstance(record[col], (int, float)):
-                record[col] = float(record[col])
+            if col in record and not isinstance(record[col], (int, float, Decimal)):
+                if record[col] not in (None, ""):
+                    try:
+                        record[col] = Decimal(record[col])
+                    except Exception:
+                        record[col] = float(record[col])
         return super().post_process(record, context)

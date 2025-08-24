@@ -55,7 +55,7 @@ class EtfAndMutualFundInformationStream(EtfStream):
         th.Property("etf_company", th.StringType),
         th.Property("expense_ratio", th.NumberType),
         th.Property("assets_under_management", th.NumberType),
-        th.Property("avg_volume", th.IntegerType),
+        th.Property("avg_volume", th.NumberType),
         th.Property("inception_date", th.DateType),
         th.Property("nav", th.NumberType),
         th.Property("nav_currency", th.StringType),

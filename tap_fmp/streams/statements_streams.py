@@ -19,6 +19,12 @@ class StatementStream(SymbolPeriodPartitionStream):
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         if "fiscal_year" in row:
             row["fiscal_year"] = int(row["fiscal_year"])
+
+        date_fields = ["filing_date", "accepted_date"]
+        for field in date_fields:
+            if field in row and row[field] == "":
+                row[field] = None
+                    
         return super().post_process(row, context)
 
 

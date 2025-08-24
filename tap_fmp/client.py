@@ -194,6 +194,10 @@ class FmpRestStream(Stream, ABC):
                 timeout = (20, 60)
 
             response = requests.get(url, params=query_params, timeout=timeout)
+
+            if response.status_code == 400 and response.text == '[]':  # bulk streams may return 400 and '[]' on the last part
+                return []
+
             response.raise_for_status()
 
             if self._expect_csv:
@@ -215,7 +219,7 @@ class FmpRestStream(Stream, ABC):
             error_message = (
                 f"{e.response.status_code} Client Error: {e.response.reason} for url: {redacted_url}"
                 if e.response and e.request
-                else str(e)
+                else self.redact_api_key(str(e))
             )
             error_message = self.redact_api_key(error_message)
             raise requests.exceptions.HTTPError(
@@ -484,7 +488,7 @@ class TimeSliceStream(FmpRestStream):
                 )
             except Exception as e:
                 logging.error(
-                    f"Failed to fetch records for symbol={context['symbol']}"
+                    f"Failed to fetch records for stream {self.name}"
                     f"{self._replication_key_starting_name}={from_date} {self._replication_key_ending_name}={to_date}: {e}"
                 )
                 continue
