@@ -18,12 +18,14 @@ class BaseBulkStream(FmpRestStream):
     _decimal_fields = None
     _float_fields = None
     _integer_fields = None
+    _date_fields = None
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         field_converters = [
             (self._decimal_fields, lambda v: Decimal(str(v))),
             (self._float_fields, float),
             (self._integer_fields, int),
+            (self._date_fields, lambda x: datetime.fromisoformat(x).date()),
         ]
         
         for fields, converter in field_converters:
@@ -190,12 +192,15 @@ class CompanyProfileBulkStream(PaginatedBulkStream):
     ]
 
     _integer_fields = ["full_time_employees"]
+    _date_fields = ["filing_date", "ipo_date"]
+
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("price", th.NumberType),
         th.Property("market_cap", th.NumberType),
+        th.Property("filing_date", th.DateType),
         th.Property("beta", th.NumberType),
         th.Property("last_dividend", th.NumberType),
         th.Property("range", th.StringType),
@@ -754,6 +759,8 @@ class IncomeStatementBulkStream(IncrementalYearPeriodStream):
         "weighted_average_shs_out_dil",
     ]
 
+    _date_fields = ["filing_date"]
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -1181,6 +1188,8 @@ class CashFlowStatementBulkStream(IncrementalYearPeriodStream):
         "income_taxes_paid",
         "interest_paid",
     ]
+
+    _date_fields = ["filing_date", "accepted_date", "ipo_date"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
