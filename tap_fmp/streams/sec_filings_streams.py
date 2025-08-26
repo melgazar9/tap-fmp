@@ -311,8 +311,11 @@ class SecCompanyFullProfileStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/sec-profile"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
-        if "employees" in row and row["employees"]:
-            row["employees"] = int(row["employees"])
+        if "employees" in row:
+            if row["employees"] in ("", None):
+                row["employees"] = None
+            else:
+                row["employees"] = int(row["employees"])
         return super().post_process(row, context)
 
 
@@ -349,6 +352,10 @@ class IndustryClassificationSearchStream(FmpRestStream):
         th.Property("symbol", th.StringType),
         th.Property("cik", th.StringType),
         th.Property("sic_code", th.StringType),
+        th.Property("business_address", th.StringType),
+        th.Property("name", th.StringType),
+        th.Property("industry_title", th.StringType),
+        th.Property("phone_number", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:

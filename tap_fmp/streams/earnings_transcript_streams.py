@@ -59,7 +59,7 @@ class EarningsTranscriptSymbolYearQuarterPartitionStream(FmpRestStream):
 
         return [
             {"symbol": s["symbol"], "year": y, "quarter": q}
-            for s in self._tap.get_cached_symbols()
+            for s in self._tap.get_cached_company_symbols()
             for y in years
             for q in quarters
         ]

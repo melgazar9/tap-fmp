@@ -4,23 +4,27 @@ from __future__ import annotations
 
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
-from tap_fmp.streams.chart_streams import (
-    ChartLightStream,
-    PriceVolumeStream,
-    Prices1minStream,
-    Prices5minStream,
-    Prices1HrStream,
+
+from tap_fmp.client import (
+    FmpSurrogateKeyStream,
+    SymbolPartitionStream,
+    SymbolPartitionTimeSliceStream,
+)
+from tap_fmp.mixins import (
+    BaseSymbolPartitionMixin,
+    CommodityConfigMixin,
+    ChartLightMixin,
+    ChartFullMixin,
+    Prices1minMixin,
+    Prices5minMixin,
+    Prices1HrMixin,
 )
 
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream
 
-
-class CommoditiesListStream(FmpRestStream):
+class CommoditiesListStream(CommodityConfigMixin, FmpSurrogateKeyStream):
     """Stream for Commodities List API."""
 
     name = "commodities_list"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -30,6 +34,16 @@ class CommoditiesListStream(FmpRestStream):
         th.Property("trade_month", th.StringType),
         th.Property("currency", th.StringType),
     ).to_dict()
+
+    def create_record_from_item(self, item: str) -> dict:
+        """Create a record dict from a commodity symbol."""
+        return {
+            "symbol": item,
+            "name": None,
+            "exchange": None,
+            "trade_month": None,
+            "currency": None,
+        }
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/commodities-list"
@@ -43,41 +57,63 @@ class CommodityPartitionStream(SymbolPartitionStream):
         return self._tap.get_cached_commodities()
 
 
-class CommodityPriceMixin(FmpRestStream):
+class TimestampProcessingMixin:
+    """Mixin for processing timestamp/date fields in commodity records."""
+
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        from datetime import datetime
+
+        if "date" not in record and "timestamp" in record:
+            try:
+                timestamp_val = int(record["timestamp"])
+                record["date"] = datetime.fromtimestamp(timestamp_val).isoformat()
+            except (ValueError, TypeError, OSError):
+                pass
+        elif "date" in record and isinstance(record["date"], str):
+            if " " in record["date"] and "T" not in record["date"]:
+                record["date"] = record["date"].replace(" ", "T")
+
+        return super().post_process(record, context)
+
+
+class CommoditySymbolPartitionMixin(TimestampProcessingMixin, BaseSymbolPartitionMixin):
+    """Mixin for commodity streams that provides symbol partitioning."""
+
     @property
-    def partitions(self):
-        query_params_symbol = self.query_params.get("symbol")
-        other_params_symbols = self.config.get("other_params", {}).get("symbols")
+    def selection_config_section(self) -> str:
+        return "commodities"
 
-        assert not (query_params_symbol and other_params_symbols), (
-            f"Cannot specify symbol configurations in both query_params and "
-            f"other_params for stream {self.name}."
-        )
+    @property
+    def selection_field_name(self) -> str:
+        return "select_commodities"
 
-        if query_params_symbol:
-            return (
-                [{"symbol": query_params_symbol}]
-                if isinstance(query_params_symbol, str)
-                else query_params_symbol
-            )
-        elif other_params_symbols:
-            return (
-                [{"symbol": symbol} for symbol in other_params_symbols]
-                if isinstance(other_params_symbols, list)
-                else other_params_symbols
-            )
-        else:
-            return [
-                {"symbol": c.get("symbol")} for c in self._tap.get_cached_commodities()
-            ]
+    def get_cached_symbols(self) -> list[dict]:
+        return self._tap.get_cached_commodities()
+
+
+class CommodityPriceMixin(
+    TimestampProcessingMixin,
+    BaseSymbolPartitionMixin,
+    FmpSurrogateKeyStream,
+):
+    """Mixin for commodity quote streams that need surrogate keys."""
+
+    @property
+    def selection_config_section(self) -> str:
+        return "commodities"
+
+    @property
+    def selection_field_name(self) -> str:
+        return "select_commodities"
+
+    def get_cached_symbols(self) -> list[dict]:
+        return self._tap.get_cached_commodities()
 
 
 class CommoditiesQuoteStream(CommodityPriceMixin, CommodityPartitionStream):
     """Stream for Commodities Quote API."""
 
     name = "commodities_quotes"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -106,8 +142,6 @@ class CommoditiesQuoteStream(CommodityPriceMixin, CommodityPartitionStream):
 
 class CommoditiesQuoteShortStream(CommodityPriceMixin, CommodityPartitionStream):
     name = "commodities_quote_short"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -121,12 +155,10 @@ class CommoditiesQuoteShortStream(CommodityPriceMixin, CommodityPartitionStream)
         return f"{self.url_base}/stable/quote-short"
 
 
-class AllCommoditiesQuotesStream(FmpRestStream):
+class AllCommoditiesQuotesStream(FmpSurrogateKeyStream):
     """Stream for All Commodities Quotes API."""
 
     name = "all_commodities_quotes"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -140,21 +172,41 @@ class AllCommoditiesQuotesStream(FmpRestStream):
         return f"{self.url_base}/stable/batch-commodity-quotes"
 
 
-class CommoditiesLightChartStream(CommodityPriceMixin, ChartLightStream):
+class CommoditiesLightChartStream(
+    CommoditySymbolPartitionMixin,
+    ChartLightMixin,
+    SymbolPartitionTimeSliceStream,
+):
     name = "commodities_light_chart"
 
 
-class CommoditiesFullChartStream(CommodityPriceMixin, PriceVolumeStream):
+class CommoditiesFullChartStream(
+    CommoditySymbolPartitionMixin,
+    ChartFullMixin,
+    SymbolPartitionTimeSliceStream,
+):
     name = "commodities_full_chart"
 
 
-class Commodities1minStream(CommodityPriceMixin, Prices1minStream):
+class Commodities1minStream(
+    CommoditySymbolPartitionMixin,
+    Prices1minMixin,
+    SymbolPartitionTimeSliceStream,
+):
     name = "commodities_1min"
 
 
-class Commodities5minStream(CommodityPriceMixin, Prices5minStream):
+class Commodities5minStream(
+    CommoditySymbolPartitionMixin,
+    Prices5minMixin,
+    SymbolPartitionTimeSliceStream,
+):
     name = "commodities_5min"
 
 
-class Commodities1HrStream(CommodityPriceMixin, Prices1HrStream):
-    name = "commodities_1hr"
+class Commodities1HrStream(
+    CommoditySymbolPartitionMixin,
+    Prices1HrMixin,
+    SymbolPartitionTimeSliceStream,
+):
+    name = "commodities_1h"

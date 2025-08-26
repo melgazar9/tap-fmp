@@ -31,6 +31,30 @@ plugins:
       label: Start Date
       description: Initial date to start extracting data from
 
+    - name: exchange_variants_source
+      kind: object
+      label: Exchange Variants Source Configuration
+      description: Configuration for how to source exchange variants data
+      default:
+        use_csv: true
+        csv_path: "distinct_exchange_variants.csv"
+        use_database: false
+        database_connection: null
+        cache_ttl_hours: 72
+
+    - name: database_config
+      kind: object
+      label: Database Configuration  
+      description: Database connection settings for exchange variants
+      default:
+        host: null
+        port: null
+        database: null
+        username: null
+        password: null
+        schema: "public"
+        table: "exchange_variants"
+
 
     select:
       ### Search Streams ###
@@ -45,7 +69,7 @@ plugins:
       - financial_statement_symbols.*
       - cik_list.*
       - symbol_changes.*
-      - etf_symbols.*
+      - etf_list.*
       - actively_trading.*
       - earnings_transcripts.*  # limited to Premium, build or enterprise plans
       - available_exchanges.*
@@ -106,16 +130,16 @@ plugins:
 
       # Starter Symbols are Limited to US Exchanges, Premium/Build Limited to US, UK, and Canada Exchanges
 
-#      - chart_light.*
-#      - chart_full.*
-#      - unadjusted_price.*
-#      - dividend_adjusted_prices.*
-#      - prices_1min.*  # Only available for Premium plans and up
-      - prices_5min.*
-#      - prices_15min.*
-#      - prices_30min.*
-#      - prices_1hr.*
-#      - prices_4h.*
+#      - securities_chart_light.*
+#      - securities_chart_full.*
+#      - securities_unadjusted_price.*
+#      - securities_dividend_adjusted_prices.*
+#      - securities_prices_1min.*  # Only available for Premium plans and up
+      - securities_prices_5min.*
+#      - securities_prices_15min.*
+#      - securities_prices_30min.*
+      - securities_prices_1h.*
+#      - securities_prices_4h.*
 
       ### DCF Streams ###
 
@@ -179,7 +203,7 @@ plugins:
       - historical_index_full_chart.*
 #      - index_1min.*
       - index_5min.*
-      - index_1hr.*
+      - index_1h.*
       - sp500_constituent.*
       - nasdaq_constituent.*
       - dow_jones_constituent.*
@@ -219,8 +243,8 @@ plugins:
       - commodities_light_chart.*
       - commodities_full_chart.*
 #      - commodities_1min.*
-      - commodities_5min.*
-      - commodities_1hr.*
+#      - commodities_5min.*
+      - commodities_1h.*
 
       ### Fundraiser Streams ###
 
@@ -239,7 +263,7 @@ plugins:
       - historical_crypto_full_chart.*
 #      - crypto_1min.*
       - crypto_5min.*
-      - crypto_1hr.*
+#      - crypto_1h.*
 
       ### Forex Streams ###
 
@@ -251,7 +275,7 @@ plugins:
       - forex_full_chart.*
 #      - forex_1min.*
       - forex_5min.*
-      - forex_1hr.*
+      - forex_1h.*
 
       ### News Streams ###
 
@@ -375,12 +399,33 @@ plugins:
       api_key: ${FMP_API_KEY}
       base_url: https://financialmodelingprep.com
       min_throttle_seconds: 0.01
+      filter_countries: [ "US" ]
+      filter_currencies: [ "USD" ]
 
+      exchange_variants_source:
+        use_csv: true
+        csv_path: "distinct_exchange_variants.csv"
+        use_database: false
+        database_connection: null
+        cache_ttl_hours: 72
+
+      database_config:
+        host: ${POSTGRES_HOST}
+        port: ${POSTGRES_PORT}
+        database: ${POSTGRES_DATABASE}
+        username: ${POSTGRES_USERNAME}
+        password: ${POSTGRES_PASSWORD}
+        schema: "public"
+        table: "exchange_variants"
+      
       symbols:
-        select_symbols:
-          - "AAPL"
-          - "NVDA"
-          - "AP"
+        select_symbols: ["AAPL", "MSFT", "GOOGL"]
+
+      index_symbols:
+        select_index_symbols:
+          - "^GSPC"  # S&P 500
+          - "^DJI"   # Dow Jones
+          - "^IXIC"  # NASDAQ
 
       etf_symbols:
         select_etf_symbols:
@@ -396,6 +441,29 @@ plugins:
       exchanges:
         select_exchanges:
           - "*"
+
+      sectors:
+        select_sectors:
+          - "*"
+
+      industries:
+        select_industries:
+          - "*"
+
+      commodities:
+        select_commodities:
+          - "HEUSX"
+          - "GCUSD"
+
+      crypto_symbols:
+        select_crypto_symbols: ["BTCUSD", "ETHUSD"]
+        filter_exchanges: ["Binance", "Coinbase"]
+
+      forex_pairs:
+        select_forex_pairs: ["EURUSD", "JPYUSD"]
+
+      cot_symbols:
+        select_cot_symbols: ["ZF", "EURGBP"]
 
       ### Search Streams ###
 
@@ -501,12 +569,12 @@ plugins:
           to: 2025-07-10
           limit: 100
 
-
       ### Company Streams ###
 
       historical_market_cap:
         query_params:
-          from: "2025-03-01"
+          from: "2025-08-01"
+          to: "2025-09-01"
           limit: 5000
         other_params:
           time_slice_days: 90
@@ -716,31 +784,26 @@ plugins:
 
       commodities_quotes:
         query_params:
-          symbol: GCUSD
           from: "2025-01-02"
           to: "2025-01-10"
 
       commodities_quote_short:
         query_params:
-          symbol: GCUSD
           from: "2025-01-02"
           to: "2025-01-10"
 
       commodities_light_chart:
         query_params:
-          symbol: GCUSD
           from: "2025-01-02"
           to: "2025-01-10"
 
       commodities_full_chart:
         query_params:
-          symbol: GCUSD
           from: "2025-01-02"
           to: "2025-01-10"
 
       commodities_1min:
         query_params:
-          symbol: GCUSD
           from: "2025-01-02"
           to: "2025-01-10"
 
@@ -750,9 +813,8 @@ plugins:
           from: "2025-01-02"
           to: "2025-01-10"
 
-      commodities_1hr:
+      commodities_1h:
         query_params:
-          symbol: GCUSD
           from: "2025-01-02"
           to: "2025-01-10"
 
@@ -772,42 +834,37 @@ plugins:
 
       crypto_1min:
         query_params:
-          symbol: BTCUSD
+          symbol: ETHUSD
           from: "2025-01-02"
           to: "2025-01-10"
           limit: 100
 
       crypto_5min:
         query_params:
-          symbol: BTCUSD
           from: "2025-01-02"
           to: "2025-01-10"
           limit: 100
 
-      crypto_1hr:
+      crypto_1h:
         query_params:
-          symbol: BTCUSD
           from: "2025-01-02"
           to: "2025-01-10"
           limit: 100
 
       crypto_quotes:
         query_params:
-          symbol: BTCUSD
           from: "2025-01-02"
           to: "2025-01-10"
           limit: 100
 
       crypto_quotes_short:
         query_params:
-          symbol: BTCUSD
           from: "2025-01-02"
           to: "2025-01-10"
           limit: 100
 
       historical_crypto_light_chart:
         query_params:
-          symbol: BTCUSD
           from: "2025-01-02"
           to: "2025-01-10"
           limit: 100
@@ -830,12 +887,11 @@ plugins:
 
       forex_5min:
         query_params:
-          symbol: EURUSD
           from: "2025-01-02"
           to: "2025-01-10"
           limit: 100
 
-      forex_1hr:
+      forex_1h:
         query_params:
           symbol: EURUSD
           from: "2025-01-02"
@@ -844,7 +900,6 @@ plugins:
 
       forex_quotes:
         query_params:
-          symbol: EURUSD
           from: "2025-01-02"
           to: "2025-01-10"
 
@@ -856,7 +911,6 @@ plugins:
 
       forex_light_chart:
         query_params:
-          symbol: EURUSD
           from: "2025-01-02"
           to: "2025-01-10"
           limit: 100
@@ -1132,7 +1186,7 @@ plugins:
 
       eod_bulk:
         other_params:
-          dates: ["2023-10-22"]
+          date_gte: "2025-08-25"
 
       ### Quote Streams ###
 

@@ -7,17 +7,24 @@ from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import (
     FmpRestStream,
-    SymbolPartitionStream,
+    FmpSurrogateKeyStream,
     SymbolPartitionTimeSliceStream,
+    SymbolPartitionStream,
 )
+from tap_fmp.streams.chart_streams import (
+    ChartLightMixin,
+    ChartFullMixin,
+    Prices1minMixin,
+    Prices5minMixin,
+    Prices1HrMixin,
+)
+from tap_fmp.mixins import BaseSymbolPartitionMixin, IndexConfigMixin
 
 
-class IndexListStream(FmpRestStream):
-    """Stock Market Indexes List API - Comprehensive list of stock market indexes."""
+class IndexListStream(IndexConfigMixin, FmpSurrogateKeyStream):
+    """Stock Market Indexes List API - Comprehensive list of stock market indices."""
 
     name = "index_list"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -27,11 +34,34 @@ class IndexListStream(FmpRestStream):
         th.Property("currency", th.StringType),
     ).to_dict()
 
+    def create_record_from_item(self, item: str) -> dict:
+        """Create a record dict from a crypto symbol."""
+        return {
+            "symbol": item,
+            "name": None,
+            "exchange": None,
+            "currency": None,
+        }
+
     def get_url(self, context: Context | None) -> str:
         return f"{self.url_base}/stable/index-list"
 
 
-class IndexQuoteStream(SymbolPartitionStream):
+class IndexSymbolPartitionMixin(BaseSymbolPartitionMixin):
+
+    @property
+    def selection_config_section(self) -> str:
+        return "index_symbols"
+
+    @property
+    def selection_field_name(self) -> str:
+        return "select_index_symbols"
+
+    def get_cached_symbols(self) -> list[dict]:
+        return self._tap.get_cached_indices()
+
+
+class IndexQuoteStream(IndexSymbolPartitionMixin, SymbolPartitionStream):
     """Index Quote API - Real-time stock index quotes."""
 
     name = "index_quote"
@@ -63,7 +93,7 @@ class IndexQuoteStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/quote"
 
 
-class IndexShortQuoteStream(SymbolPartitionStream):
+class IndexShortQuoteStream(IndexSymbolPartitionMixin, SymbolPartitionStream):
     """Index Short Quote API - Concise stock index quotes."""
 
     name = "index_short_quote"
@@ -101,73 +131,48 @@ class AllIndexQuotesStream(FmpRestStream):
         return f"{self.url_base}/stable/batch-index-quotes"
 
 
-class HistoricalIndexLightChartStream(SymbolPartitionTimeSliceStream):
+class HistoricalIndexLightChartStream(
+    IndexSymbolPartitionMixin,
+    ChartLightMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """Historical Index Light Chart API - End-of-day historical prices for stock indexes."""
 
     name = "historical_index_light_chart"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
-
-    schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
-        th.Property("date", th.DateType),
-        th.Property("price", th.NumberType),
-        th.Property("volume", th.NumberType),
-    ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
         return f"{self.url_base}/stable/historical-price-eod/light"
 
 
-class HistoricalIndexFullChartStream(SymbolPartitionTimeSliceStream):
+class HistoricalIndexFullChartStream(
+    IndexSymbolPartitionMixin, ChartFullMixin, SymbolPartitionTimeSliceStream
+):
     """Historical Index Full Chart API - Full historical end-of-day prices for stock indexes."""
 
     name = "historical_index_full_chart"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
-
-    schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
-        th.Property("date", th.DateType),
-        th.Property("open", th.NumberType),
-        th.Property("high", th.NumberType),
-        th.Property("low", th.NumberType),
-        th.Property("close", th.NumberType),
-        th.Property("volume", th.NumberType),
-        th.Property("change", th.NumberType),
-        th.Property("change_percent", th.NumberType),
-        th.Property("vwap", th.NumberType),
-    ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
         return f"{self.url_base}/stable/historical-price-eod/full"
 
 
-class Index1MinuteIntervalStream(SymbolPartitionTimeSliceStream):
+class Index1MinuteIntervalStream(
+    IndexSymbolPartitionMixin,
+    Prices1minMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """1-Minute Interval Index Price API - 1-minute interval intraday data for stock indexes."""
 
     name = "index_1min"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
-
-    schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
-        th.Property("date", th.DateTimeType),
-        th.Property("open", th.NumberType),
-        th.Property("low", th.NumberType),
-        th.Property("high", th.NumberType),
-        th.Property("close", th.NumberType),
-        th.Property("volume", th.NumberType),
-    ).to_dict()
 
     def get_url(self, context: Context | None) -> str:
         return f"{self.url_base}/stable/historical-chart/1min"
 
 
-class Index5MinuteIntervalStream(Index1MinuteIntervalStream):
+class Index5MinuteIntervalStream(
+    IndexSymbolPartitionMixin,
+    Prices5minMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """5-Minute Interval Index Price API - 5-minute interval intraday data for stock indexes."""
 
     name = "index_5min"
@@ -176,10 +181,14 @@ class Index5MinuteIntervalStream(Index1MinuteIntervalStream):
         return f"{self.url_base}/stable/historical-chart/5min"
 
 
-class Index1HourIntervalStream(Index1MinuteIntervalStream):
+class Index1HourIntervalStream(
+    IndexSymbolPartitionMixin,
+    Prices1HrMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """1-Hour Interval Index Price API - 1-hour interval intraday data for stock indexes."""
 
-    name = "index_1hr"
+    name = "index_1h"
 
     def get_url(self, context: Context | None) -> str:
         return f"{self.url_base}/stable/historical-chart/1hour"

@@ -28,22 +28,55 @@ pipx install git+https://github.com/ORG_NAME/tap-fmp.git@main
 
 ### Accepted Config Options
 
-<!--
-Developer TODO: Provide a list of config options accepted by the tap.
-
-This section can be created by copy-pasting the CLI output from:
-
-```
-tap-fmp --about --format=markdown
-```
--->
-
 A full list of supported settings and capabilities for this
 tap is available by running:
 
 ```bash
 tap-fmp --about
 ```
+
+### General Configuration
+
+The following configuration options are available for the `tap-fmp` extractor:
+
+*   **`api_key`**: Your FMP API key. This is a required setting.
+*   **`start_date`**: The initial date to start extracting data from. This should be in `YYYY-MM-DDTHH:mm:ssZ` format.
+*   **`exchange_variants_source`**: Configuration for how to source exchange variants data. You can use a CSV file or a database.
+*   **`database_config`**: Database connection settings for exchange variants.
+
+### Symbol and List Configuration
+
+The tap allows you to specify lists of symbols for various streams. This is useful for focusing your data extraction on a specific set of securities.
+
+*   **`symbols`**: A list of stock symbols to extract data for.
+*   **`index_symbols`**: A list of index symbols to extract data for.
+*   **`etf_symbols`**: A list of ETF symbols to extract data for.
+*   **`ciks`**: A list of CIKs (Central Index Key) to extract data for.
+*   **`exchanges`**: A list of exchanges to extract data for. Use `"*"` to select all exchanges.
+*   **`sectors`**: A list of sectors to extract data for. Use `"*"` to select all sectors.
+*   **`industries`**: A list of industries to extract data for. Use `"*"` to select all industries.
+*   **`commodities`**: A list of commodity symbols to extract data for.
+*   **`crypto_symbols`**: A list of cryptocurrency symbols to extract data for.
+*   **`forex_pairs`**: A list of foreign exchange pairs to extract data for.
+*   **`cot_symbols`**: A list of Commitment of Traders symbols to extract data for.
+
+**Note on Filtering Logic:** When you specify multiple filters (e.g., `symbols`, `countries`, `currencies`), the tap will extract data that matches **any** of the specified filters. For example, if you specify a list of symbols and a list of countries, the tap will extract data for those symbols, as well as all data for the specified countries. The filtering logic is an "OR" condition, not an "AND" condition.
+
+### Stream-Specific Configuration
+
+You can also configure specific parameters for each stream. This allows you to customize the data extraction for each stream.
+
+For example, you can configure the `stock_screener` stream to only return stocks with a volume greater than 1,000,000 and a limit of 1000 results:
+
+```yaml
+      stock_screener:
+        query_params:
+          volumeMoreThan: 1000000
+          limit: 1000
+          exchanges: ["NASDAQ", "NYSE", "AMEX", "TSX", "LSE", "NEO"]
+```
+
+You can also configure date ranges, limits, and other parameters for most streams. Please refer to the `meltano.yml` file for a full list of available options for each stream.
 
 ### Configure using environment variables
 

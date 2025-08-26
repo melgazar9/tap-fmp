@@ -1,19 +1,18 @@
 """REST client handling, including FmpRestStream base class."""
 
-from __future__ import annotations
 from abc import ABC
 import backoff
 from datetime import datetime, timedelta
 import re
 from singer_sdk.helpers.types import Context
-from singer_sdk.streams import Stream
+from singer_sdk.streams import RESTStream
 from singer_sdk import Tap
-from tap_fmp.helpers import clean_json_keys
+from tap_fmp.helpers import clean_json_keys, generate_surrogate_key
+from tap_fmp.mixins import SymbolPartitionMixin
 import typing as t
 import logging
 import requests
 from singer_sdk.exceptions import ConfigValidationError
-from tap_fmp.helpers import generate_surrogate_key
 import threading
 import time
 import random
@@ -21,7 +20,7 @@ import csv
 import io
 
 
-class FmpRestStream(Stream, ABC):
+class FmpRestStream(RESTStream, ABC):
     """FMP stream class with symbol partitioning support."""
 
     _use_cached_symbols_default = False
@@ -72,7 +71,7 @@ class FmpRestStream(Stream, ABC):
         return self.config.get("base_url", "https://financialmodelingprep.com")
 
     def get_url(self, context):
-        raise ValueError("Must be overridden in the stream class.")
+        raise ValueError("get_url must be overridden in the stream class.")
 
     def parse_config_params(self) -> None:
         cfg_params = self.config.get(self.name)
@@ -193,9 +192,13 @@ class FmpRestStream(Stream, ABC):
             else:
                 timeout = (20, 60)
 
-            response = requests.get(url, params=query_params, timeout=timeout)
+            response = self.requests_session.get(
+                url, params=query_params, timeout=timeout
+            )
 
-            if response.status_code == 400 and response.text == '[]':  # bulk streams may return 400 and '[]' on the last part
+            if (
+                response.status_code == 400 and response.text == "[]"
+            ):  # bulk streams may return 400 and '[]' on the last 'part'
                 return []
 
             response.raise_for_status()
@@ -241,7 +244,9 @@ class FmpRestStream(Stream, ABC):
             )
         return self
 
-    def _handle_pagination(self, url: str, query_params: dict) -> t.Iterable[dict]:
+    def _handle_pagination(
+        self, url: str, query_params: dict, context: Context | None = None
+    ) -> t.Iterable[dict]:
         self._set_configured_page()
         page = self.configured_page if self.configured_page is not None else 0
         consecutive_empty_pages = 0
@@ -273,7 +278,7 @@ class FmpRestStream(Stream, ABC):
                 consecutive_empty_pages = 0
 
             for record in records:
-                record = self.post_process(record)
+                record = self.post_process(record, context)
                 self._check_missing_fields(self.schema, record)
                 yield record
 
@@ -292,11 +297,11 @@ class FmpRestStream(Stream, ABC):
         url = self.get_url(context)
 
         if self._paginate:
-            yield from self._handle_pagination(url, self.query_params)
+            yield from self._handle_pagination(url, self.query_params, context)
         else:
             records = self._fetch_with_retry(url, self.query_params)
             for record in records:
-                record = self.post_process(record)
+                record = self.post_process(record, context)
                 self._check_missing_fields(self.schema, record)
                 yield record
 
@@ -306,14 +311,17 @@ class FmpRestStream(Stream, ABC):
         return record
 
 
-class SymbolPartitionStream(FmpRestStream):
+class FmpSurrogateKeyStream(FmpRestStream):
+    """Base class for streams that need surrogate keys."""
+
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
+
+
+class SymbolPartitionStream(SymbolPartitionMixin, FmpRestStream):
     _use_cached_symbols_default = True
     _symbol_in_path_params = False
     _symbol_in_query_params = True
-
-    @property
-    def partitions(self):
-        return [{"symbol": s["symbol"]} for s in self._tap.get_cached_symbols()]
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         assert self._symbol_in_path_params or self._symbol_in_query_params
@@ -329,18 +337,16 @@ class SymbolPartitionStream(FmpRestStream):
         url = self.get_url(context)
 
         if self._paginate:
-            yield from self._handle_pagination(url, query_params)
+            yield from self._handle_pagination(url, query_params, context)
         else:
             records = self._fetch_with_retry(url, query_params)
             for record in records:
-                record = self.post_process(record)
+                record = self.post_process(record, context)
                 self._check_missing_fields(self.schema, record)
                 yield record
 
 
-class SymbolPeriodPartitionStream(FmpRestStream):
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
+class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):
 
     @staticmethod
     def _get_periods(periods):
@@ -362,7 +368,7 @@ class SymbolPeriodPartitionStream(FmpRestStream):
         ).get("periods")
 
         periods = self._get_periods(periods)
-        symbols = self._tap.get_cached_symbols()
+        symbols = self._tap.get_cached_company_symbols()
 
         if not periods:
             return [{"symbol": s["symbol"]} for s in symbols]
@@ -430,7 +436,15 @@ class TimeSliceStream(FmpRestStream):
             current = slice_end
         return slices
 
-    def fetch_window(self, url, query_params, from_date, to_date, max_records):
+    def fetch_window(
+        self,
+        url,
+        query_params,
+        from_date,
+        to_date,
+        max_records,
+        context: Context | None = None,
+    ):
         """
         Recursively fetch all records for a window, splitting if we hit the max_records limit.
         """
@@ -441,7 +455,7 @@ class TimeSliceStream(FmpRestStream):
         records = self._fetch_with_retry(url, query_params)
         if len(records) < max_records:
             for record in records:
-                record = self.post_process(record)
+                record = self.post_process(record, context)
                 self._check_missing_fields(self.schema, record)
                 yield record
         else:
@@ -462,11 +476,11 @@ class TimeSliceStream(FmpRestStream):
             mid_date = mid_dt.strftime("%Y-%m-%d")
             # Fetch left half
             yield from self.fetch_window(
-                url, query_params, from_date, mid_date, max_records
+                url, query_params, from_date, mid_date, max_records, context
             )
             # Fetch right half
             yield from self.fetch_window(
-                url, query_params, mid_date, to_date, max_records
+                url, query_params, mid_date, to_date, max_records, context
             )
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
@@ -484,7 +498,7 @@ class TimeSliceStream(FmpRestStream):
         for from_date, to_date in time_slices:
             try:
                 yield from self.fetch_window(
-                    url, query_params, from_date, to_date, max_records
+                    url, query_params, from_date, to_date, max_records, context
                 )
             except Exception as e:
                 logging.error(
@@ -494,14 +508,10 @@ class TimeSliceStream(FmpRestStream):
                 continue
 
 
-class SymbolPartitionTimeSliceStream(TimeSliceStream):
+class SymbolPartitionTimeSliceStream(SymbolPartitionMixin, TimeSliceStream):
     _use_cached_symbols_default = True
     _symbol_in_path_params = False
     _symbol_in_query_params = True
-
-    @property
-    def partitions(self):
-        return [{"symbol": s["symbol"]} for s in self._tap.get_cached_symbols()]
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         assert self._symbol_in_path_params or self._symbol_in_query_params
@@ -525,7 +535,7 @@ class SymbolPartitionTimeSliceStream(TimeSliceStream):
         for from_date, to_date in time_slices:
             try:
                 yield from self.fetch_window(
-                    url, query_params, from_date, to_date, max_records
+                    url, query_params, from_date, to_date, max_records, context
                 )
             except Exception as e:
                 logging.error(
@@ -575,7 +585,7 @@ class CikFetcher(FmpRestStream):
 
     def fetch_all_ciks(self, context) -> list[dict]:
         url = self.get_url(context)
-        return list(self._handle_pagination(url, self.query_params))
+        return list(self._handle_pagination(url, self.query_params, context))
 
     @staticmethod
     def fetch_specific_ciks(cik_list: list[str]) -> list[dict]:
@@ -621,11 +631,9 @@ class ExchangeFetcher(FmpRestStream):
         ]
 
 
-class IncrementalDateStream(FmpRestStream):
-    primary_keys = ["surrogate_key"]
+class IncrementalDateStream(FmpSurrogateKeyStream):
     replication_key = "date"
     replication_method = "INCREMENTAL"
-    _add_surrogate_key = True
 
     def _format_replication_key(self, replication_key_value):
         if isinstance(replication_key_value, str):

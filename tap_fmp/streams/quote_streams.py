@@ -5,35 +5,28 @@ from __future__ import annotations
 import typing as t
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
-from tap_fmp.client import SymbolPartitionStream, FmpRestStream
+from tap_fmp.client import SymbolPartitionStream, FmpSurrogateKeyStream
 
 
-class QuoteSymbolPartitionStream(SymbolPartitionStream):
+class QuoteSymbolPartitionStream(SymbolPartitionStream, FmpSurrogateKeyStream):
     """Base class for quote streams with surrogate key support."""
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
 
-class BatchSymbolStream(FmpRestStream):
+class BatchSymbolStream(FmpSurrogateKeyStream):
     """Base class for batch symbol streams with automatic chunking."""
-
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     def get_symbol_chunks(self, chunk_size: int = 100):
         """Get symbols in chunks for batch processing."""
         symbols = self.config.get("symbols", {}).get("select_symbols", [])
         if isinstance(symbols, str):
             symbols = [symbols]
-        
-        # Split into chunks
+
         for i in range(0, len(symbols), chunk_size):
-            yield symbols[i:i+chunk_size]
-    
+            yield symbols[i : i + chunk_size]
+
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         """Override to handle batching by chunks of symbols."""
         for symbol_chunk in self.get_symbol_chunks():
-            # Update query params with current chunk
             self.query_params["symbols"] = ",".join(symbol_chunk)
             yield from super().get_records(context)
 
@@ -42,7 +35,7 @@ class StockQuoteStream(QuoteSymbolPartitionStream):
     """Stream for real-time stock quotes."""
 
     name = "stock_quote"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -78,7 +71,7 @@ class StockQuoteShortStream(QuoteSymbolPartitionStream):
     """Stream for short format stock quotes."""
 
     name = "stock_quote_short"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -95,7 +88,7 @@ class AftermarketTradeStream(QuoteSymbolPartitionStream):
     """Stream for aftermarket trade data."""
 
     name = "aftermarket_trade"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -113,7 +106,7 @@ class AftermarketQuoteStream(QuoteSymbolPartitionStream):
     """Stream for aftermarket quotes."""
 
     name = "aftermarket_quote"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -133,7 +126,7 @@ class StockPriceChangeStream(QuoteSymbolPartitionStream):
     """Stream for stock price changes."""
 
     name = "stock_price_change"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -162,7 +155,7 @@ class StockBatchStream(BatchSymbolStream):
     """Stream for batch stock data with automatic chunking."""
 
     name = "stock_batch"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -204,7 +197,7 @@ class StockBatchQuoteShortStream(BatchSymbolStream):
     """Stream for batch short stock quotes with automatic chunking."""
 
     name = "stock_batch_quote_short"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -221,7 +214,7 @@ class BatchAftermarketTradeStream(BatchSymbolStream):
     """Stream for batch aftermarket trades with automatic chunking."""
 
     name = "batch_aftermarket_trade"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -239,7 +232,7 @@ class BatchAftermarketQuoteStream(BatchSymbolStream):
     """Stream for batch aftermarket quotes with automatic chunking."""
 
     name = "batch_aftermarket_quote"
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -255,15 +248,12 @@ class BatchAftermarketQuoteStream(BatchSymbolStream):
         return f"{self.url_base}/stable/batch-aftermarket-quote"
 
 
-
-
-
 class MutualFundPriceQuotesStream(QuoteSymbolPartitionStream):
     """Stream for mutual fund price quotes."""
 
     name = "mutual_fund_price_quotes"
     _use_cached_symbols_default = False
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -299,7 +289,7 @@ class ETFPriceQuotesStream(QuoteSymbolPartitionStream):
     def get_symbols(self, context: Context | None = None) -> t.List[dict]:
         """Use cached ETF symbols instead of regular stock symbols."""
         return self.tap.get_cached_etf_symbols()
-    
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),

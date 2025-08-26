@@ -5,20 +5,24 @@ from __future__ import annotations
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream
-from tap_fmp.streams.chart_streams import (
-    ChartLightStream,
-    PriceVolumeStream,
-    Prices1minStream,
-    Prices5minStream,
-    Prices1HrStream,
+from tap_fmp.client import (
+    FmpSurrogateKeyStream,
+    SymbolPartitionStream,
+    SymbolPartitionTimeSliceStream,
+)
+from tap_fmp.mixins import (
+    BaseSymbolPartitionMixin,
+    ForexConfigMixin,
+    ChartLightMixin,
+    ChartFullMixin,
+    Prices1minMixin,
+    Prices5minMixin,
+    Prices1HrMixin,
 )
 
 
-class ForexPairsStream(FmpRestStream):
+class ForexPairsStream(ForexConfigMixin, FmpSurrogateKeyStream):
     name = "forex_pairs"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -28,6 +32,16 @@ class ForexPairsStream(FmpRestStream):
         th.Property("from_name", th.StringType),
         th.Property("to_name", th.StringType),
     ).to_dict()
+
+    def create_record_from_item(self, item: str) -> dict:
+        """Create a record dict from a forex symbol."""
+        return {
+            "symbol": item,
+            "from_currency": None,
+            "to_currency": None,
+            "from_name": None,
+            "to_name": None,
+        }
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/forex-list"
@@ -42,42 +56,24 @@ class ForexPartitionStream(SymbolPartitionStream):
         ]
 
 
-class ForexSymbolPartitionMixin(FmpRestStream):
+class ForexSymbolPartitionMixin(BaseSymbolPartitionMixin):
+
     @property
-    def partitions(self):
-        query_params_symbol = self.query_params.get("symbol")
-        other_params_symbols = self.config.get("other_params", {}).get("symbols")
+    def selection_config_section(self) -> str:
+        return "forex_pairs"
 
-        assert not (query_params_symbol and other_params_symbols), (
-            f"Cannot specify symbol configurations in both query_params and "
-            f"other_params for stream {self.name}."
-        )
+    @property
+    def selection_field_name(self) -> str:
+        return "select_forex_pairs"
 
-        if query_params_symbol:
-            return (
-                [{"symbol": query_params_symbol}]
-                if isinstance(query_params_symbol, str)
-                else query_params_symbol
-            )
-        elif other_params_symbols:
-            return (
-                [{"symbol": symbol} for symbol in other_params_symbols]
-                if isinstance(other_params_symbols, list)
-                else other_params_symbols
-            )
-        else:
-            return [
-                {"symbol": forex_json.get("symbol")}
-                for forex_json in self._tap.get_cached_forex_pairs()
-            ]
+    def get_cached_symbols(self) -> list[dict]:
+        return self._tap.get_cached_forex_pairs()
 
 
 class ForexQuoteStream(ForexSymbolPartitionMixin, ForexPartitionStream):
     """Stream for Forex Quote API."""
 
     name = "forex_quotes"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -109,8 +105,6 @@ class ForexQuoteShortStream(ForexSymbolPartitionMixin, ForexPartitionStream):
     """Stream for Forex Short Quote API."""
 
     name = "forex_quotes_short"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -124,12 +118,10 @@ class ForexQuoteShortStream(ForexSymbolPartitionMixin, ForexPartitionStream):
         return f"{self.url_base}/stable/quote-short"
 
 
-class BatchForexQuotesStream(FmpRestStream):
+class BatchForexQuotesStream(FmpSurrogateKeyStream):
     """Stream for Batch Forex Quotes API."""
 
     name = "batch_forex_quotes"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -143,7 +135,11 @@ class BatchForexQuotesStream(FmpRestStream):
         return f"{self.url_base}/stable/batch-forex-quotes"
 
 
-class ForexLightChartStream(ForexSymbolPartitionMixin, ChartLightStream):
+class ForexLightChartStream(
+    ForexSymbolPartitionMixin,
+    ChartLightMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """Stream for Historical Forex Light Chart API."""
 
     name = "forex_light_chart"
@@ -152,37 +148,39 @@ class ForexLightChartStream(ForexSymbolPartitionMixin, ChartLightStream):
         return f"{self.url_base}/stable/historical-price-eod/light"
 
 
-class ForexFullChartStream(ForexSymbolPartitionMixin, PriceVolumeStream):
+class ForexFullChartStream(
+    ForexSymbolPartitionMixin, ChartFullMixin, SymbolPartitionTimeSliceStream
+):
     """Stream for Historical Forex Full Chart API."""
 
     name = "forex_full_chart"
 
-    def get_url(self, context: Context | None = None) -> str:
-        return f"{self.url_base}/stable/historical-price-eod/full"
 
-
-class Forex1minStream(ForexSymbolPartitionMixin, Prices1minStream):
+class Forex1minStream(
+    ForexSymbolPartitionMixin,
+    Prices1minMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """Stream for 1-Minute Interval Forex Chart API."""
 
     name = "forex_1min"
 
-    def get_url(self, context: Context | None = None) -> str:
-        return f"{self.url_base}/stable/historical-chart/1min"
 
-
-class Forex5minStream(ForexSymbolPartitionMixin, Prices5minStream):
+class Forex5minStream(
+    ForexSymbolPartitionMixin,
+    Prices5minMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """Stream for 5-Minute Interval Forex Chart API."""
 
     name = "forex_5min"
 
-    def get_url(self, context: Context | None = None) -> str:
-        return f"{self.url_base}/stable/historical-chart/5min"
 
-
-class Forex1HrStream(ForexSymbolPartitionMixin, Prices1HrStream):
+class Forex1HrStream(
+    ForexSymbolPartitionMixin,
+    Prices1HrMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """Stream for 1-Hour Interval Forex Chart API."""
 
-    name = "forex_1hr"
-
-    def get_url(self, context: Context | None = None) -> str:
-        return f"{self.url_base}/stable/historical-chart/1hour"
+    name = "forex_1h"

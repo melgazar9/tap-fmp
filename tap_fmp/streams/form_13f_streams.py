@@ -8,6 +8,7 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpRestStream
+from tap_fmp.helpers import safe_int
 
 
 class Form13fCikPartitionStream(FmpRestStream):
@@ -76,7 +77,7 @@ class Form13fSymbolPartitionStream(FmpRestStream):
 
         return [
             {"symbol": s["symbol"], "year": y, "quarter": q}
-            for s in self._tap.get_cached_symbols()
+            for s in self._tap.get_cached_company_symbols()
             for y in years
             for q in quarters
         ]
@@ -370,6 +371,14 @@ class PositionsSummaryStream(Form13fSymbolPartitionStream):
         return (
             f"{self.url_base}/stable/institutional-ownership/symbol-positions-summary"
         )
+
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        """Add year and quarter from context and convert to integers."""
+        if context and "year" in context:
+            record["year"] = safe_int(context["year"])
+        if context and "quarter" in context:
+            record["quarter"] = safe_int(context["quarter"])
+        return super().post_process(record, context)
 
 
 class IndustryPerformanceSummaryStream(FmpRestStream):

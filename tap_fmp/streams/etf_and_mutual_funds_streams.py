@@ -1,24 +1,54 @@
-"""ESG (Environmental, Social, and Governance) Streams."""
+"""ETF and Mutual Fund Streams."""
 
 import typing as t
 
-from tap_fmp.client import SymbolPartitionStream, FmpRestStream
+from tap_fmp.client import FmpSurrogateKeyStream, SymbolPartitionStream
+from tap_fmp.mixins import BaseSymbolPartitionMixin, EtfConfigMixin
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 from datetime import datetime
 
 
-class EtfStream(SymbolPartitionStream):
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
+class EtfListStream(EtfConfigMixin, FmpSurrogateKeyStream):
+    """Stream for ETF List API."""
+
+    name = "etf_list"
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
+        th.Property("name", th.StringType),
+    ).to_dict()
+
+    def create_record_from_item(self, symbol: str) -> dict:
+        """Create a record dict from an ETF symbol."""
+        return {
+            "symbol": symbol,
+            "name": None,
+        }
+
+    def get_url(self, context: Context | None = None) -> str:
+        """Get URL for the request."""
+        return f"{self.url_base}/stable/etf-list"
+
+
+class EtfSymbolPartitionMixin(BaseSymbolPartitionMixin):
 
     @property
-    def partitions(self):
-        # Use ETF symbols instead of regular stock symbols
-        return [{"symbol": s["symbol"]} for s in self._tap.get_cached_etf_symbols()]
+    def selection_config_section(self) -> str:
+        return "etf_symbols"
+
+    @property
+    def selection_field_name(self) -> str:
+        return "select_etf_symbols"
+
+    def get_cached_symbols(self) -> list[dict]:
+        return self._tap.get_cached_etf_symbols()
 
 
-class EtfAndFundHoldingsStream(EtfStream):
+class EtfAndFundHoldingsStream(
+    EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
+):
     name = "etf_and_fund_holdings"
 
     schema = th.PropertiesList(
@@ -39,7 +69,9 @@ class EtfAndFundHoldingsStream(EtfStream):
         return f"{self.url_base}/stable/etf/holdings"
 
 
-class EtfAndMutualFundInformationStream(EtfStream):
+class EtfAndMutualFundInformationStream(
+    EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
+):
     name = "etf_and_mutual_fund_holdings"
 
     schema = th.PropertiesList(
@@ -76,7 +108,9 @@ class EtfAndMutualFundInformationStream(EtfStream):
         return f"{self.url_base}/stable/etf/info"
 
 
-class EtfAndFundCountryAllocationStream(EtfStream):
+class EtfAndFundCountryAllocationStream(
+    EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
+):
     name = "etf_and_fund_country_allocation"
 
     schema = th.PropertiesList(
@@ -88,8 +122,15 @@ class EtfAndFundCountryAllocationStream(EtfStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/etf/country-weightings"
 
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        if "weight_percentage" in row:
+            row["weight_percentage"] = str(row["weight_percentage"])
+        return super().post_process(row, context)
 
-class EtfAssetExposureStream(EtfStream):
+
+class EtfAssetExposureStream(
+    EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
+):
     name = "etf_asset_exposure"
 
     schema = th.PropertiesList(
@@ -105,7 +146,9 @@ class EtfAssetExposureStream(EtfStream):
         return f"{self.url_base}/stable/etf/asset-exposure"
 
 
-class EtfSectorWeightingStream(EtfStream):
+class EtfSectorWeightingStream(
+    EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
+):
     name = "etf_sector_weighting"
 
     schema = th.PropertiesList(
@@ -119,7 +162,9 @@ class EtfSectorWeightingStream(EtfStream):
         return f"{self.url_base}/stable/etf/sector-weightings"
 
 
-class MutualFundAndEtfDisclosureStream(EtfStream):
+class MutualFundAndEtfDisclosureStream(
+    EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
+):
     name = "mutual_fund_and_etf_disclosure"
 
     schema = th.PropertiesList(
@@ -142,7 +187,9 @@ class MutualFundAndEtfDisclosureStream(EtfStream):
         return super().post_process(record, context)
 
 
-class MutualFundDisclosuresStream(EtfStream):
+class MutualFundDisclosuresStream(
+    EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
+):
     name = "mutual_fund_disclosures"
 
     schema = th.PropertiesList(
@@ -179,12 +226,14 @@ class MutualFundDisclosuresStream(EtfStream):
     def partitions(self):
         quarters = [1, 2, 3, 4]
         years = [str(y) for y in range(2020, datetime.today().year + 1)]
-        etf_symbols = self._tap.get_cached_etf_symbols()
+
+        symbol_data = self.get_cached_symbols()
+
         mutual_fund_partitions = [
-            {"quarter": str(q), "year": str(y), "symbol": s["symbol"]}
+            {"quarter": str(q), "year": str(y), "symbol": symbol["symbol"]}
             for q in quarters
             for y in years
-            for s in etf_symbols
+            for symbol in symbol_data
         ]
         return mutual_fund_partitions
 
@@ -200,12 +249,10 @@ class MutualFundDisclosuresStream(EtfStream):
         yield from super().get_records(context)
 
 
-class MutualFundAndEtfDisclosureNameSearchStream(FmpRestStream):
+class MutualFundAndEtfDisclosureNameSearchStream(FmpSurrogateKeyStream):
     """Search for mutual fund and ETF disclosure information by name."""
 
     name = "mutual_fund_and_etf_disclosure_name_search"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -224,11 +271,46 @@ class MutualFundAndEtfDisclosureNameSearchStream(FmpRestStream):
         th.Property("state", th.StringType),
     ).to_dict()
 
+    @property
+    def partitions(self):
+        query_params_name = self.query_params.get("name")
+        other_params_names = self.config.get("other_params", {}).get("names")
+
+        assert not (query_params_name and other_params_names), (
+            f"Cannot specify name configurations in both query_params and "
+            f"other_params for stream {self.name}."
+        )
+
+        if query_params_name:
+            return (
+                [{"name": query_params_name}]
+                if isinstance(query_params_name, str)
+                else query_params_name
+            )
+        elif other_params_names:
+            return (
+                [{"name": name} for name in other_params_names]
+                if isinstance(other_params_names, list)
+                else other_params_names
+            )
+        else:
+            raise ValueError(
+                f"Stream '{self.name}' requires name configuration. "
+                f"Configure either 'query_params.name' or 'other_params.names' "
+                f"for this search stream."
+            )
+
+    def get_records(self, context: Context | None):
+        self.query_params.update(context)
+        return super().get_records(context)
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/funds/disclosure-holders-search"
 
 
-class FundAndEtfDisclosuresByDateStream(EtfStream):
+class FundAndEtfDisclosuresByDateStream(
+    EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
+):
     name = "fund_and_etf_disclosures_by_date"
 
     schema = th.PropertiesList(

@@ -2,6 +2,8 @@ from tap_fmp.client import SymbolPartitionTimeSliceStream, FmpRestStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
+from tap_fmp.mixins import SelectableStreamMixin
+
 
 class CotPartitionStream(SymbolPartitionTimeSliceStream):
     @property
@@ -181,7 +183,7 @@ class CotAnalysisByDateStream(CotPartitionStream):
         return super().post_process(row, context)
 
 
-class CotReportListStream(FmpRestStream):
+class CotReportListStream(SelectableStreamMixin, FmpRestStream):
     name = "cot_report_list"
     primary_keys = ["symbol", "name"]
 
@@ -189,6 +191,26 @@ class CotReportListStream(FmpRestStream):
         th.Property("symbol", th.StringType, required=True),
         th.Property("name", th.StringType),
     ).to_dict()
+
+    @property
+    def selection_config_key(self) -> str:
+        return "cot_symbols"
+
+    @property
+    def selection_field_key(self) -> str:
+        return "select_cot_symbols"
+
+    @property
+    def item_name_singular(self) -> str:
+        return "COT symbol"
+
+    @property
+    def item_name_plural(self) -> str:
+        return "COT symbols"
+
+    def create_record_from_item(self, item: str) -> dict:
+        """Create a record dict from a COT symbol."""
+        return {"symbol": item, "name": None}
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/commitment-of-traders-list"

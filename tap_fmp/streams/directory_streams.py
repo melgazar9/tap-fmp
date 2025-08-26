@@ -4,10 +4,12 @@ from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import (
     FmpRestStream,
+    FmpSurrogateKeyStream,
     SymbolFetcher,
     CikFetcher,
     ExchangeFetcher,
 )
+from tap_fmp.mixins import SelectableStreamMixin
 
 
 class CompanySymbolsStream(SymbolFetcher):
@@ -206,11 +208,11 @@ class ETFSymbolStream(FmpRestStream):
         ]
 
 
-class ActivelyTradingStream(FmpRestStream):
+class ActivelyTradingStream(FmpSurrogateKeyStream):
     name = "actively_trading"
-    primary_keys = ["symbol"]
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("name", th.StringType),
     ).to_dict()
@@ -292,7 +294,7 @@ class AvailableExchangesStream(ExchangeFetcher):
             yield record
 
 
-class AvailableSectorsStream(FmpRestStream):
+class AvailableSectorsStream(SelectableStreamMixin, FmpRestStream):
     name = "available_sectors"
     primary_keys = ["sector"]
 
@@ -300,17 +302,49 @@ class AvailableSectorsStream(FmpRestStream):
         th.Property("sector", th.StringType, required=True),
     ).to_dict()
 
+    @property
+    def selection_config_key(self) -> str:
+        return "sectors"
+
+    @property
+    def selection_field_key(self) -> str:
+        return "select_sectors"
+
+    @property
+    def item_name_singular(self) -> str:
+        return "sector"
+
+    @property
+    def item_name_plural(self) -> str:
+        return "sectors"
+
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/available-sectors"
 
 
-class AvailableIndustriesStream(FmpRestStream):
+class AvailableIndustriesStream(SelectableStreamMixin, FmpRestStream):
     name = "available_industries"
     primary_keys = ["industry"]
 
     schema = th.PropertiesList(
         th.Property("industry", th.StringType, required=True),
     ).to_dict()
+
+    @property
+    def selection_config_key(self) -> str:
+        return "industries"
+
+    @property
+    def selection_field_key(self) -> str:
+        return "select_industries"
+
+    @property
+    def item_name_singular(self) -> str:
+        return "industry"
+
+    @property
+    def item_name_plural(self) -> str:
+        return "industries"
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/available-industries"

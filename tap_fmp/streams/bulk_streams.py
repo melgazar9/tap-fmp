@@ -5,14 +5,13 @@ from __future__ import annotations
 import typing as t
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
-from tap_fmp.client import FmpRestStream, IncrementalDateStream
+from tap_fmp.client import FmpSurrogateKeyStream, IncrementalDateStream
 from datetime import datetime
 from singer_sdk.exceptions import ConfigValidationError
 from decimal import Decimal
 
-class BaseBulkStream(FmpRestStream):
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
+
+class BaseBulkStream(FmpSurrogateKeyStream):
     _expect_csv = True
 
     _decimal_fields = None
@@ -29,7 +28,7 @@ class BaseBulkStream(FmpRestStream):
             (self._date_fields, lambda x: datetime.fromisoformat(x).date()),
             (self._datetime_fields, lambda x: datetime.fromisoformat(x)),
         ]
-        
+
         for fields, converter in field_converters:
             if fields:
                 assert isinstance(fields, (tuple, list))
@@ -147,7 +146,9 @@ class IncrementalYearPeriodStream(BaseBulkStream):
         starting_date = self.get_starting_timestamp(context)
 
         filtered_years = [
-            y for y in year_range if y >= max(datetime.fromisoformat(starting_date).year, 1990)
+            y
+            for y in year_range
+            if y >= max(datetime.fromisoformat(starting_date).year, 1990)
         ]
 
         periods = self._get_periods()
@@ -195,7 +196,6 @@ class CompanyProfileBulkStream(PaginatedBulkStream):
 
     _integer_fields = ["full_time_employees"]
     _date_fields = ["filing_date", "ipo_date"]
-
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -307,7 +307,7 @@ class FinancialScoresBulkStream(BaseBulkStream):
         "total_liabilities",
         "revenue",
     ]
-    
+
     _float_fields = ["altman_z_score"]
 
     _integer_fields = ["piotroski_score"]
@@ -373,7 +373,6 @@ class EtfHolderBulkStream(PaginatedBulkStream):
     name = "etf_holder_bulk"
 
     _decimal_fields = ["market_value"]
-    
     _float_fields = ["weight_percentage", "shares_number"]
 
     schema = th.PropertiesList(
@@ -429,13 +428,13 @@ class KeyMetricsTtmBulkStream(TtmBulkStream):
 
     _decimal_fields = [
         "market_cap",
-        "enterprise_value_ttm", 
+        "enterprise_value_ttm",
         "graham_number_ttm",
         "graham_net_net_ttm",
         "working_capital_ttm",
         "invested_capital_ttm",
         "average_receivables_ttm",
-        "average_payables_ttm", 
+        "average_payables_ttm",
         "average_inventory_ttm",
         "free_cash_flow_to_equity_ttm",
         "free_cash_flow_to_firm_ttm",
@@ -1243,6 +1242,7 @@ class CashFlowStatementBulkStream(IncrementalYearPeriodStream):
         th.Property("free_cash_flow", th.NumberType),
         th.Property("income_taxes_paid", th.NumberType),
         th.Property("interest_paid", th.NumberType),
+        th.Property("ipo_date", th.DateType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
@@ -1368,6 +1368,18 @@ class EodBulkStream(IncrementalDateStream):
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/eod-bulk"
+
+    def get_starting_timestamp(self, context: Context | None) -> str | None:
+        """Get the starting timestamp for the stream."""
+        start_date = super().get_starting_timestamp(context)
+        date_gte = (
+            self.config.get(self.name, {}).get("other_params", {}).get("date_gte")
+        )
+
+        if date_gte:
+            return max(start_date, date_gte)
+
+        return start_date
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         for col in ["open", "high", "low", "close", "adj_close", "volume"]:

@@ -6,23 +6,24 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import (
-    FmpRestStream,
+    FmpSurrogateKeyStream,
     SymbolPartitionStream,
     SymbolPartitionTimeSliceStream,
 )
 from tap_fmp.streams.chart_streams import (
-    Prices1minStream,
-    Prices5minStream,
-    Prices1HrStream,
+    Prices1minMixin,
+    Prices5minMixin,
+    Prices1HrMixin,
+    ChartLightMixin,
+    ChartFullMixin,
 )
+from tap_fmp.mixins import BaseSymbolPartitionMixin, CryptoConfigMixin
 
 
-class CryptoListStream(FmpRestStream):
+class CryptoListStream(CryptoConfigMixin, FmpSurrogateKeyStream):
     """Stream for Crypto List API."""
 
     name = "crypto_list"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -34,47 +35,40 @@ class CryptoListStream(FmpRestStream):
         th.Property("total_supply", th.NumberType),
     ).to_dict()
 
+    def create_record_from_item(self, item: str) -> dict:
+        """Create a record dict from a crypto symbol."""
+        return {
+            "symbol": item,
+            "name": None,
+            "exchange": None,
+            "ico_date": None,
+            "circulating_supply": None,
+            "total_supply": None,
+        }
+
     def get_url(self, context: Context | None = None) -> str:
         """Get URL for the request."""
         return f"{self.url_base}/stable/cryptocurrency-list"
 
 
-class CryptoSymbolPartitionMixin(SymbolPartitionStream):
+class CryptoSymbolPartitionMixin(BaseSymbolPartitionMixin):
+
     @property
-    def partitions(self):
-        query_params_symbol = self.query_params.get("symbol")
-        other_params_symbols = self.config.get("other_params", {}).get("symbols")
+    def selection_config_section(self) -> str:
+        return "crypto_symbols"
 
-        assert not (query_params_symbol and other_params_symbols), (
-            f"Cannot specify symbol configurations in both query_params and "
-            f"other_params for stream {self.name}."
-        )
+    @property
+    def selection_field_name(self) -> str:
+        return "select_crypto_symbols"
 
-        if query_params_symbol:
-            return (
-                [{"symbol": query_params_symbol}]
-                if isinstance(query_params_symbol, str)
-                else query_params_symbol
-            )
-        elif other_params_symbols:
-            return (
-                [{"symbol": symbol} for symbol in other_params_symbols]
-                if isinstance(other_params_symbols, list)
-                else other_params_symbols
-            )
-        else:
-            return [
-                {"symbol": c.get("symbol")}
-                for c in self._tap.get_cached_crypto_symbols()
-            ]
+    def get_cached_symbols(self) -> list[dict]:
+        return self._tap.get_cached_crypto_symbols()
 
 
-class FullCryptoQuoteStream(CryptoSymbolPartitionMixin):
+class FullCryptoQuoteStream(CryptoSymbolPartitionMixin, SymbolPartitionStream):
     """Stream for Full Crypto Quote API."""
 
     name = "crypto_quotes"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -102,12 +96,10 @@ class FullCryptoQuoteStream(CryptoSymbolPartitionMixin):
         return f"{self.url_base}/stable/quote"
 
 
-class CryptoQuoteShortStream(CryptoSymbolPartitionMixin):
+class CryptoQuoteShortStream(CryptoSymbolPartitionMixin, SymbolPartitionStream):
     """Stream for Crypto Quote Short API."""
 
     name = "crypto_quotes_short"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -122,12 +114,10 @@ class CryptoQuoteShortStream(CryptoSymbolPartitionMixin):
         return f"{self.url_base}/stable/quote-short"
 
 
-class AllCryptoQuotesStream(FmpRestStream):
+class AllCryptoQuotesStream(FmpSurrogateKeyStream):
     """Stream for All Crypto Quotes API."""
 
     name = "all_crypto_quotes"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -143,19 +133,13 @@ class AllCryptoQuotesStream(FmpRestStream):
 
 
 class HistoricalCryptoLightChartStream(
-    CryptoSymbolPartitionMixin, SymbolPartitionTimeSliceStream
+    CryptoSymbolPartitionMixin,
+    ChartLightMixin,
+    SymbolPartitionTimeSliceStream,
 ):
     """Stream for Historical Crypto Light Chart API."""
 
     name = "historical_crypto_light_chart"
-    primary_keys = ["symbol", "date"]
-
-    schema = th.PropertiesList(
-        th.Property("symbol", th.StringType, required=True),
-        th.Property("date", th.DateType),
-        th.Property("price", th.NumberType),
-        th.Property("volume", th.NumberType),
-    ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
         """Get URL for the request."""
@@ -163,44 +147,42 @@ class HistoricalCryptoLightChartStream(
 
 
 class HistoricalCryptoFullChartStream(
-    CryptoSymbolPartitionMixin, SymbolPartitionTimeSliceStream
+    CryptoSymbolPartitionMixin, ChartFullMixin, SymbolPartitionTimeSliceStream
 ):
     """Stream for Historical Crypto Full Chart API."""
 
     name = "historical_crypto_full_chart"
-    primary_keys = ["symbol", "date"]
-
-    schema = th.PropertiesList(
-        th.Property("symbol", th.StringType, required=True),
-        th.Property("date", th.DateType),
-        th.Property("open", th.NumberType),
-        th.Property("high", th.NumberType),
-        th.Property("low", th.NumberType),
-        th.Property("close", th.NumberType),
-        th.Property("volume", th.NumberType),
-        th.Property("change", th.NumberType),
-        th.Property("change_percent", th.NumberType),
-        th.Property("vwap", th.NumberType),
-    ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
         """Get URL for the request."""
         return f"{self.url_base}/stable/historical-price-eod/full"
 
 
-class Crypto1minStream(CryptoSymbolPartitionMixin, Prices1minStream):
+class Crypto1minStream(
+    CryptoSymbolPartitionMixin,
+    Prices1minMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """Stream for 1-Minute Interval Crypto Data API."""
 
     name = "crypto_1min"
 
 
-class Crypto5minStream(CryptoSymbolPartitionMixin, Prices5minStream):
+class Crypto5minStream(
+    CryptoSymbolPartitionMixin,
+    Prices5minMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """Stream for 5-Minute Interval Crypto Data API."""
 
     name = "crypto_5min"
 
 
-class Crypto1HrStream(CryptoSymbolPartitionMixin, Prices1HrStream):
+class Crypto1HrStream(
+    CryptoSymbolPartitionMixin,
+    Prices1HrMixin,
+    SymbolPartitionTimeSliceStream,
+):
     """Stream for 1-Hour Interval Crypto Data API."""
 
-    name = "crypto_1hr"
+    name = "crypto_1h"

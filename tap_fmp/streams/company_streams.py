@@ -224,7 +224,7 @@ class CompanyBatchMarketCapStream(FmpRestStream):
         return f"{self.url_base}/stable/market-capitalization-batch"
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        symbols = self._tap.get_cached_symbols()
+        symbols = self._tap.get_cached_company_symbols()
         self.query_params.update({"symbols": ",".join(s["symbol"] for s in symbols)})
         yield from super().get_records(context)
 
