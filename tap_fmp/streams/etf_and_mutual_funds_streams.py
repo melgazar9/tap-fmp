@@ -20,13 +20,6 @@ class EtfListStream(EtfConfigMixin, FmpSurrogateKeyStream):
         th.Property("name", th.StringType),
     ).to_dict()
 
-    def create_record_from_item(self, symbol: str) -> dict:
-        """Create a record dict from an ETF symbol."""
-        return {
-            "symbol": symbol,
-            "name": None,
-        }
-
     def get_url(self, context: Context | None = None) -> str:
         """Get URL for the request."""
         return f"{self.url_base}/stable/etf-list"

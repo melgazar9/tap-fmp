@@ -1068,6 +1068,7 @@ class FinancialStatementGrowthStream(StatementStream):
     name = "financial_statement_growth"
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("date", th.DateType),
         th.Property("fiscal_year", th.IntegerType),

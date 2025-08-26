@@ -116,7 +116,7 @@ plugins:
       - company_employee_count.*
       - company_historical_employee_count.*
       - company_market_cap.*  # Starter: US Exchanges only, Premium: Symbol Limited to US, UK, and Canada Exchanges
-#      - company_batch_market_cap.*  # not useful unless passing small number of symbols
+      - company_batch_market_cap.*
       - historical_market_cap.*  # Build: up to 5 years
       - company_share_and_liquidity_float.*
       - all_shares_float.*
@@ -237,7 +237,7 @@ plugins:
       ### Commodity Streams ###
 
       - commodities_list.*
-      - commodities_quote.*
+      - commodities_quotes.*
       - commodities_quote_short.*
 #      - all_commodities_quotes.*
       - commodities_light_chart.*
@@ -414,8 +414,8 @@ plugins:
         schema: "public"
         table: "exchange_variants"
       
-      symbols:
-        select_symbols: ["AAPL", "MSFT", "GOOGL"]
+      company_symbols:
+        select_symbols: ["NVDA", "META"]
 
       index_symbols:
         select_index_symbols:

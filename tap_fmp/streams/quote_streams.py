@@ -6,29 +6,11 @@ import typing as t
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 from tap_fmp.client import SymbolPartitionStream, FmpSurrogateKeyStream
+from tap_fmp.mixins import ChunkedSymbolPartitionMixin, CompanyBatchStreamMixin
 
 
 class QuoteSymbolPartitionStream(SymbolPartitionStream, FmpSurrogateKeyStream):
     """Base class for quote streams with surrogate key support."""
-
-
-class BatchSymbolStream(FmpSurrogateKeyStream):
-    """Base class for batch symbol streams with automatic chunking."""
-
-    def get_symbol_chunks(self, chunk_size: int = 100):
-        """Get symbols in chunks for batch processing."""
-        symbols = self.config.get("symbols", {}).get("select_symbols", [])
-        if isinstance(symbols, str):
-            symbols = [symbols]
-
-        for i in range(0, len(symbols), chunk_size):
-            yield symbols[i : i + chunk_size]
-
-    def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        """Override to handle batching by chunks of symbols."""
-        for symbol_chunk in self.get_symbol_chunks():
-            self.query_params["symbols"] = ",".join(symbol_chunk)
-            yield from super().get_records(context)
 
 
 class StockQuoteStream(QuoteSymbolPartitionStream):
@@ -93,7 +75,6 @@ class AftermarketTradeStream(QuoteSymbolPartitionStream):
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("price", th.NumberType),
-        th.Property("size", th.NumberType),
         th.Property("trade_size", th.NumberType),
         th.Property("timestamp", th.IntegerType),
     ).to_dict()
@@ -151,7 +132,9 @@ class StockPriceChangeStream(QuoteSymbolPartitionStream):
         return f"{self.url_base}/stable/stock-price-change"
 
 
-class StockBatchStream(BatchSymbolStream):
+class StockBatchStream(
+    CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
+):
     """Stream for batch stock data with automatic chunking."""
 
     name = "stock_batch"
@@ -193,7 +176,9 @@ class StockBatchQuoteStream(StockBatchStream):
     name = "stock_batch_quote"
 
 
-class StockBatchQuoteShortStream(BatchSymbolStream):
+class StockBatchQuoteShortStream(
+    CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
+):
     """Stream for batch short stock quotes with automatic chunking."""
 
     name = "stock_batch_quote_short"
@@ -210,7 +195,9 @@ class StockBatchQuoteShortStream(BatchSymbolStream):
         return f"{self.url_base}/stable/batch-quote-short"
 
 
-class BatchAftermarketTradeStream(BatchSymbolStream):
+class BatchAftermarketTradeStream(
+    CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
+):
     """Stream for batch aftermarket trades with automatic chunking."""
 
     name = "batch_aftermarket_trade"
@@ -228,7 +215,9 @@ class BatchAftermarketTradeStream(BatchSymbolStream):
         return f"{self.url_base}/stable/batch-aftermarket-trade"
 
 
-class BatchAftermarketQuoteStream(BatchSymbolStream):
+class BatchAftermarketQuoteStream(
+    CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
+):
     """Stream for batch aftermarket quotes with automatic chunking."""
 
     name = "batch_aftermarket_quote"

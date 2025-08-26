@@ -27,7 +27,7 @@ class CompanySymbolsStream(SymbolFetcher):
 
     def get_symbol_list(self) -> list[str] | None:
         """Get a list of selected symbols from config."""
-        symbols_config = self.config.get("symbols", {})
+        symbols_config = self.config.get("company_symbols", {})
         selected_symbols = symbols_config.get("select_symbols")
 
         if not selected_symbols or selected_symbols in ("*", ["*"]):

@@ -372,20 +372,12 @@ class AllIndustryClassificationStream(FmpRestStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
-        th.Property("company_name", th.StringType),
-        th.Property("sic", th.StringType),
-        th.Property("industry_title", th.StringType),
-        th.Property("exchange", th.StringType),
-        th.Property("sector", th.StringType),
-        th.Property("industry", th.StringType),
-        th.Property("business_address", th.StringType),
-        th.Property("business_phone", th.StringType),
-        th.Property("website", th.StringType),
-        th.Property("description", th.StringType),
-        th.Property("phone_number", th.StringType),
-        th.Property("cik", th.StringType),
         th.Property("name", th.StringType),
+        th.Property("cik", th.StringType),
         th.Property("sic_code", th.StringType),
+        th.Property("industry_title", th.StringType),
+        th.Property("business_address", th.StringType),
+        th.Property("phone_number", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:

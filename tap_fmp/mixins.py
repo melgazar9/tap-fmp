@@ -96,9 +96,11 @@ class BaseSymbolPartitionMixin(ABC):
     name: str
 
     @abstractmethod
-    def get_cached_symbols(self) -> list[dict]:
+    def get_cached_company_symbols(self) -> list[dict]:
         """Get symbols from the specific cache method. Must be implemented by subclasses."""
-        raise NotImplementedError("get_cached_symbols must be implemented by subclass.")
+        raise NotImplementedError(
+            "get_cached_company_symbols must be implemented by subclass."
+        )
 
     @property
     def selection_config_section(self) -> str | None:
@@ -144,14 +146,14 @@ class BaseSymbolPartitionMixin(ABC):
                 else [{"symbol": other_params_symbols}]
             )
         else:
-            cached_symbols = self.get_cached_symbols()
-            return [{"symbol": c.get("symbol")} for c in cached_symbols]
+            cached_company_symbols = self.get_cached_company_symbols()
+            return [{"symbol": c.get("symbol")} for c in cached_company_symbols]
 
 
 class SymbolPartitionMixin(BaseSymbolPartitionMixin):
     """Mixin for streams that partition data by symbols, using company symbols as default."""
 
-    def get_cached_symbols(self) -> list[dict]:
+    def get_cached_company_symbols(self) -> list[dict]:
         """Get symbols from cached company symbols."""
         return self._tap.get_cached_company_symbols()
 
@@ -203,10 +205,12 @@ class CryptoConfigMixin(SelectableStreamMixin):
     def item_name_plural(self) -> str:
         return "crypto symbols"
 
-    def get_symbols(self) -> list[str]:
+    def get_symbols_for_batch_stream(self) -> list[str]:
         """Get default crypto symbols from cached list."""
         cached_symbols = self._tap.get_cached_crypto_symbols()
-        return [symbol.get("symbol") for symbol in cached_symbols if symbol.get("symbol")]
+        return [
+            symbol.get("symbol") for symbol in cached_symbols if symbol.get("symbol")
+        ]
 
 
 class EtfConfigMixin(SelectableStreamMixin):
@@ -270,7 +274,7 @@ class CompanyConfigMixin(SelectableStreamMixin):
 
     @property
     def selection_config_key(self) -> str:
-        return "symbols"
+        return "company_symbols"
 
     @property
     def selection_field_key(self) -> str:
@@ -283,6 +287,34 @@ class CompanyConfigMixin(SelectableStreamMixin):
     @property
     def item_name_plural(self) -> str:
         return "company symbols"
+
+    def get_symbols_for_batch_stream(self) -> list[str]:
+        """Get default company symbols from cached list."""
+        cached_company_symbols = self._tap.get_cached_company_symbols()
+        return [
+            symbol.get("symbol")
+            for symbol in cached_company_symbols
+            if symbol.get("symbol")
+        ]
+
+
+class CompanyBatchStreamMixin:
+    """Mixin for batch streams that use company symbols without selection logic."""
+    
+    def get_symbols_for_batch_stream(self) -> list[str]:
+        """Get company symbols from cached list."""
+        cached_company_symbols = self._tap.get_cached_company_symbols()
+        return [
+            symbol.get("symbol")
+            for symbol in cached_company_symbols
+            if symbol.get("symbol")
+        ]
+    
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        """Handle batch symbol context and delegate to parent."""
+        if context and "symbols" in context:
+            self.query_params["symbols"] = context["symbols"]
+        yield from super().get_records(context)
 
 
 class ForexConfigMixin(SelectableStreamMixin):
@@ -432,7 +464,7 @@ class ChunkedSymbolPartitionMixin(ABC):
             else:
                 symbols = [str(symbols_config)]
         else:
-            symbols = self.get_default_symbols()
+            symbols = self.get_symbols_for_batch_stream()
 
         # Split symbols into chunks of _max_symbols_per_request
         partitions = []

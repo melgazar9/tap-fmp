@@ -2,6 +2,7 @@ from tap_fmp.client import (
     SymbolPartitionStream,
     SymbolPeriodPartitionStream,
     FmpRestStream,
+    FmpSurrogateKeyStream,
 )
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
@@ -164,7 +165,7 @@ class PriceTargetNewsStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/price-target-news"
 
 
-class PriceTargetLatestNewsStream(FmpRestStream):
+class PriceTargetLatestNewsStream(FmpSurrogateKeyStream):
     """Stream for price target latest news."""
 
     name = "price_target_latest_news"

@@ -5,9 +5,12 @@ from tap_fmp.client import (
     SymbolPartitionStream,
     SymbolPartitionTimeSliceStream,
 )
+
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 from datetime import datetime
+
+from tap_fmp.mixins import ChunkedSymbolPartitionMixin
 
 
 class CompanySymbolPartitionStream(SymbolPartitionStream):
@@ -210,7 +213,7 @@ class CompanyMarketCapStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/market-capitalization"
 
 
-class CompanyBatchMarketCapStream(FmpRestStream):
+class CompanyBatchMarketCapStream(ChunkedSymbolPartitionMixin, FmpRestStream):
     name = "company_batch_market_cap"
     primary_keys = ["symbol", "date"]
 
@@ -220,12 +223,16 @@ class CompanyBatchMarketCapStream(FmpRestStream):
         th.Property("market_cap", th.NumberType),
     ).to_dict()
 
-    def get_url(self, context: Context):
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/market-capitalization-batch"
 
-    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+    def get_symbols_for_batch_stream(self) -> list[str]:
         symbols = self._tap.get_cached_company_symbols()
-        self.query_params.update({"symbols": ",".join(s["symbol"] for s in symbols)})
+        return [s["symbol"] for s in symbols if s.get("symbol")]
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        if context and "symbols" in context:
+            self.query_params["symbols"] = context["symbols"]
         yield from super().get_records(context)
 
 

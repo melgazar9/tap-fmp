@@ -350,7 +350,7 @@ class TapFMP(Tap):
 
     name = "tap-fmp"
 
-    _cached_symbols: t.List[dict] | None = None
+    _cached_company_symbols: t.List[dict] | None = None
     _symbols_stream_instance: CompanySymbolsStream | None = None
     _symbols_lock = threading.Lock()
 
@@ -515,7 +515,7 @@ class TapFMP(Tap):
             description="Start date for data extraction",
         ),
         th.Property(
-            "symbols",
+            "company_symbols",
             th.ObjectType(
                 th.Property(
                     "select_symbols",
@@ -529,22 +529,24 @@ class TapFMP(Tap):
 
     def get_cached_company_symbols(self) -> t.List[dict]:
         """Thread-safe company symbol caching for parallel execution."""
-        if self._cached_symbols is None:
+        if self._cached_company_symbols is None:
             with self._symbols_lock:
-                if self._cached_symbols is None:
+                if self._cached_company_symbols is None:
                     self.logger.info("Fetching and caching company symbols...")
                     symbols_stream = self.get_symbols_stream()
                     symbols = sorted(
                         list(symbols_stream.get_records(context=None)),
                         key=lambda x: x.get("symbol", ""),
                     )
-                    self._cached_symbols = self._apply_country_currency_filtering(
-                        symbols, "symbols"
+                    self._cached_company_symbols = (
+                        self._apply_country_currency_filtering(
+                            symbols, "company_symbols"
+                        )
                     )
                     self.logger.info(
-                        f"Cached {len(self._cached_symbols)} company symbols."
+                        f"Cached {len(self._cached_company_symbols)} company symbols."
                     )
-        return self._cached_symbols
+        return self._cached_company_symbols
 
     def get_symbols_stream(self) -> CompanySymbolsStream:
         if self._symbols_stream_instance is None:

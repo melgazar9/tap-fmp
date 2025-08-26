@@ -11,7 +11,7 @@ from tap_fmp.mixins import BaseSymbolPartitionMixin
 
 
 class TechnicalIndicatorSymbolPartitionMixin(BaseSymbolPartitionMixin):
-    def get_cached_symbols(self) -> list[dict]:
+    def get_cached_company_symbols(self) -> list[dict]:
         return self._tap.get_cached_company_symbols()
 
 
