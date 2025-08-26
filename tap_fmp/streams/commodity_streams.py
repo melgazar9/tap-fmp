@@ -134,6 +134,7 @@ class CommoditiesQuoteStream(CommodityPriceMixin, CommodityPartitionStream):
         th.Property("open", th.NumberType),
         th.Property("previous_close", th.NumberType),
         th.Property("timestamp", th.IntegerType),
+        th.Property("date", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:

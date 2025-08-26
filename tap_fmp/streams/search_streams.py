@@ -78,6 +78,7 @@ class ExchangeVariantsStream(SymbolPartitionStream):
         th.Property("is_actively_trading", th.BooleanType),
         th.Property("is_adr", th.BooleanType),
         th.Property("is_fund", th.BooleanType),
+        th.Property("updated_at", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
