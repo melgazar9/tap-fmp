@@ -168,6 +168,9 @@ class PriceTargetLatestNewsStream(FmpRestStream):
     """Stream for price target latest news."""
 
     name = "price_target_latest_news"
+    replication_key = "published_date"
+    replication_method = "INCREMENTAL"
+    is_timestamp_replication_key = True
     _paginate = True
     _max_pages = 100
 
@@ -290,6 +293,9 @@ class StockGradeLatestNewsStream(FmpRestStream):
     """Stream for stock grade latest news."""
 
     name = "stock_grades_latest_news"
+    replication_key = "published_date"
+    replication_method = "INCREMENTAL"
+    is_timestamp_replication_key = True
     _add_surrogate_key = True
     _paginate = True
     _max_pages = 100

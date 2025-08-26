@@ -285,10 +285,6 @@ plugins:
       - stock_news.*
       - crypto_news.*
       - forex_news.*
-#      - search_press_releases.*
-      - search_stock_news.*
-      - search_crypto_news.*
-      - search_forex_news.*
 
       ### Technical Indicator Streams ###
 
