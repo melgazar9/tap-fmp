@@ -203,6 +203,11 @@ class CryptoConfigMixin(SelectableStreamMixin):
     def item_name_plural(self) -> str:
         return "crypto symbols"
 
+    def get_symbols(self) -> list[str]:
+        """Get default crypto symbols from cached list."""
+        cached_symbols = self._tap.get_cached_crypto_symbols()
+        return [symbol.get("symbol") for symbol in cached_symbols if symbol.get("symbol")]
+
 
 class EtfConfigMixin(SelectableStreamMixin):
     """Mixin providing ETF configuration properties."""
