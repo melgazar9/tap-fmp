@@ -347,9 +347,7 @@ class ForexConfigMixin(SelectableStreamMixin):
     def get_symbols_for_batch_stream(self) -> list[str]:
         """Get default forex pairs from cached list."""
         cached_forex_pairs = self._tap.get_cached_forex_pairs()
-        return [
-            pair.get("symbol") for pair in cached_forex_pairs if pair.get("symbol")
-        ]
+        return [pair.get("symbol") for pair in cached_forex_pairs if pair.get("symbol")]
 
 
 class BasePriceSchemaMixin:

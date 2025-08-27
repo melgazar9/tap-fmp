@@ -65,7 +65,7 @@ class EtfAndFundHoldingsStream(
 class EtfAndMutualFundInformationStream(
     EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
 ):
-    name = "etf_and_mutual_fund_holdings"
+    name = "etf_and_mutual_fund_info"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -102,7 +102,7 @@ class EtfAndMutualFundInformationStream(
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         record["symbol"] = context.get("symbol")
-        return record
+        return super().post_process(record, context)
 
 
 class EtfAndFundCountryAllocationStream(

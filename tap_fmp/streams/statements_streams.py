@@ -17,6 +17,13 @@ class StatementStream(SymbolPeriodPartitionStream):
     _add_surrogate_key = True
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
+        if context:
+            if "symbol" in context:
+                row["symbol"] = context["symbol"]
+            if "period" in context:
+                row["period"] = context["period"]
+            if "year" in context:
+                row["year"] = context["year"]
         if "fiscal_year" in row:
             row["fiscal_year"] = int(row["fiscal_year"])
 
@@ -1162,7 +1169,15 @@ class FinancialReportsForm10kJsonStream(StatementStream):
         th.Property("symbol", th.StringType),
         th.Property("period", th.StringType, required=True),
         th.Property("year", th.StringType, required=True),
-        th.Property("filing_data", th.ObjectType()),
+        th.Property(
+            "filing_data",
+            th.CustomType(
+                {
+                    "type": "object",
+                    "additionalProperties": True,
+                }
+            ),
+        ),
         th.Property("error_message", th.AnyType()),  # For API errors
     ).to_dict()
 
@@ -1174,9 +1189,12 @@ class FinancialReportsForm10kJsonStream(StatementStream):
         if filing_data:
             processed_record["filing_data"] = filing_data
 
-        processed_record["symbol"] = context.get("symbol")
-        processed_record["period"] = context.get("period")
-        processed_record["year"] = context.get("year")
+        if context:
+            symbol = context.get("symbol")
+            if symbol:
+                processed_record["symbol"] = symbol.strip()
+            processed_record["period"] = context.get("period")
+            processed_record["year"] = context.get("year")
 
         return super().post_process(processed_record, context)
 

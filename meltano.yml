@@ -344,8 +344,8 @@ plugins:
 
       ### ETF and Mutual Fund Streams ###
 
+      - etf_and_mutual_fund_info.*
       - etf_and_fund_holdings.*
-      - etf_and_mutual_fund_holdings.*
       - etf_and_fund_country_allocation.*
       - etf_asset_exposure.*
       - etf_sector_weighting.*

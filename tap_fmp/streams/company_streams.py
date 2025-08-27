@@ -122,6 +122,10 @@ class CikProfileStream(FmpRestStream):
         self.query_params.update({"cik": context.get("cik")})
         yield from super().get_records(context)
 
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        row["cik"] = context.get("cik")
+        return super().post_process(row, context)
+
 
 class CompanyNotesStream(CompanySymbolPartitionStream):
     name = "company_notes"
