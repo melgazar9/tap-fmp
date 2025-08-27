@@ -300,7 +300,7 @@ class CompanyConfigMixin(SelectableStreamMixin):
 
 class CompanyBatchStreamMixin:
     """Mixin for batch streams that use company symbols without selection logic."""
-    
+
     def get_symbols_for_batch_stream(self) -> list[str]:
         """Get company symbols from cached list."""
         cached_company_symbols = self._tap.get_cached_company_symbols()
@@ -309,7 +309,7 @@ class CompanyBatchStreamMixin:
             for symbol in cached_company_symbols
             if symbol.get("symbol")
         ]
-    
+
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         """Handle batch symbol context and delegate to parent."""
         if context and "symbols" in context:
@@ -343,6 +343,13 @@ class ForexConfigMixin(SelectableStreamMixin):
     @property
     def item_name_plural(self) -> str:
         return "forex pairs"
+
+    def get_symbols_for_batch_stream(self) -> list[str]:
+        """Get default forex pairs from cached list."""
+        cached_forex_pairs = self._tap.get_cached_forex_pairs()
+        return [
+            pair.get("symbol") for pair in cached_forex_pairs if pair.get("symbol")
+        ]
 
 
 class BasePriceSchemaMixin:

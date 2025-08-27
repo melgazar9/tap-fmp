@@ -43,7 +43,7 @@ class IncomeStatementStream(StatementStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("date", th.DateType, required=True),
+        th.Property("date", th.DateType),
         th.Property("symbol", th.StringType, required=True),
         th.Property("reported_currency", th.StringType),
         th.Property("cik", th.StringType),
@@ -93,7 +93,7 @@ class BalanceSheetStream(StatementStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("date", th.DateType, required=True),
+        th.Property("date", th.DateType),
         th.Property("symbol", th.StringType, required=True),
         th.Property("reported_currency", th.StringType),
         th.Property("cik", th.StringType),
@@ -367,7 +367,7 @@ class CashFlowTtmStream(TtmStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("date", th.DateType, required=True),
+        th.Property("date", th.DateType),
         th.Property("symbol", th.StringType, required=True),
         th.Property("reported_currency", th.StringType),
         th.Property("cik", th.StringType),
@@ -427,7 +427,7 @@ class KeyMetricsStream(StatementStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("date", th.DateType, required=True),
+        th.Property("date", th.DateType),
         th.Property("symbol", th.StringType, required=True),
         th.Property("period", th.StringType),
         th.Property("revenue_per_share", th.NumberType),
@@ -830,7 +830,7 @@ class OwnerEarningsStream(SymbolPartitionStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("date", th.DateType, required=True),
+        th.Property("date", th.DateType),
         th.Property("symbol", th.StringType, required=True),
         th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
@@ -862,7 +862,7 @@ class EnterpriseValuesStream(StatementStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("date", th.DateType, required=True),
+        th.Property("date", th.DateType),
         th.Property("symbol", th.StringType, required=True),
         th.Property("stock_price", th.NumberType),
         th.Property("number_of_shares", th.NumberType),
@@ -940,7 +940,7 @@ class BalanceSheetGrowthStream(StatementStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
-        th.Property("date", th.DateType, required=True),
+        th.Property("date", th.DateType),
         th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("reported_currency", th.StringType),
@@ -1011,7 +1011,7 @@ class CashFlowGrowthStream(StatementStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
-        th.Property("date", th.DateType, required=True),
+        th.Property("date", th.DateType),
         th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("reported_currency", th.StringType),
@@ -1151,7 +1151,7 @@ class FinancialReportsForm10kJsonStream(StatementStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
         th.Property("period", th.StringType, required=True),
         th.Property("year", th.StringType, required=True),
         th.Property("filing_data", th.ObjectType()),
@@ -1199,7 +1199,7 @@ class RevenueProductSegmentationStream(StatementStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("date", th.DateType, required=True),
+        th.Property("date", th.DateType),
         th.Property("symbol", th.StringType, required=True),
         th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
@@ -1237,7 +1237,7 @@ class AsReportedIncomeStatementsStream(StatementStream):
         th.Property("fiscal_year", th.IntegerType, required=True),
         th.Property("period", th.StringType, required=True),
         th.Property("reported_currency", th.StringType),
-        th.Property("date", th.DateType, required=True),
+        th.Property("date", th.DateType),
         th.Property("data", th.StringType),
     ).to_dict()
 

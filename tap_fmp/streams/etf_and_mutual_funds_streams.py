@@ -266,8 +266,9 @@ class MutualFundAndEtfDisclosureNameSearchStream(FmpSurrogateKeyStream):
 
     @property
     def partitions(self):
-        query_params_name = self.query_params.get("name")
-        other_params_names = self.config.get("other_params", {}).get("names")
+        stream_config = self.config.get(self.name, {})
+        query_params_name = stream_config.get("query_params", {}).get("name")
+        other_params_names = stream_config.get("other_params", {}).get("names")
 
         assert not (query_params_name and other_params_names), (
             f"Cannot specify name configurations in both query_params and "

@@ -394,9 +394,9 @@ plugins:
       start_date: '2025-01-01T00:00:00Z'
       api_key: ${FMP_API_KEY}
       base_url: https://financialmodelingprep.com
-      min_throttle_seconds: 0.01
-      filter_countries: [ "US" ]
-      filter_currencies: [ "USD" ]
+      min_throttle_seconds: 0.1
+      filter_countries: [ "US", "USA", "United States" ]
+      filter_currencies: [ "USD", "US" ]
 
       exchange_variants_source:
         use_csv: true
@@ -1065,7 +1065,7 @@ plugins:
       latest_8k_filings:
         query_params:
           from: "2025-01-02"
-          to: "2025-01-10"
+          to: "2025-01-20"
           limit: 1000
         other_params:
           max_records_per_request: 1000
@@ -1094,7 +1094,7 @@ plugins:
       latest_sec_filings:
         query_params:
           from: "2025-01-02"
-          to: "2025-01-10"
+          to: "2025-01-20"
           limit: 1000
 
       ### COT Streams ###
