@@ -38,6 +38,11 @@ class EtfSymbolPartitionMixin(BaseSymbolPartitionMixin):
     def get_cached_symbols(self) -> list[dict]:
         return self._tap.get_cached_etf_symbols()
 
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        if context and "symbol" in context:
+            record["symbol"] = context["symbol"]
+        return super().post_process(record, context)
+
 
 class EtfAndFundHoldingsStream(
     EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
@@ -100,10 +105,6 @@ class EtfAndMutualFundInformationStream(
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/etf/info"
 
-    def post_process(self, record: dict, context: Context | None = None) -> dict:
-        record["symbol"] = context.get("symbol")
-        return super().post_process(record, context)
-
 
 class EtfAndFundCountryAllocationStream(
     EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
@@ -121,7 +122,6 @@ class EtfAndFundCountryAllocationStream(
         return f"{self.url_base}/stable/etf/country-weightings"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["symbol"] = context.get("symbol")
         if "weight_percentage" in row:
             row["weight_percentage"] = str(row["weight_percentage"])
         return super().post_process(row, context)
@@ -179,11 +179,6 @@ class MutualFundAndEtfDisclosureStream(
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/funds/disclosure-holders-latest"
-
-    def post_process(self, record: dict, context: Context | None = None) -> dict:
-        if record and context:
-            record["symbol"] = context.get("symbol")
-        return super().post_process(record, context)
 
 
 class MutualFundDisclosuresStream(
