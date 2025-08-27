@@ -77,7 +77,7 @@ class EarningsTranscriptStream(EarningsTranscriptSymbolYearQuarterPartitionStrea
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
         th.Property("period", th.StringType),
         th.Property("year", th.NumberType),
         th.Property("quarter", th.NumberType),

@@ -71,7 +71,8 @@ class CikProfileStream(FmpRestStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType, required=True),
+        th.Property("cik", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
         th.Property("price", th.NumberType),
         th.Property("market_cap", th.NumberType),
         th.Property("beta", th.NumberType),
@@ -83,7 +84,6 @@ class CikProfileStream(FmpRestStream):
         th.Property("average_volume", th.NumberType),
         th.Property("company_name", th.StringType),
         th.Property("currency", th.StringType),
-        th.Property("cik", th.StringType),
         th.Property("isin", th.StringType),
         th.Property("cusip", th.StringType),
         th.Property("exchange_full_name", th.StringType),

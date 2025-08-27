@@ -43,8 +43,8 @@ class IncomeStatementStream(StatementStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("date", th.DateType),
         th.Property("symbol", th.StringType, required=True),
+        th.Property("date", th.DateType),
         th.Property("reported_currency", th.StringType),
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.DateType),
@@ -87,6 +87,10 @@ class IncomeStatementStream(StatementStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/income-statement"
 
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        row["symbol"] = context.get("symbol")
+        return super().post_process(row, context)
+
 
 class BalanceSheetStream(StatementStream):
     name = "balance_sheet"
@@ -94,7 +98,7 @@ class BalanceSheetStream(StatementStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
-        th.Property("symbol", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
         th.Property("reported_currency", th.StringType),
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.DateType),
@@ -512,6 +516,10 @@ class KeyMetricsStream(StatementStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/key-metrics"
 
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        row["symbol"] = context.get("symbol")
+        return super().post_process(row, context)
+
 
 class FinancialRatiosStream(StatementStream):
     """Financial ratios data for companies."""
@@ -521,7 +529,7 @@ class FinancialRatiosStream(StatementStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
-        th.Property("date", th.StringType, required=True),
+        th.Property("date", th.StringType),
         th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("reported_currency", th.StringType),
@@ -863,7 +871,7 @@ class EnterpriseValuesStream(StatementStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
-        th.Property("symbol", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
         th.Property("stock_price", th.NumberType),
         th.Property("number_of_shares", th.NumberType),
         th.Property("market_capitalization", th.NumberType),
@@ -884,8 +892,8 @@ class IncomeStatementGrowthStream(StatementStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("date", th.DateType, required=True),
         th.Property("symbol", th.StringType, required=True),
+        th.Property("date", th.DateType),
         th.Property("period", th.StringType),
         th.Property("growth_revenue", th.NumberType),
         th.Property("growth_cost_of_revenue", th.NumberType),
@@ -1160,14 +1168,15 @@ class FinancialReportsForm10kJsonStream(StatementStream):
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         """Process record and move all filing data to filing_data field."""
-        # Extract core fields
         core_fields = {"surrogate_key", "symbol", "period", "year", "error_message"}
         filing_data = {k: v for k, v in record.items() if k not in core_fields}
-
-        # Create new record with core fields and all filing data in filing_data field
         processed_record = {k: v for k, v in record.items() if k in core_fields}
         if filing_data:
             processed_record["filing_data"] = filing_data
+
+        processed_record["symbol"] = context.get("symbol")
+        processed_record["period"] = context.get("period")
+        processed_record["year"] = context.get("year")
 
         return super().post_process(processed_record, context)
 

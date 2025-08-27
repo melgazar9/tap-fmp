@@ -100,6 +100,10 @@ class EtfAndMutualFundInformationStream(
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/etf/info"
 
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        record["symbol"] = context.get("symbol")
+        return record
+
 
 class EtfAndFundCountryAllocationStream(
     EtfSymbolPartitionMixin, SymbolPartitionStream, FmpSurrogateKeyStream
@@ -108,7 +112,8 @@ class EtfAndFundCountryAllocationStream(
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("country", th.StringType, required=True),
+        th.Property("symbol", th.StringType),
+        th.Property("country", th.StringType),
         th.Property("weight_percentage", th.StringType),
     ).to_dict()
 
@@ -116,6 +121,7 @@ class EtfAndFundCountryAllocationStream(
         return f"{self.url_base}/stable/etf/country-weightings"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
+        row["symbol"] = context.get("symbol")
         if "weight_percentage" in row:
             row["weight_percentage"] = str(row["weight_percentage"])
         return super().post_process(row, context)
