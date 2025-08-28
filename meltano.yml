@@ -11,7 +11,7 @@ plugins:
   - name: "tap-fmp"
     namespace: "tap_fmp"
     pip_url: -e .
-    
+
     capabilities:
     - state
     - catalog
@@ -44,7 +44,7 @@ plugins:
 
     - name: database_config
       kind: object
-      label: Database Configuration  
+      label: Database Configuration
       description: Database connection settings for exchange variants
       default:
         host: null
@@ -398,9 +398,9 @@ plugins:
       filter_currencies: [ "USD", "US" ]
 
       exchange_variants_source:
-        use_csv: true
+        use_csv: false
         csv_path: "distinct_exchange_variants.csv"
-        use_database: false
+        use_database: true
         database_connection: null
         cache_ttl_hours: 72
 
@@ -408,11 +408,11 @@ plugins:
         host: ${POSTGRES_HOST}
         port: ${POSTGRES_PORT}
         database: ${POSTGRES_DATABASE}
-        username: ${POSTGRES_USERNAME}
+        username: ${POSTGRES_USER}
         password: ${POSTGRES_PASSWORD}
-        schema: "public"
+        schema: "tap_fmp_production"
         table: "exchange_variants"
-      
+
       company_symbols:
         select_symbols: ["NVDA", "META"]
 

@@ -150,7 +150,7 @@ class ExchangeVariantsManager:
             from psycopg2.extras import RealDictCursor
         except ImportError:
             self.logger.error(
-                "psycopg2 not installed. Install with: pip install psycopg2-binary"
+                "psycopg2 not installed. Install with: uv add psycopg2-binary"
             )
             return None
 
