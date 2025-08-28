@@ -158,6 +158,14 @@ class SymbolPartitionMixin(BaseSymbolPartitionMixin):
         return self._tap.get_cached_company_symbols()
 
 
+class FinancialStatementSymbolPartitionMixin(BaseSymbolPartitionMixin):
+    """Mixin for financial statement streams that use only symbols with available financial data."""
+
+    def get_cached_company_symbols(self) -> list[dict]:
+        """Get symbols from cached financial statement symbols (optimized for financial data)."""
+        return self._tap.get_cached_financial_statement_symbols()
+
+
 class BaseConfigMixin(SelectableStreamMixin):
     """Base class for config mixins with common selection logic."""
 

@@ -353,6 +353,12 @@ class TapFMP(Tap):
     _symbols_stream_instance: CompanySymbolsStream | None = None
     _symbols_lock = threading.Lock()
 
+    _cached_financial_statement_symbols: t.List[dict] | None = None
+    _financial_statement_symbols_stream_instance: (
+        FinancialStatementSymbolsStream | None
+    ) = None
+    _financial_statement_symbols_lock = threading.Lock()
+
     _cached_ciks: t.List[dict] | None = None
     _cik_stream_instance: CikListStream | None = None
     _ciks_lock = threading.Lock()
@@ -553,6 +559,28 @@ class TapFMP(Tap):
             self.logger.info("Creating SymbolsStream instance...")
             self._symbols_stream_instance = CompanySymbolsStream(self)
         return self._symbols_stream_instance
+
+    def get_cached_financial_statement_symbols(self) -> t.List[dict]:
+        """Thread-safe financial statement symbols caching for parallel execution."""
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_financial_statement_symbols",
+                "lock": self._financial_statement_symbols_lock,
+                "stream_getter": self.get_financial_statement_symbols_stream,
+                "data_type": "financial statement symbols",
+                "sort_key": "symbol",
+                "apply_filtering": True,
+                "filter_config_key": "company_symbols",
+            }
+        )
+
+    def get_financial_statement_symbols_stream(self) -> FinancialStatementSymbolsStream:
+        if self._financial_statement_symbols_stream_instance is None:
+            self.logger.info("Creating FinancialStatementSymbolsStream instance...")
+            self._financial_statement_symbols_stream_instance = (
+                FinancialStatementSymbolsStream(self)
+            )
+        return self._financial_statement_symbols_stream_instance
 
     def get_cached_ciks(self) -> t.List[dict]:
         """Thread-safe CIK caching for parallel execution."""

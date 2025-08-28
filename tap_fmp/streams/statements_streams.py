@@ -12,8 +12,12 @@ from tap_fmp.client import (
     SymbolPeriodPartitionStream,
 )
 
+from tap_fmp.mixins import FinancialStatementSymbolPartitionMixin
 
-class StatementStream(SymbolPeriodPartitionStream):
+
+class StatementStream(
+    FinancialStatementSymbolPartitionMixin, SymbolPeriodPartitionStream
+):
     _add_surrogate_key = True
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
@@ -35,7 +39,7 @@ class StatementStream(SymbolPeriodPartitionStream):
         return super().post_process(row, context)
 
 
-class TtmStream(SymbolPartitionStream):
+class TtmStream(FinancialStatementSymbolPartitionMixin, SymbolPartitionStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
 
@@ -606,7 +610,9 @@ class FinancialRatiosStream(StatementStream):
         return f"{self.url_base}/stable/ratios"
 
 
-class KeyMetricsTtmStream(SymbolPartitionStream):
+class KeyMetricsTtmStream(
+    FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
+):
     """Key metrics TTM data for companies."""
 
     name = "key_metrics_ttm"
@@ -674,7 +680,9 @@ class KeyMetricsTtmStream(SymbolPartitionStream):
         return super().post_process(row, context)
 
 
-class FinancialRatiosTtmStream(SymbolPartitionStream):
+class FinancialRatiosTtmStream(
+    FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
+):
     """Financial ratios TTM data for companies."""
 
     name = "financial_ratios_ttm"
@@ -811,7 +819,9 @@ class FinancialRatiosTtmStream(SymbolPartitionStream):
         return super().post_process(row, context)
 
 
-class FinancialScoresStream(SymbolPartitionStream):
+class FinancialScoresStream(
+    FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
+):
     """Financial scores data for companies."""
 
     name = "financial_scores"
@@ -837,7 +847,9 @@ class FinancialScoresStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/financial-scores"
 
 
-class OwnerEarningsStream(SymbolPartitionStream):
+class OwnerEarningsStream(
+    FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
+):
     """Owner earnings data for companies."""
 
     name = "owner_earnings"
@@ -1134,7 +1146,9 @@ class FinancialStatementGrowthStream(StatementStream):
         return f"{self.url_base}/stable/financial-growth"
 
 
-class FinancialStatementReportDatesStream(SymbolPartitionStream):
+class FinancialStatementReportDatesStream(
+    FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
+):
     """Financial statements report dates."""
 
     name = "financial_report_dates"
@@ -1210,7 +1224,7 @@ class FinancialReportsForm10kJsonStream(StatementStream):
             years = [str(y) for y in years]
         return [
             {"symbol": s["symbol"], "period": p, "year": y}
-            for s in self._tap.get_cached_company_symbols()
+            for s in self._tap.get_cached_financial_statement_symbols()
             for p in periods
             for y in years
         ]
