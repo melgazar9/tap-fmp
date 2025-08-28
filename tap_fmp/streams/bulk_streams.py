@@ -1406,4 +1406,6 @@ class EodBulkStream(IncrementalDateStream):
                         record[col] = Decimal(record[col])
                     except Exception:
                         record[col] = float(record[col])
+                else:
+                    record[col] = None
         return super().post_process(record, context)
