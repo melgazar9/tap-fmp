@@ -377,14 +377,13 @@ plugins:
 
       ### Quote Streams ###
 
-      - stock_quote.*
-      - stock_quote_short.*
+      - securities_quote.*
+      - securities_quote_short.*
       - aftermarket_trade.*
       - aftermarket_quote.*
-      - stock_price_change.*
-      - stock_batch.*
-      - stock_batch_quote.*
-      - stock_batch_quote_short.*
+      - securities_price_change.*
+      - securities_batch_quote.*
+      - securities_batch_quote_short.*
       - batch_aftermarket_trade.*
       - batch_aftermarket_quote.*
       - mutual_fund_price_quotes.*
@@ -1186,27 +1185,23 @@ plugins:
 
       ### Quote Streams ###
 
-      stock_quote:
+      securities_quote:
         symbols:
           select_symbols: ["AAPL", "MSFT", "GOOGL"]
 
-      stock_quote_short:
+      securities_quote_short:
         symbols:
           select_symbols: ["AAPL", "MSFT", "GOOGL"]
 
-      stock_price_change:
+      securities_price_change:
         symbols:
           select_symbols: ["AAPL", "MSFT", "GOOGL"]
 
-      stock_batch:
+      securities_batch_quote:
         symbols:
           select_symbols: ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"]
 
-      stock_batch_quote:
-        symbols:
-          select_symbols: ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"]
-
-      stock_batch_quote_short:
+      securities_batch_quote_short:
         symbols:
           select_symbols: ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"]
 

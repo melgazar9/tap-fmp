@@ -77,73 +77,73 @@ class GeneralNewsStream(BaseNewsTimeSliceStream):
         return f"{self.url_base}/stable/news/general-latest"
 
 
-class PressReleasesStream(BaseNewsTimeSliceStream):
-    """Stream for Press Releases API."""
+class PressReleasesLatestStream(BaseNewsTimeSliceStream):
+    """Stream for Press Releases Latest API."""
 
-    name = "press_releases"
+    name = "press_releases_latest"
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/news/press-releases-latest"
 
 
-class StockNewsStream(BaseNewsTimeSliceStream):
-    """Stream for Stock News API."""
+class PressReleasesStream(CompanyConfigMixin, BaseSearchNewsStream):
+    """Stream for Press Releases API."""
 
-    name = "stock_news"
-
-    def get_url(self, context: Context | None = None) -> str:
-        return f"{self.url_base}/stable/news/stock-latest"
-
-
-class CryptoNewsStream(BaseNewsTimeSliceStream):
-    """Stream for Crypto News API."""
-
-    name = "crypto_news"
-
-    def get_url(self, context: Context | None = None) -> str:
-        return f"{self.url_base}/stable/news/crypto-latest"
-
-
-class ForexNewsStream(BaseNewsTimeSliceStream):
-    """Stream for Forex News API."""
-
-    name = "forex_news"
-
-    def get_url(self, context: Context | None = None) -> str:
-        return f"{self.url_base}/stable/news/forex-latest"
-
-
-class SearchPressReleasesStream(CompanyConfigMixin, BaseSearchNewsStream):
-    """Stream for Search Press Releases API."""
-
-    name = "search_press_releases"
+    name = "press_releases"
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/news/press-releases"
 
 
-class SearchStockNewsStream(CompanyConfigMixin, BaseSearchNewsStream):
-    """Stream for Search Stock News API."""
+class StockNewsLatestStream(BaseNewsTimeSliceStream):
+    """Stream for Stock News Latest API."""
 
-    name = "search_stock_news"
+    name = "stock_news_latest"
+
+    def get_url(self, context: Context | None = None) -> str:
+        return f"{self.url_base}/stable/news/stock-latest"
+
+
+class CryptoNewsLatestStream(BaseNewsTimeSliceStream):
+    """Stream for Crypto News Latest API."""
+
+    name = "crypto_news_latest"
+
+    def get_url(self, context: Context | None = None) -> str:
+        return f"{self.url_base}/stable/news/crypto-latest"
+
+
+class ForexNewsLatestStream(BaseNewsTimeSliceStream):
+    """Stream for Forex News Latest API."""
+
+    name = "forex_news_latest"
+
+    def get_url(self, context: Context | None = None) -> str:
+        return f"{self.url_base}/stable/news/forex-latest"
+
+
+class StockNewsStream(CompanyConfigMixin, BaseSearchNewsStream):
+    """Stream for Stock News API."""
+
+    name = "stock_news"
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/news/stock"
 
 
-class SearchCryptoNewsStream(CryptoConfigMixin, BaseSearchNewsStream):
-    """Stream for Search Crypto News API."""
+class CryptoNewsStream(CryptoConfigMixin, BaseSearchNewsStream):
+    """Stream for Crypto News API."""
 
-    name = "search_crypto_news"
+    name = "crypto_news"
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/news/crypto"
 
 
-class SearchForexNewsStream(ForexConfigMixin, BaseSearchNewsStream):
-    """Stream for Search Forex News API."""
+class ForexNewsStream(ForexConfigMixin, BaseSearchNewsStream):
+    """Stream for Forex News API."""
 
-    name = "search_forex_news"
+    name = "forex_news"
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/news/forex"

@@ -228,10 +228,10 @@ from tap_fmp.streams.news_streams import (
     StockNewsStream,
     CryptoNewsStream,
     ForexNewsStream,
-    SearchPressReleasesStream,
-    SearchStockNewsStream,
-    SearchCryptoNewsStream,
-    SearchForexNewsStream,
+    PressReleasesStream,
+    StockNewsStream,
+    CryptoNewsStream,
+    ForexNewsStream,
 )
 
 from tap_fmp.streams.technical_indicators_streams import (
@@ -330,14 +330,13 @@ from tap_fmp.streams.bulk_streams import (
 )
 
 from tap_fmp.streams.quote_streams import (
-    StockQuoteStream,
-    StockQuoteShortStream,
+    SecuritiesQuoteStream,
+    SecuritiesQuoteShortStream,
     AftermarketTradeStream,
     AftermarketQuoteStream,
-    StockPriceChangeStream,
-    StockBatchStream,
-    StockBatchQuoteStream,
-    StockBatchQuoteShortStream,
+    SecuritiesPriceChangeStream,
+    SecuritiesBatchQuoteStream,
+    SecuritiesBatchQuoteShortStream,
     BatchAftermarketTradeStream,
     BatchAftermarketQuoteStream,
     MutualFundPriceQuotesStream,
@@ -397,22 +396,46 @@ class TapFMP(Tap):
     _exchange_variants_manager: ExchangeVariantsManager | None = None
     _exchange_variants_lock = threading.Lock()
 
+    def _get_cached_data(self, config: dict) -> t.List[dict]:
+        """Generic thread-safe caching with configuration."""
+        cache_attr = config["cache_attr"]
+        lock = config["lock"]
+        stream_getter = config["stream_getter"]
+        data_type = config["data_type"]
+        sort_key = config["sort_key"]
+        apply_filtering = config.get("apply_filtering", False)
+        filter_config_key = config.get("filter_config_key")
+
+        cached_data = getattr(self, cache_attr)
+        if cached_data is None:
+            with lock:
+                cached_data = getattr(self, cache_attr)
+                if cached_data is None:
+                    self.logger.info(f"Fetching and caching {data_type}...")
+                    stream = stream_getter()
+                    data = list(stream.get_records(context=None))
+
+                    if apply_filtering and filter_config_key:
+                        data = self._apply_country_currency_filtering(
+                            data, filter_config_key
+                        )
+
+                    cached_data = sorted(data, key=lambda x: x.get(sort_key, ""))
+                    setattr(self, cache_attr, cached_data)
+                    self.logger.info(f"Cached {len(cached_data)} {data_type}.")
+        return cached_data
+
     def get_cached_forex_pairs(self) -> t.List[dict]:
         """Thread-safe forex caching for parallel execution."""
-        if self._cached_forex_pairs is None:
-            with self._forex_lock:
-                if self._cached_forex_pairs is None:
-                    self.logger.info("Fetching and caching forex pairs...")
-                    forex_stream = self.get_forex_stream()
-                    symbols = list(forex_stream.get_records(context=None))
-                    self._cached_forex_pairs = sorted(
-                        symbols,
-                        key=lambda x: x.get("symbol", ""),
-                    )
-                    self.logger.info(
-                        f"Cached {len(self._cached_forex_pairs)} forex pairs."
-                    )
-        return self._cached_forex_pairs
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_forex_pairs",
+                "lock": self._forex_lock,
+                "stream_getter": self.get_forex_stream,
+                "data_type": "forex pairs",
+                "sort_key": "symbol",
+            }
+        )
 
     def get_forex_stream(self) -> ForexPairsStream:
         if self._forex_stream_instance is None:
@@ -422,20 +445,15 @@ class TapFMP(Tap):
 
     def get_cached_crypto_symbols(self) -> t.List[dict]:
         """Thread-safe crypto caching for parallel execution."""
-        if self._cached_crypto_symbols is None:
-            with self._crypto_lock:
-                if self._cached_crypto_symbols is None:
-                    self.logger.info("Fetching and caching crypto...")
-                    crypto_stream = self.get_crypto_stream()
-                    symbols = list(crypto_stream.get_records(context=None))
-                    self._cached_crypto_symbols = sorted(
-                        symbols,
-                        key=lambda x: x.get("symbol", ""),
-                    )
-                    self.logger.info(
-                        f"Cached {len(self._cached_crypto_symbols)} crypto."
-                    )
-        return self._cached_crypto_symbols
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_crypto_symbols",
+                "lock": self._crypto_lock,
+                "stream_getter": self.get_crypto_stream,
+                "data_type": "crypto symbols",
+                "sort_key": "symbol",
+            }
+        )
 
     def get_crypto_stream(self) -> CryptoListStream:
         if self._crypto_stream_instance is None:
@@ -445,20 +463,15 @@ class TapFMP(Tap):
 
     def get_cached_commodities(self) -> t.List[dict]:
         """Thread-safe commodity caching for parallel execution."""
-        if self._cached_commodities is None:
-            with self._commodities_lock:
-                if self._cached_commodities is None:
-                    self.logger.info("Fetching and caching commodities...")
-                    commodity_stream = self.get_commodity_stream()
-                    symbols = list(commodity_stream.get_records(context=None))
-                    self._cached_commodities = sorted(
-                        symbols,
-                        key=lambda x: x.get("symbol", ""),
-                    )
-                    self.logger.info(
-                        f"Cached {len(self._cached_commodities)} commodities."
-                    )
-        return self._cached_commodities
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_commodities",
+                "lock": self._commodities_lock,
+                "stream_getter": self.get_commodity_stream,
+                "data_type": "commodities",
+                "sort_key": "symbol",
+            }
+        )
 
     def get_commodity_stream(self) -> CommoditiesListStream:
         if self._commodity_stream_instance is None:
@@ -468,17 +481,15 @@ class TapFMP(Tap):
 
     def get_cached_sectors(self) -> t.List[dict]:
         """Thread-safe sector caching for parallel execution."""
-        if self._cached_sectors is None:
-            with self._sectors_lock:
-                if self._cached_sectors is None:
-                    self.logger.info("Fetching and caching sectors...")
-                    sector_stream = self.get_sector_stream()
-                    self._cached_sectors = sorted(
-                        list(sector_stream.get_records(context=None)),
-                        key=lambda x: x.get("sector", ""),
-                    )
-                    self.logger.info(f"Cached {len(self._cached_sectors)} sectors.")
-        return self._cached_sectors
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_sectors",
+                "lock": self._sectors_lock,
+                "stream_getter": self.get_sector_stream,
+                "data_type": "sectors",
+                "sort_key": "sector",
+            }
+        )
 
     def get_sector_stream(self) -> AvailableSectorsStream:
         if self._sector_stream_instance is None:
@@ -488,19 +499,15 @@ class TapFMP(Tap):
 
     def get_cached_industries(self) -> t.List[dict]:
         """Thread-safe industry caching for parallel execution."""
-        if self._cached_industries is None:
-            with self._industries_lock:
-                if self._cached_industries is None:
-                    self.logger.info("Fetching and caching industries...")
-                    industry_stream = self.get_industry_stream()
-                    self._cached_industries = sorted(
-                        list(industry_stream.get_records(context=None)),
-                        key=lambda x: x.get("industry", ""),
-                    )
-                    self.logger.info(
-                        f"Cached {len(self._cached_industries)} industries."
-                    )
-        return self._cached_industries
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_industries",
+                "lock": self._industries_lock,
+                "stream_getter": self.get_industry_stream,
+                "data_type": "industries",
+                "sort_key": "industry",
+            }
+        )
 
     def get_industry_stream(self) -> AvailableIndustriesStream:
         if self._industry_stream_instance is None:
@@ -529,24 +536,17 @@ class TapFMP(Tap):
 
     def get_cached_company_symbols(self) -> t.List[dict]:
         """Thread-safe company symbol caching for parallel execution."""
-        if self._cached_company_symbols is None:
-            with self._symbols_lock:
-                if self._cached_company_symbols is None:
-                    self.logger.info("Fetching and caching company symbols...")
-                    symbols_stream = self.get_symbols_stream()
-                    symbols = sorted(
-                        list(symbols_stream.get_records(context=None)),
-                        key=lambda x: x.get("symbol", ""),
-                    )
-                    self._cached_company_symbols = (
-                        self._apply_country_currency_filtering(
-                            symbols, "company_symbols"
-                        )
-                    )
-                    self.logger.info(
-                        f"Cached {len(self._cached_company_symbols)} company symbols."
-                    )
-        return self._cached_company_symbols
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_company_symbols",
+                "lock": self._symbols_lock,
+                "stream_getter": self.get_symbols_stream,
+                "data_type": "company symbols",
+                "sort_key": "symbol",
+                "apply_filtering": True,
+                "filter_config_key": "company_symbols",
+            }
+        )
 
     def get_symbols_stream(self) -> CompanySymbolsStream:
         if self._symbols_stream_instance is None:
@@ -556,17 +556,15 @@ class TapFMP(Tap):
 
     def get_cached_ciks(self) -> t.List[dict]:
         """Thread-safe CIK caching for parallel execution."""
-        if self._cached_ciks is None:
-            with self._ciks_lock:
-                if self._cached_ciks is None:
-                    self.logger.info("Fetching and caching CIKs...")
-                    cik_stream = self.get_cik_stream()
-                    self._cached_ciks = sorted(
-                        list(cik_stream.get_records(context=None)),
-                        key=lambda x: x.get("cik", ""),
-                    )
-                    self.logger.info(f"Cached {len(self._cached_ciks)} CIKs.")
-        return self._cached_ciks
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_ciks",
+                "lock": self._ciks_lock,
+                "stream_getter": self.get_cik_stream,
+                "data_type": "CIKs",
+                "sort_key": "cik",
+            }
+        )
 
     def get_cik_stream(self) -> CikListStream:
         if self._cik_stream_instance is None:
@@ -576,17 +574,15 @@ class TapFMP(Tap):
 
     def get_cached_exchanges(self) -> t.List[dict]:
         """Thread-safe exchange caching for parallel execution."""
-        if self._cached_exchanges is None:
-            with self._exchanges_lock:
-                if self._cached_exchanges is None:
-                    self.logger.info("Fetching and caching exchanges...")
-                    exchange_stream = self.get_exchange_stream()
-                    self._cached_exchanges = sorted(
-                        list(exchange_stream.get_records(context=None)),
-                        key=lambda x: x.get("exchange", ""),
-                    )
-                    self.logger.info(f"Cached {len(self._cached_exchanges)} exchanges.")
-        return self._cached_exchanges
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_exchanges",
+                "lock": self._exchanges_lock,
+                "stream_getter": self.get_exchange_stream,
+                "data_type": "exchanges",
+                "sort_key": "exchange",
+            }
+        )
 
     def get_exchange_stream(self) -> AvailableExchangesStream:
         if self._exchange_stream_instance is None:
@@ -596,22 +592,17 @@ class TapFMP(Tap):
 
     def get_cached_cot_symbols(self) -> t.List[dict]:
         """Thread-safe COT symbols caching for parallel execution."""
-        if self._cached_cot_symbols is None:
-            with self._cot_symbols_lock:
-                if self._cached_cot_symbols is None:
-                    self.logger.info("Fetching and caching COT symbols...")
-                    cot_symbols_stream = self.get_cot_symbols_stream()
-                    symbols = sorted(
-                        list(cot_symbols_stream.get_records(context=None)),
-                        key=lambda x: x.get("symbol", ""),
-                    )
-                    self._cached_cot_symbols = self._apply_country_currency_filtering(
-                        symbols, "cot_symbols"
-                    )
-                    self.logger.info(
-                        f"Cached {len(self._cached_cot_symbols)} COT symbols."
-                    )
-        return self._cached_cot_symbols
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_cot_symbols",
+                "lock": self._cot_symbols_lock,
+                "stream_getter": self.get_cot_symbols_stream,
+                "data_type": "COT symbols",
+                "sort_key": "symbol",
+                "apply_filtering": True,
+                "filter_config_key": "cot_symbols",
+            }
+        )
 
     def get_cot_symbols_stream(self) -> CotReportListStream:
         if self._cot_symbols_stream_instance is None:
@@ -621,22 +612,17 @@ class TapFMP(Tap):
 
     def get_cached_etf_symbols(self) -> t.List[dict]:
         """Thread-safe ETF symbols caching for parallel execution."""
-        if self._cached_etf_symbols is None:
-            with self._etf_symbols_lock:
-                if self._cached_etf_symbols is None:
-                    self.logger.info("Fetching and caching ETF symbols...")
-                    etf_symbols_stream = self.get_etf_symbols_stream()
-                    symbols = sorted(
-                        list(etf_symbols_stream.get_records(context=None)),
-                        key=lambda x: x.get("symbol", ""),
-                    )
-                    self._cached_etf_symbols = self._apply_country_currency_filtering(
-                        symbols, "etf_symbols"
-                    )
-                    self.logger.info(
-                        f"Cached {len(self._cached_etf_symbols)} ETF symbols."
-                    )
-        return self._cached_etf_symbols
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_etf_symbols",
+                "lock": self._etf_symbols_lock,
+                "stream_getter": self.get_etf_symbols_stream,
+                "data_type": "ETF symbols",
+                "sort_key": "symbol",
+                "apply_filtering": True,
+                "filter_config_key": "etf_symbols",
+            }
+        )
 
     def get_etf_symbols_stream(self) -> ETFSymbolStream:
         if self._etf_symbols_stream_instance is None:
@@ -646,20 +632,17 @@ class TapFMP(Tap):
 
     def get_cached_indices(self) -> t.List[dict]:
         """Thread-safe index caching for parallel execution."""
-        if self._cached_indices is None:
-            with self._indices_lock:
-                if self._cached_indices is None:
-                    self.logger.info("Fetching and caching indices...")
-                    index_stream = self.get_index_stream()
-                    symbols = sorted(
-                        list(index_stream.get_records(context=None)),
-                        key=lambda x: x.get("symbol", ""),
-                    )
-                    self._cached_indices = self._apply_country_currency_filtering(
-                        symbols, "indices"
-                    )
-                    self.logger.info(f"Cached {len(self._cached_indices)} indices.")
-        return self._cached_indices
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_indices",
+                "lock": self._indices_lock,
+                "stream_getter": self.get_index_stream,
+                "data_type": "indices",
+                "sort_key": "symbol",
+                "apply_filtering": True,
+                "filter_config_key": "indices",
+            }
+        )
 
     def get_index_stream(self):
         if self._index_stream_instance is None:
@@ -683,16 +666,6 @@ class TapFMP(Tap):
         """Get exchange variants using priority system: DB > CSV > API."""
         manager = self.get_exchange_variants_manager()
         return manager.get_exchange_variants()
-
-    def clear_exchange_variants_cache(self) -> None:
-        """Clear the exchange variants cache."""
-        manager = self.get_exchange_variants_manager()
-        manager.clear_cache()
-
-    def get_exchange_variants_info(self) -> dict:
-        """Get information about exchange variants cache and configuration."""
-        manager = self.get_exchange_variants_manager()
-        return manager.get_cache_info()
 
     def _apply_country_currency_filtering(
         self, symbols: list[dict], config_key: str
@@ -734,17 +707,29 @@ class TapFMP(Tap):
         for s in symbols:
             variant = variants_by_symbol.get(s["symbol"])
             if not variant:
+                # Symbol not found in exchange_variants - exclude it from results
+                self.logger.debug(
+                    f"Symbol {s['symbol']} not found in exchange_variants, excluding"
+                )
                 continue
 
+            # Check if symbol matches filter criteria
             country_match = (
-                filter_countries and variant.get("country") in filter_countries
+                not filter_countries or variant.get("country") in filter_countries
             )
             currency_match = (
-                filter_currencies and variant.get("currency") in filter_currencies
+                not filter_currencies or variant.get("currency") in filter_currencies
             )
 
-            if country_match or currency_match:
+            # Symbol must match ALL specified filters (AND logic)
+            if country_match and currency_match:
                 filtered_symbols.append(s)
+            else:
+                self.logger.debug(
+                    f"Symbol {s['symbol']} filtered out: country={variant.get('country')} "
+                    f"(filter: {filter_countries}), currency={variant.get('currency')} "
+                    f"(filter: {filter_currencies})"
+                )
 
         self.logger.info(
             f"Filtered {len(symbols)} to {len(filtered_symbols)} symbols for {config_key}"
@@ -978,10 +963,10 @@ class TapFMP(Tap):
             StockNewsStream(self),
             CryptoNewsStream(self),
             ForexNewsStream(self),
-            SearchPressReleasesStream(self),
-            SearchStockNewsStream(self),
-            SearchCryptoNewsStream(self),
-            SearchForexNewsStream(self),
+            PressReleasesStream(self),
+            StockNewsStream(self),
+            CryptoNewsStream(self),
+            ForexNewsStream(self),
 
 
             ### Technical Indicator Streams ###
@@ -1096,14 +1081,13 @@ class TapFMP(Tap):
 
             ### Quote Streams ###
 
-            StockQuoteStream(self),
-            StockQuoteShortStream(self),
+            SecuritiesQuoteStream(self),
+            SecuritiesQuoteShortStream(self),
             AftermarketTradeStream(self),
             AftermarketQuoteStream(self),
-            StockPriceChangeStream(self),
-            StockBatchStream(self),
-            StockBatchQuoteStream(self),
-            StockBatchQuoteShortStream(self),
+            SecuritiesPriceChangeStream(self),
+            SecuritiesBatchQuoteStream(self),
+            SecuritiesBatchQuoteShortStream(self),
             BatchAftermarketTradeStream(self),
             BatchAftermarketQuoteStream(self),
             MutualFundPriceQuotesStream(self),

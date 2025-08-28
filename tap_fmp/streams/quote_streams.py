@@ -13,10 +13,10 @@ class QuoteSymbolPartitionStream(SymbolPartitionStream, FmpSurrogateKeyStream):
     """Base class for quote streams with surrogate key support."""
 
 
-class StockQuoteStream(QuoteSymbolPartitionStream):
-    """Stream for real-time stock quotes."""
+class SecuritiesQuoteStream(QuoteSymbolPartitionStream):
+    """Stream for real-time securities quotes."""
 
-    name = "stock_quote"
+    name = "securities_quote"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -49,10 +49,10 @@ class StockQuoteStream(QuoteSymbolPartitionStream):
         return f"{self.url_base}/stable/quote"
 
 
-class StockQuoteShortStream(QuoteSymbolPartitionStream):
-    """Stream for short format stock quotes."""
+class SecuritiesQuoteShortStream(QuoteSymbolPartitionStream):
+    """Stream for short format securities quotes."""
 
-    name = "stock_quote_short"
+    name = "securities_quote_short"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -103,10 +103,10 @@ class AftermarketQuoteStream(QuoteSymbolPartitionStream):
         return f"{self.url_base}/stable/aftermarket-quote"
 
 
-class StockPriceChangeStream(QuoteSymbolPartitionStream):
-    """Stream for stock price changes."""
+class SecuritiesPriceChangeStream(QuoteSymbolPartitionStream):
+    """Stream for securities price changes."""
 
-    name = "stock_price_change"
+    name = "securities_price_change"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -132,12 +132,12 @@ class StockPriceChangeStream(QuoteSymbolPartitionStream):
         return f"{self.url_base}/stable/stock-price-change"
 
 
-class StockBatchStream(
+class SecuritiesBatchQuoteStream(
     CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
 ):
-    """Stream for batch stock data with automatic chunking."""
+    """Stream for batch securities quote data with automatic chunking."""
 
-    name = "stock_batch"
+    name = "securities_batch_quote"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -169,19 +169,18 @@ class StockBatchStream(
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/batch-quote"
 
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        if "timestamp" in record and record["timestamp"] is not None:
+            record["timestamp"] = int(float(record["timestamp"]))
+        return super().post_process(record, context)
 
-class StockBatchQuoteStream(StockBatchStream):
-    """Stream for batch stock quotes (same as StockBatchStream)."""
 
-    name = "stock_batch_quote"
-
-
-class StockBatchQuoteShortStream(
+class SecuritiesBatchQuoteShortStream(
     CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
 ):
-    """Stream for batch short stock quotes with automatic chunking."""
+    """Stream for batch short securities quotes with automatic chunking."""
 
-    name = "stock_batch_quote_short"
+    name = "securities_batch_quote_short"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -214,6 +213,11 @@ class BatchAftermarketTradeStream(
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/batch-aftermarket-trade"
 
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        if "timestamp" in record and record["timestamp"] is not None:
+            record["timestamp"] = int(record["timestamp"])
+        return super().post_process(record, context)
+
 
 class BatchAftermarketQuoteStream(
     CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
@@ -235,6 +239,11 @@ class BatchAftermarketQuoteStream(
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/batch-aftermarket-quote"
+
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        if "timestamp" in record and record["timestamp"] is not None:
+            record["timestamp"] = int(record["timestamp"])
+        return super().post_process(record, context)
 
 
 class MutualFundPriceQuotesStream(QuoteSymbolPartitionStream):

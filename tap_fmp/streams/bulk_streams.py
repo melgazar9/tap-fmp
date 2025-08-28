@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import typing as t
+import backoff
+import requests
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 from tap_fmp.client import FmpSurrogateKeyStream, IncrementalDateStream
@@ -1380,6 +1382,21 @@ class EodBulkStream(IncrementalDateStream):
             return max(start_date, date_gte)
 
         return start_date
+
+    @backoff.on_exception(
+        backoff.expo,
+        (requests.exceptions.Timeout, requests.exceptions.HTTPError),
+        max_tries=3,
+        giveup=lambda e: not (
+            isinstance(e, requests.exceptions.HTTPError)
+            and e.response is not None
+            and e.response.status_code in [504, 408]
+        )
+        and not isinstance(e, requests.exceptions.Timeout),
+    )
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        """Override to add timeout retry logic for problematic historical dates."""
+        yield from super().get_records(context)
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         for col in ["open", "high", "low", "close", "adj_close", "volume"]:

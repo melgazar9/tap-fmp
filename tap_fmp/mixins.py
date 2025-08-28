@@ -158,52 +158,64 @@ class SymbolPartitionMixin(BaseSymbolPartitionMixin):
         return self._tap.get_cached_company_symbols()
 
 
-class CommodityConfigMixin(SelectableStreamMixin):
-    """Mixin providing commodity configuration properties."""
+class BaseConfigMixin(SelectableStreamMixin):
+    """Base class for config mixins with common selection logic."""
+
+    # These should be overridden by subclasses
+    _selection_config_key: str = None
+    _selection_field_key: str = None
+    _item_name_singular: str = None
+    _item_name_plural: str = None
 
     @property
     def selection_config_key(self) -> str:
-        return "commodities"
+        if self._selection_config_key is None:
+            raise NotImplementedError("_selection_config_key must be set in subclass")
+        return self._selection_config_key
 
     @property
     def selection_field_key(self) -> str:
-        return "select_commodities"
+        if self._selection_field_key is None:
+            raise NotImplementedError("_selection_field_key must be set in subclass")
+        return self._selection_field_key
 
     @property
     def selection_config_section(self) -> str:
-        return "commodities"
+        return self.selection_config_key
 
     @property
     def selection_field_name(self) -> str:
-        return "select_commodities"
+        return self.selection_field_key
 
     @property
     def item_name_singular(self) -> str:
-        return "commodity"
+        if self._item_name_singular is None:
+            raise NotImplementedError("_item_name_singular must be set in subclass")
+        return self._item_name_singular
 
     @property
     def item_name_plural(self) -> str:
-        return "commodities"
+        if self._item_name_plural is None:
+            raise NotImplementedError("_item_name_plural must be set in subclass")
+        return self._item_name_plural
 
 
-class CryptoConfigMixin(SelectableStreamMixin):
+class CommodityConfigMixin(BaseConfigMixin):
+    """Mixin providing commodity configuration properties."""
+
+    _selection_config_key = "commodities"
+    _selection_field_key = "select_commodities"
+    _item_name_singular = "commodity"
+    _item_name_plural = "commodities"
+
+
+class CryptoConfigMixin(BaseConfigMixin):
     """Mixin providing crypto configuration properties."""
 
-    @property
-    def selection_config_key(self) -> str:
-        return "crypto_symbols"
-
-    @property
-    def selection_field_key(self) -> str:
-        return "select_crypto_symbols"
-
-    @property
-    def item_name_singular(self) -> str:
-        return "crypto symbol"
-
-    @property
-    def item_name_plural(self) -> str:
-        return "crypto symbols"
+    _selection_config_key = "crypto_symbols"
+    _selection_field_key = "select_crypto_symbols"
+    _item_name_singular = "crypto symbol"
+    _item_name_plural = "crypto symbols"
 
     def get_symbols_for_batch_stream(self) -> list[str]:
         """Get default crypto symbols from cached list."""
@@ -213,80 +225,31 @@ class CryptoConfigMixin(SelectableStreamMixin):
         ]
 
 
-class EtfConfigMixin(SelectableStreamMixin):
+class EtfConfigMixin(BaseConfigMixin):
     """Mixin providing ETF configuration properties."""
 
-    @property
-    def selection_config_key(self) -> str:
-        return "etf_symbols"
-
-    @property
-    def selection_field_key(self) -> str:
-        return "select_etf_symbols"
-
-    @property
-    def selection_config_section(self) -> str:
-        return "etf_symbols"
-
-    @property
-    def selection_field_name(self) -> str:
-        return "select_etf_symbols"
-
-    @property
-    def item_name_singular(self) -> str:
-        return "ETF symbol"
-
-    @property
-    def item_name_plural(self) -> str:
-        return "ETF symbols"
+    _selection_config_key = "etf_symbols"
+    _selection_field_key = "select_etf_symbols"
+    _item_name_singular = "ETF symbol"
+    _item_name_plural = "ETF symbols"
 
 
-class IndexConfigMixin(SelectableStreamMixin):
+class IndexConfigMixin(BaseConfigMixin):
     """Mixin providing Index configuration properties."""
 
-    @property
-    def selection_config_key(self) -> str:
-        return "index_symbols"
-
-    @property
-    def selection_field_key(self) -> str:
-        return "select_index_symbols"
-
-    @property
-    def selection_config_section(self) -> str:
-        return "index_symbols"
-
-    @property
-    def selection_field_name(self) -> str:
-        return "select_index_symbols"
-
-    @property
-    def item_name_singular(self) -> str:
-        return "Index symbol"
-
-    @property
-    def item_name_plural(self) -> str:
-        return "Index symbols"
+    _selection_config_key = "index_symbols"
+    _selection_field_key = "select_index_symbols"
+    _item_name_singular = "Index symbol"
+    _item_name_plural = "Index symbols"
 
 
-class CompanyConfigMixin(SelectableStreamMixin):
+class CompanyConfigMixin(BaseConfigMixin):
     """Mixin providing company configuration properties."""
 
-    @property
-    def selection_config_key(self) -> str:
-        return "company_symbols"
-
-    @property
-    def selection_field_key(self) -> str:
-        return "select_symbols"
-
-    @property
-    def item_name_singular(self) -> str:
-        return "company symbol"
-
-    @property
-    def item_name_plural(self) -> str:
-        return "company symbols"
+    _selection_config_key = "company_symbols"
+    _selection_field_key = "select_symbols"
+    _item_name_singular = "company symbol"
+    _item_name_plural = "company symbols"
 
     def get_symbols_for_batch_stream(self) -> list[str]:
         """Get default company symbols from cached list."""
@@ -317,32 +280,13 @@ class CompanyBatchStreamMixin:
         yield from super().get_records(context)
 
 
-class ForexConfigMixin(SelectableStreamMixin):
+class ForexConfigMixin(BaseConfigMixin):
     """Mixin providing Forex configuration properties."""
 
-    @property
-    def selection_config_key(self) -> str:
-        return "forex_pairs"
-
-    @property
-    def selection_field_key(self) -> str:
-        return "select_forex_pairs"
-
-    @property
-    def selection_config_section(self) -> str:
-        return "forex_pairs"
-
-    @property
-    def selection_field_name(self) -> str:
-        return "select_forex_pairs"
-
-    @property
-    def item_name_singular(self) -> str:
-        return "forex pair"
-
-    @property
-    def item_name_plural(self) -> str:
-        return "forex pairs"
+    _selection_config_key = "forex_pairs"
+    _selection_field_key = "select_forex_pairs"
+    _item_name_singular = "forex pair"
+    _item_name_plural = "forex pairs"
 
     def get_symbols_for_batch_stream(self) -> list[str]:
         """Get default forex pairs from cached list."""
