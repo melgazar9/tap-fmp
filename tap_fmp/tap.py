@@ -684,17 +684,6 @@ class TapFMP(Tap):
             )
             return symbols
 
-        # Check if symbols were manually selected. If symbols have None/null values for key fields,
-        # they were likely manually selected and should not be filtered by country/currency
-
-        if symbols and all(
-            s.get("exchange") is None and s.get("country") is None for s in symbols
-        ):
-            self.logger.info(
-                f"Detected manually selected symbols for {config_key}, skipping country/currency filtering"
-            )
-            return symbols
-
         self.logger.info(
             f"Loading exchange variants for filtering {config_key} symbols..."
         )
@@ -722,12 +711,15 @@ class TapFMP(Tap):
             )
 
             # Symbol must match ALL specified filters (AND logic)
+
             if country_match and currency_match:
                 filtered_symbols.append(s)
             else:
+                country_val = variant.get("country") if variant else "N/A"
+                currency_val = variant.get("currency") if variant else "N/A"
                 self.logger.debug(
-                    f"Symbol {s['symbol']} filtered out: country={variant.get('country')} "
-                    f"(filter: {filter_countries}), currency={variant.get('currency')} "
+                    f"Symbol {s['symbol']} filtered out: country={country_val} "
+                    f"(filter: {filter_countries}), currency={currency_val} "
                     f"(filter: {filter_currencies})"
                 )
 
