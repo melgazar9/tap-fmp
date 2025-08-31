@@ -195,6 +195,7 @@ class FmpRestStream(RESTStream, ABC):
         )
         def fetch_with_backoff():
             return self._make_http_request(url, query_params, page)
+
         return fetch_with_backoff()
 
     def _make_http_request(
@@ -393,9 +394,9 @@ class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):
 
     @property
     def partitions(self):
-        periods = self.stream_config.get("query_params", {}).get("period") or self.stream_config.get(
-            "other_params", {}
-        ).get("periods")
+        periods = self.stream_config.get("query_params", {}).get(
+            "period"
+        ) or self.stream_config.get("other_params", {}).get("periods")
 
         periods = self._get_periods(periods)
         symbols = self._tap.get_cached_company_symbols()
@@ -521,10 +522,8 @@ class TimeSliceStream(FmpRestStream):
         url = self.get_url(context)
 
         time_slices = self.create_time_slice_chunks(context)
-        max_records = (
-            self.stream_config
-            .get("other_params", {})
-            .get("max_records_per_request", 4000)
+        max_records = self.stream_config.get("other_params", {}).get(
+            "max_records_per_request", 4000
         )
 
         for from_date, to_date in time_slices:
@@ -558,10 +557,8 @@ class SymbolPartitionTimeSliceStream(SymbolPartitionMixin, TimeSliceStream):
 
         url = self.get_url(context)
         time_slices = self.create_time_slice_chunks(context)
-        max_records = (
-            self.stream_config
-            .get("other_params", {})
-            .get("max_records_per_request", 4000)
+        max_records = self.stream_config.get("other_params", {}).get(
+            "max_records_per_request", 4000
         )
 
         for from_date, to_date in time_slices:
@@ -769,7 +766,9 @@ class BaseSymbolYearPartitionStream(SymbolPartitionStream):
             partition_values = self._partition_values
 
         assert years is not None, f"Years cannot be None for stream {self.name}."
-        assert partition_values is not None, f"Must set partition values in meltano.yml or as a stream class attribute for stream {self.name}."
+        assert (
+            partition_values is not None
+        ), f"Must set partition values in meltano.yml or as a stream class attribute for stream {self.name}."
 
         partitions = []
         for symbol in symbols:

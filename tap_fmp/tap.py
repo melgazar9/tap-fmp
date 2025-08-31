@@ -673,8 +673,8 @@ class TapFMP(Tap):
     def get_transcript_symbols_stream(self) -> AvailableTranscriptSymbolsStream:
         if self._transcript_symbols_stream_instance is None:
             self.logger.info("Creating AvailableTranscriptSymbolsStream instance...")
-            self._transcript_symbols_stream_instance = (
-                AvailableTranscriptSymbolsStream(self)
+            self._transcript_symbols_stream_instance = AvailableTranscriptSymbolsStream(
+                self
             )
         return self._transcript_symbols_stream_instance
 

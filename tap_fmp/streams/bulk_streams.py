@@ -1373,22 +1373,20 @@ class EodBulkStream(IncrementalDateStream):
     def get_starting_timestamp(self, context: Context | None) -> str | None:
         """Get the starting timestamp for the stream."""
         start_date = super().get_starting_timestamp(context)
-        date_gte = (
-            self.stream_config.get("other_params", {}).get("date_gte")
-        )
+        date_gte = self.stream_config.get("other_params", {}).get("date_gte")
 
         if date_gte:
             return max(start_date, date_gte)
 
         return start_date
-    
+
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         """Override to add date_lte filtering and skip dates that fail after retries."""
         dates_dict = self._get_dates_dict()
         starting_date = self.get_starting_timestamp(context)
         other_params = self.stream_config.get("other_params", {})
         date_lte = other_params.get("date_lte")
-        
+
         # Apply both date_gte (via starting_date) and date_lte filtering
         filtered_dates = [d for d in dates_dict if d["date"] >= starting_date]
         if date_lte:
@@ -1397,16 +1395,16 @@ class EodBulkStream(IncrementalDateStream):
         # Track consecutive 504 failures
         consecutive_504_failures = 0
         max_consecutive_failures = 3
-        
+
         for date_dict in filtered_dates:
             current_date = date_dict.get("date", "unknown")
-            
+
             try:
                 self.query_params.update(date_dict)
                 yield from super(IncrementalDateStream, self).get_records(context)
                 # Reset consecutive failures on success
                 consecutive_504_failures = 0
-                
+
             except (requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
                 is_504_timeout = (
                     isinstance(e, requests.exceptions.HTTPError)
@@ -1414,10 +1412,10 @@ class EodBulkStream(IncrementalDateStream):
                     and e.response
                     and e.response.status_code == 504
                 )
-                
+
                 if is_504_timeout:
                     consecutive_504_failures += 1
-                    
+
                     if consecutive_504_failures >= max_consecutive_failures:
                         self.logger.error(
                             f"*** EOD BULK CRITICAL ERROR: {consecutive_504_failures} consecutive 504 Gateway "
@@ -1433,7 +1431,7 @@ class EodBulkStream(IncrementalDateStream):
                 else:
                     # Reset consecutive failures for non-504 errors
                     consecutive_504_failures = 0
-                    
+
                     if isinstance(e, requests.exceptions.Timeout):
                         self.logger.warning(
                             f"EOD Bulk: Request timeout for date {current_date}, skipping. "
@@ -1445,7 +1443,6 @@ class EodBulkStream(IncrementalDateStream):
                             f"{self.redact_api_key(str(e))}"
                         )
                 continue
-
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         for col in ["open", "high", "low", "close", "adj_close", "volume"]:

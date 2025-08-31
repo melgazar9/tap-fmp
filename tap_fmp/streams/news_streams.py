@@ -6,7 +6,12 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpSurrogateKeyStream, TimeSliceStream
-from tap_fmp.mixins import BatchSymbolPartitionMixin, CompanyBatchStreamMixin, CryptoConfigMixin, ForexConfigMixin
+from tap_fmp.mixins import (
+    BatchSymbolPartitionMixin,
+    CompanyBatchStreamMixin,
+    CryptoConfigMixin,
+    ForexConfigMixin,
+)
 
 
 class BaseNewsTimeSliceStream(TimeSliceStream, FmpSurrogateKeyStream):
@@ -81,7 +86,9 @@ class PressReleasesLatestStream(BaseNewsTimeSliceStream):
         return f"{self.url_base}/stable/news/press-releases-latest"
 
 
-class PressReleasesStream(BatchSymbolPartitionMixin, CompanyBatchStreamMixin, BaseNewsTimeSliceStream):
+class PressReleasesStream(
+    BatchSymbolPartitionMixin, CompanyBatchStreamMixin, BaseNewsTimeSliceStream
+):
     """Stream for Press Releases API."""
 
     name = "press_releases"
@@ -117,7 +124,9 @@ class ForexNewsLatestStream(BaseNewsTimeSliceStream):
         return f"{self.url_base}/stable/news/forex-latest"
 
 
-class StockNewsStream(BatchSymbolPartitionMixin, CompanyBatchStreamMixin, BaseNewsTimeSliceStream):
+class StockNewsStream(
+    BatchSymbolPartitionMixin, CompanyBatchStreamMixin, BaseNewsTimeSliceStream
+):
     """Stream for Stock News API."""
 
     name = "stock_news"
@@ -126,7 +135,9 @@ class StockNewsStream(BatchSymbolPartitionMixin, CompanyBatchStreamMixin, BaseNe
         return f"{self.url_base}/stable/news/stock"
 
 
-class CryptoNewsStream(BatchSymbolPartitionMixin, CryptoConfigMixin, BaseNewsTimeSliceStream):
+class CryptoNewsStream(
+    BatchSymbolPartitionMixin, CryptoConfigMixin, BaseNewsTimeSliceStream
+):
     """Stream for Crypto News API."""
 
     name = "crypto_news"
@@ -135,7 +146,9 @@ class CryptoNewsStream(BatchSymbolPartitionMixin, CryptoConfigMixin, BaseNewsTim
         return f"{self.url_base}/stable/news/crypto"
 
 
-class ForexNewsStream(BatchSymbolPartitionMixin, ForexConfigMixin, BaseNewsTimeSliceStream):
+class ForexNewsStream(
+    BatchSymbolPartitionMixin, ForexConfigMixin, BaseNewsTimeSliceStream
+):
     """Stream for Forex News API."""
 
     name = "forex_news"

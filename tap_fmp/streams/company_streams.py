@@ -217,7 +217,9 @@ class CompanyMarketCapStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/market-capitalization"
 
 
-class CompanyBatchMarketCapStream(BatchSymbolPartitionMixin, CompanyBatchStreamMixin, FmpRestStream):
+class CompanyBatchMarketCapStream(
+    BatchSymbolPartitionMixin, CompanyBatchStreamMixin, FmpRestStream
+):
     name = "company_batch_market_cap"
     primary_keys = ["symbol", "date"]
 

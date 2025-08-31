@@ -222,6 +222,7 @@ class BaseConfigMixin(SelectableStreamMixin):
         """Create a record dict from a symbol string. Default implementation for symbol-based records."""
         return {"symbol": item}
 
+
 class CommodityConfigMixin(BaseConfigMixin):
     """Mixin providing commodity configuration properties."""
 
@@ -290,7 +291,6 @@ class FinancialStatementConfigMixin(BaseConfigMixin):
     _selection_field_key = "select_symbols"
     _item_name_singular = "financial statement symbol"
     _item_name_plural = "financial statement symbols"
-
 
     def get_symbols_for_batch_stream(self) -> list[str]:
         """Get default financial statement symbols from cached list."""

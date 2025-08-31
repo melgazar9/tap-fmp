@@ -27,7 +27,11 @@ class LatestEarningTranscriptsStream(FmpSurrogateKeyStream):
         return f"{self.url_base}/stable/earning-call-transcript-latest"
 
 
-class EarningsTranscriptStream(TranscriptSymbolPartitionMixin, FmpSurrogateKeyStream, SymbolYearQuarterPartitionStream):
+class EarningsTranscriptStream(
+    TranscriptSymbolPartitionMixin,
+    FmpSurrogateKeyStream,
+    SymbolYearQuarterPartitionStream,
+):
     """Stream for pulling earnings transcripts by symbol, year, and quarter."""
 
     name = "earnings_transcripts"
@@ -56,7 +60,9 @@ class EarningsTranscriptStream(TranscriptSymbolPartitionMixin, FmpSurrogateKeySt
         return super().post_process(record, context)
 
 
-class TranscriptsDatesBySymbolStream(FmpSurrogateKeyStream, TranscriptSymbolPartitionMixin, SymbolPartitionStream):
+class TranscriptsDatesBySymbolStream(
+    FmpSurrogateKeyStream, TranscriptSymbolPartitionMixin, SymbolPartitionStream
+):
     """Stream for pulling transcript dates by symbol."""
 
     name = "transcripts_dates_by_symbol"
