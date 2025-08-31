@@ -14,9 +14,8 @@ from tap_fmp.helpers import safe_int
 class Form13fCikPartitionStream(FmpRestStream):
     @property
     def partitions(self):
-        config = self.config.get(self.name, {})
-        query_params = config.get("query_params", {})
-        other_params = config.get("other_params", {})
+        query_params = self.stream_config.get("query_params", {})
+        other_params = self.stream_config.get("other_params", {})
 
         quarters = (
             [query_params["quarter"]]
@@ -52,9 +51,8 @@ class Form13fCikPartitionStream(FmpRestStream):
 class Form13fSymbolPartitionStream(FmpRestStream):
     @property
     def partitions(self):
-        config = self.config.get(self.name, {})
-        query_params = config.get("query_params", {})
-        other_params = config.get("other_params", {})
+        query_params = self.stream_config.get("query_params", {})
+        other_params = self.stream_config.get("other_params", {})
 
         quarters = (
             [query_params.get("quarter")]
@@ -398,9 +396,8 @@ class IndustryPerformanceSummaryStream(FmpRestStream):
 
     @property
     def partitions(self):
-        cfg = self.config.get(self.name, {})
-        query_params = cfg.get("query_params", {})
-        other_params = cfg.get("other_params", {})
+        query_params = self.stream_config.get("query_params", {})
+        other_params = self.stream_config.get("other_params", {})
 
         if ("year" in query_params or "quarter" in query_params) and (
             "years" in other_params or "quarters" in other_params

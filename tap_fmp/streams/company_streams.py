@@ -4,13 +4,13 @@ from tap_fmp.client import (
     FmpRestStream,
     SymbolPartitionStream,
     SymbolPartitionTimeSliceStream,
+    IncrementalYearStream,
 )
 
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
-from datetime import datetime
 
-from tap_fmp.mixins import ChunkedSymbolPartitionMixin
+from tap_fmp.mixins import BatchSymbolPartitionMixin, CompanyBatchStreamMixin
 
 
 class CompanySymbolPartitionStream(SymbolPartitionStream):
@@ -217,7 +217,7 @@ class CompanyMarketCapStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/market-capitalization"
 
 
-class CompanyBatchMarketCapStream(ChunkedSymbolPartitionMixin, FmpRestStream):
+class CompanyBatchMarketCapStream(BatchSymbolPartitionMixin, CompanyBatchStreamMixin, FmpRestStream):
     name = "company_batch_market_cap"
     primary_keys = ["symbol", "date"]
 
@@ -229,15 +229,6 @@ class CompanyBatchMarketCapStream(ChunkedSymbolPartitionMixin, FmpRestStream):
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/market-capitalization-batch"
-
-    def get_symbols_for_batch_stream(self) -> list[str]:
-        symbols = self._tap.get_cached_company_symbols()
-        return [s["symbol"] for s in symbols if s.get("symbol")]
-
-    def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        if context and "symbols" in context:
-            self.query_params["symbols"] = context["symbols"]
-        yield from super().get_records(context)
 
 
 class HistoricalMarketCapStream(SymbolPartitionTimeSliceStream):
@@ -368,11 +359,8 @@ class ExecutiveCompensationStream(CompanySymbolPartitionStream):
         return f"{self.url_base}/stable/governance-executive-compensation"
 
 
-class ExecutiveCompensationBenchmarkStream(FmpRestStream):
+class ExecutiveCompensationBenchmarkStream(IncrementalYearStream):
     name = "executive_compensation_benchmark"
-    replication_key = "year"
-    replication_method = "INCREMENTAL"
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -381,48 +369,5 @@ class ExecutiveCompensationBenchmarkStream(FmpRestStream):
         th.Property("average_compensation", th.NumberType),
     ).to_dict()
 
-    def _format_replication_key(self, replication_key_value):
-        if (
-            isinstance(replication_key_value, int)
-            and len(str(replication_key_value)) == 4
-        ):
-            return replication_key_value
-        elif isinstance(replication_key_value, str):
-            try:
-                output_value = datetime.strptime(replication_key_value, "%Y-%m-%d").year
-            except ValueError:
-                output_value = datetime.fromisoformat(replication_key_value).year
-            return output_value
-        else:
-            raise ValueError(f"Could not format replication key for stream {self.name}")
-
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/executive-compensation-benchmark"
-
-    def _get_years_dict(self):
-        if "year" in self.query_params:
-            return [{"year": self.query_params.get("year")}]
-
-        other_params = self.config.get(self.name, {}).get("other_params", {})
-        all_years = [{"year": y} for y in range(1973, datetime.today().date().year + 1)]
-        cfg_start_year = datetime.fromisoformat(self.config.get("start_date")).year
-        all_available_years = [d for d in all_years if d["year"] >= cfg_start_year]
-
-        if other_params:
-            years = other_params.get("years")
-            if years == "*":
-                return all_available_years
-            elif isinstance(years, list):
-                return years
-            else:
-                raise ValueError(f"Could not set partitions for stream {self.name}")
-        else:
-            raise ValueError(f"Could not set partitions for stream {self.name}")
-
-    def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        years_dict = self._get_years_dict()
-        starting_year = self.get_starting_timestamp(context)
-        filtered_years = [d for d in years_dict if d["year"] >= starting_year]
-        for year in filtered_years:
-            self.query_params.update(year)
-            yield from super().get_records(context)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import typing as t
-import backoff
 import requests
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
@@ -55,7 +54,7 @@ class PaginatedBulkStream(BaseBulkStream):
         if "part" in self.query_params:
             return [self.query_params.get("part")]
 
-        other_params = self.config.get(self.name, {}).get("other_params", {})
+        other_params = self.stream_config.get("other_params", {})
         parts = other_params.get("parts")
 
         if "part" in self.query_params and "parts" in other_params:
@@ -106,7 +105,7 @@ class IncrementalYearPeriodStream(BaseBulkStream):
         if "year" in self.query_params:
             return [self.query_params.get("year")]
 
-        other_params = self.config.get(self.name, {}).get("other_params", {})
+        other_params = self.stream_config.get("other_params", {})
         year_range = other_params.get("year_range")
 
         if "year" in self.query_params and "year_range" in other_params:
@@ -124,7 +123,7 @@ class IncrementalYearPeriodStream(BaseBulkStream):
         return year_range
 
     def _get_periods(self):
-        other_params = self.config.get(self.name, {}).get("other_params", {})
+        other_params = self.stream_config.get("other_params", {})
 
         if "period" in self.query_params and "periods" in other_params:
             raise ConfigValidationError(
@@ -697,7 +696,7 @@ class EarningsSurprisesBulkStream(BaseBulkStream):
         if "year" in self.query_params:
             return [{"year": str(self.query_params.get("year"))}]
 
-        other_params = self.config.get(self.name, {}).get("other_params", {})
+        other_params = self.stream_config.get("other_params", {})
         years = other_params.get("years")
 
         if "year" in self.query_params and "years" in other_params:
@@ -1375,28 +1374,78 @@ class EodBulkStream(IncrementalDateStream):
         """Get the starting timestamp for the stream."""
         start_date = super().get_starting_timestamp(context)
         date_gte = (
-            self.config.get(self.name, {}).get("other_params", {}).get("date_gte")
+            self.stream_config.get("other_params", {}).get("date_gte")
         )
 
         if date_gte:
             return max(start_date, date_gte)
 
         return start_date
-
-    @backoff.on_exception(
-        backoff.expo,
-        (requests.exceptions.Timeout, requests.exceptions.HTTPError),
-        max_tries=3,
-        giveup=lambda e: not (
-            isinstance(e, requests.exceptions.HTTPError)
-            and e.response is not None
-            and e.response.status_code in [504, 408]
-        )
-        and not isinstance(e, requests.exceptions.Timeout),
-    )
+    
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        """Override to add timeout retry logic for problematic historical dates."""
-        yield from super().get_records(context)
+        """Override to add date_lte filtering and skip dates that fail after retries."""
+        dates_dict = self._get_dates_dict()
+        starting_date = self.get_starting_timestamp(context)
+        other_params = self.stream_config.get("other_params", {})
+        date_lte = other_params.get("date_lte")
+        
+        # Apply both date_gte (via starting_date) and date_lte filtering
+        filtered_dates = [d for d in dates_dict if d["date"] >= starting_date]
+        if date_lte:
+            filtered_dates = [d for d in filtered_dates if d["date"] <= date_lte]
+
+        # Track consecutive 504 failures
+        consecutive_504_failures = 0
+        max_consecutive_failures = 3
+        
+        for date_dict in filtered_dates:
+            current_date = date_dict.get("date", "unknown")
+            
+            try:
+                self.query_params.update(date_dict)
+                yield from super(IncrementalDateStream, self).get_records(context)
+                # Reset consecutive failures on success
+                consecutive_504_failures = 0
+                
+            except (requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
+                is_504_timeout = (
+                    isinstance(e, requests.exceptions.HTTPError)
+                    and hasattr(e, "response")
+                    and e.response
+                    and e.response.status_code == 504
+                )
+                
+                if is_504_timeout:
+                    consecutive_504_failures += 1
+                    
+                    if consecutive_504_failures >= max_consecutive_failures:
+                        self.logger.error(
+                            f"*** EOD BULK CRITICAL ERROR: {consecutive_504_failures} consecutive 504 Gateway "
+                            f"Timeout failures detected. Skipping date {current_date} and continuing to next date. "
+                            f"This indicates potential server issues at FMP API. ***"
+                        )
+                    else:
+                        self.logger.warning(
+                            f"EOD Bulk: 504 Gateway Timeout for date {current_date} "
+                            f"({consecutive_504_failures}/{max_consecutive_failures} consecutive failures). "
+                            f"Skipping this date. Error: {self.redact_api_key(str(e))}"
+                        )
+                else:
+                    # Reset consecutive failures for non-504 errors
+                    consecutive_504_failures = 0
+                    
+                    if isinstance(e, requests.exceptions.Timeout):
+                        self.logger.warning(
+                            f"EOD Bulk: Request timeout for date {current_date}, skipping. "
+                            f"Error: {self.redact_api_key(str(e))}"
+                        )
+                    else:
+                        self.logger.error(
+                            f"EOD Bulk: Unexpected error for date {current_date}, skipping: "
+                            f"{self.redact_api_key(str(e))}"
+                        )
+                continue
+
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         for col in ["open", "high", "low", "close", "adj_close", "volume"]:

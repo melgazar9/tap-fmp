@@ -6,7 +6,7 @@ import typing as t
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 from tap_fmp.client import SymbolPartitionStream, FmpSurrogateKeyStream
-from tap_fmp.mixins import ChunkedSymbolPartitionMixin, CompanyBatchStreamMixin
+from tap_fmp.mixins import BatchSymbolPartitionMixin, CompanyBatchStreamMixin
 
 
 class QuoteSymbolPartitionStream(SymbolPartitionStream, FmpSurrogateKeyStream):
@@ -133,7 +133,7 @@ class SecuritiesPriceChangeStream(QuoteSymbolPartitionStream):
 
 
 class SecuritiesBatchQuoteStream(
-    CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
+    CompanyBatchStreamMixin, BatchSymbolPartitionMixin, FmpSurrogateKeyStream
 ):
     """Stream for batch securities quote data with automatic chunking."""
 
@@ -176,7 +176,7 @@ class SecuritiesBatchQuoteStream(
 
 
 class SecuritiesBatchQuoteShortStream(
-    CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
+    CompanyBatchStreamMixin, BatchSymbolPartitionMixin, FmpSurrogateKeyStream
 ):
     """Stream for batch short securities quotes with automatic chunking."""
 
@@ -195,7 +195,7 @@ class SecuritiesBatchQuoteShortStream(
 
 
 class BatchAftermarketTradeStream(
-    CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
+    CompanyBatchStreamMixin, BatchSymbolPartitionMixin, FmpSurrogateKeyStream
 ):
     """Stream for batch aftermarket trades with automatic chunking."""
 
@@ -220,7 +220,7 @@ class BatchAftermarketTradeStream(
 
 
 class BatchAftermarketQuoteStream(
-    CompanyBatchStreamMixin, ChunkedSymbolPartitionMixin, FmpSurrogateKeyStream
+    CompanyBatchStreamMixin, BatchSymbolPartitionMixin, FmpSurrogateKeyStream
 ):
     """Stream for batch aftermarket quotes with automatic chunking."""
 

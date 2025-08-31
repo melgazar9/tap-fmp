@@ -227,7 +227,7 @@ class EquityOfferingUpdatesStream(FmpRestStream):
     @property
     def partitions(self):
         if (
-            self.config.get(self.name, {})
+            self.stream_config
             .get("other_params", {})
             .get("use_cached_ciks")
         ):

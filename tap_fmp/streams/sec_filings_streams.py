@@ -174,6 +174,11 @@ class SecFilingsByCikStream(TimeSliceStream):
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/sec-filings-search/cik"
 
+    def get_records(self, context: Context | None):
+        if context:
+            self.query_params.update(context)
+        return super().get_records(context)
+
 
 class SecFilingsByNameStream(FmpRestStream):
     """Stream for SEC Filings By Name API."""
@@ -199,7 +204,8 @@ class SecFilingsByNameStream(FmpRestStream):
 
     @property
     def partitions(self) -> list[dict] | None:
-        names = self.config.get(self.name, {}).get("other_params", {}).get("names")
+        ### I don't see a way to get all "name" values from FMP ###
+        names = self.stream_config.get("other_params", {}).get("names")
         if not names:
             names = ["Berkshire"]
         return [{"company": name} for name in names]

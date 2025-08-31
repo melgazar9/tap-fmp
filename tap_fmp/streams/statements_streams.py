@@ -1214,7 +1214,7 @@ class FinancialReportsForm10kJsonStream(StatementStream):
 
     @property
     def partitions(self):
-        query_params = self.config.get(self.name, {}).get("query_params", {})
+        query_params = self.stream_config.get("query_params", {})
         periods = query_params.get("period")
         years = query_params.get("years")
         if periods is None or periods == "*":

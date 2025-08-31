@@ -398,9 +398,9 @@ plugins:
       filter_currencies: [ "USD", "US" ]
 
       exchange_variants_source:
-        use_csv: false
+        use_csv: true
         csv_path: "distinct_exchange_variants.csv"
-        use_database: true
+        use_database: false
         database_connection: null
         cache_ttl_hours: 72
 
@@ -414,23 +414,23 @@ plugins:
         table: "exchange_variants"
 
       company_symbols:
-        select_symbols: ["NVDA", "META"]
+        select_symbols: ["NVDA", "META", "AAPL"]
 
-      index_symbols:
-        select_index_symbols:
-          - "^GSPC"  # S&P 500
-          - "^DJI"   # Dow Jones
-          - "^IXIC"  # NASDAQ
+      indices:
+        select_index_symbols: ["^GSPC", "^DJI", "^IXIC"]  # S&P 500, Dow Jones, NASDAQ
 
       etf_symbols:
-        select_etf_symbols:
-          - "SPY"
-          - "QQQ"
+        select_etf_symbols: ["SPY", "QQQ", "IWM", "VTI"]
+
+      financial_statement_symbols:
+        select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
       ciks:
         select_ciks:
           - "0000320193"  # AAPL
           - "0001326801"  # META
+          - "0001045810"  # NVDA
+          - "0000789019"  # MSFT
           - "0001067983"  # Berkshire Hathaway Inc (institutional investor)
 
       exchanges:
@@ -446,19 +446,18 @@ plugins:
           - "*"
 
       commodities:
-        select_commodities:
-          - "HEUSX"
-          - "GCUSD"
+        select_commodities: ["HEUSX", "GCUSD", "CLUSD"]
 
       crypto_symbols:
-        select_crypto_symbols: ["BTCUSD", "ETHUSD"]
+        select_crypto_symbols: ["BTCUSD", "ETHUSD", "SOLUSD"]
         filter_exchanges: ["Binance", "Coinbase"]
 
       forex_pairs:
-        select_forex_pairs: ["EURUSD", "JPYUSD"]
+        select_forex_pairs: ["EURUSD", "JPYUSD", "GBPUSD"]
 
       cot_symbols:
-        select_cot_symbols: ["ZF", "EURGBP"]
+        select_cot_symbols: ["ZF", "EURGBP", "GC"]
+
 
       ### Search Streams ###
 
@@ -494,6 +493,7 @@ plugins:
       ### Analyst Streams ###
 
       analyst_estimates:
+        select_symbols: ["NVDA", "META", "AAPL"]
         query_params:
           limit: 10
           period: ["annual", "quarter"]  # starter limited to annual
@@ -537,10 +537,12 @@ plugins:
           from: "2025-03-01"
 
       dividends_company:
+        select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
         query_params:
           limit: 1000
 
       earnings_report:
+        select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
         query_params:
           limit: 1000
 
@@ -757,60 +759,60 @@ plugins:
 
       historical_sector_performance:
         query_params:
-          from: "2025-01-01"
+          from: "2025-02-01"
           to: "2025-05-01"
 
       historical_industry_performance:
         query_params:
-          from: "2025-01-01"
+          from: "2025-02-01"
           to: "2025-05-01"
 
       historical_sector_pe:
         query_params:
-          from: "2025-01-01"
+          from: "2025-02-01"
           to: "2025-05-01"
 
       historical_industry_pe:
         query_params:
-          from: "2025-01-01"
+          from: "2025-02-01"
           to: "2025-05-01"
 
       ### Commodity Streams ###
 
       commodities_quotes:
         query_params:
-          from: "2025-01-02"
-          to: "2025-01-10"
+          from: "2025-01-06"
+          to: "2025-01-12"
 
       commodities_quote_short:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       commodities_light_chart:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       commodities_full_chart:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       commodities_1min:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       commodities_5min:
         query_params:
           symbol: GCUSD
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       commodities_1h:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       ### Fundraiser Streams ###
@@ -830,44 +832,44 @@ plugins:
       crypto_1min:
         query_params:
           symbol: ETHUSD
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
       crypto_5min:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
       crypto_1h:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
       crypto_quotes:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
       crypto_quotes_short:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
       historical_crypto_light_chart:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
       historical_crypto_full_chart:
         query_params:
           symbol: BTCUSD
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
@@ -876,44 +878,44 @@ plugins:
       forex_1min:
         query_params:
           symbol: EURUSD
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
       forex_5min:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
       forex_1h:
         query_params:
           symbol: EURUSD
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
       forex_quotes:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       forex_quotes_short:
         query_params:
           symbol: EURUSD
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       forex_light_chart:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
       forex_full_chart:
         query_params:
           symbol: EURUSD
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 100
 
@@ -921,58 +923,58 @@ plugins:
 
       fmp_articles:
         query_params:
-          from: "2025-01-02"
-          to: "2025-01-03"
+          from: "2025-01-06"
+          to: "2025-01-07"
 
       general_news:
         query_params:
-          from: "2025-01-02"
-          to: "2025-01-03"
+          from: "2025-01-06"
+          to: "2025-01-07"
           limit: 250
 
       press_releases:
         query_params:
-          from: "2025-01-02"
-          to: "2025-01-03"
+          from: "2025-01-06"
+          to: "2025-01-07"
           limit: 250
 
       stock_news:
         query_params:
-          from: "2025-01-02"
-          to: "2025-01-03"
+          from: "2025-01-06"
+          to: "2025-01-07"
           limit: 250
 
       crypto_news:
         query_params:
-          from: "2025-01-02"
-          to: "2025-01-03"
+          from: "2025-01-06"
+          to: "2025-01-07"
           limit: 250
 
       forex_news:
         query_params:
-          from: "2025-01-02"
-          to: "2025-01-03"
+          from: "2025-01-06"
+          to: "2025-01-07"
           limit: 250
 
       search_stock_news:
         query_params:
           symbols: ["AAPL", "META"]
-          from: "2025-01-02"
-          to: "2025-01-03"
+          from: "2025-01-06"
+          to: "2025-01-07"
           limit: 250
 
       search_crypto_news:
         query_params:
           symbols: ["BTCUSD", "ETHUSD"]
-          from: "2025-01-02"
-          to: "2025-01-06"
+          from: "2025-01-06"
+          to: "2025-01-07"
           limit: 250
 
       search_forex_news:
         query_params:
           symbols: "EURUSD"
-          from: "2025-01-02"
-          to: "2025-01-06"
+          from: "2025-01-06"
+          to: "2025-01-07"
           limit: 250
 
       ### Technical Indicator Streams ###
@@ -980,72 +982,72 @@ plugins:
       simple_moving_average:
         query_params:
           periodLength: 10
-          from: "2025-01-02"
-          to: "2025-01-06"
+          from: "2025-01-06"
+          to: "2025-01-07"
         other_params:
           timeframes: ["5min", "1hour"]
 
       exponential_moving_average:
         query_params:
           periodLength: 10
-          from: "2025-01-02"
-          to: "2025-01-06"
+          from: "2025-01-06"
+          to: "2025-01-07"
         other_params:
           timeframes: ["5min", "1hour"]
 
       weighted_moving_average:
         query_params:
           periodLength: 10
-          from: "2025-01-02"
-          to: "2025-01-06"
+          from: "2025-01-06"
+          to: "2025-01-07"
         other_params:
           timeframes: ["5min", "1hour"]
 
       double_exponential_moving_average:
         query_params:
           periodLength: 10
-          from: "2025-01-02"
-          to: "2025-01-06"
+          from: "2025-01-06"
+          to: "2025-01-07"
         other_params:
           timeframes: ["5min", "1hour"]
 
       triple_exponential_moving_average:
         query_params:
           periodLength: 10
-          from: "2025-01-02"
-          to: "2025-01-06"
+          from: "2025-01-06"
+          to: "2025-01-07"
         other_params:
           timeframes: ["5min", "1hour"]
 
       relative_strength_index:
         query_params:
           periodLength: 10
-          from: "2025-01-02"
-          to: "2025-01-03"
+          from: "2025-01-06"
+          to: "2025-01-07"
         other_params:
           timeframes: ["5min", "1hour"]
 
       standard_deviation:
         query_params:
           periodLength: 10
-          from: "2025-01-02"
-          to: "2025-01-06"
+          from: "2025-01-06"
+          to: "2025-01-07"
         other_params:
           timeframes: ["5min", "1hour"]
 
       williams:
         query_params:
           periodLength: 10
-          from: "2025-01-02"
-          to: "2025-01-06"
+          from: "2025-01-06"
+          to: "2025-01-07"
         other_params:
           timeframes: ["5min", "1hour"]
 
       average_directional_index:
         query_params:
           periodLength: 10
-          from: "2025-01-02"
-          to: "2025-01-06"
+          from: "2025-01-06"
+          to: "2025-01-07"
         other_params:
           timeframes: ["5min", "1hour"]
 
@@ -1063,7 +1065,7 @@ plugins:
 
       latest_8k_filings:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-20"
           limit: 1000
         other_params:
@@ -1071,7 +1073,7 @@ plugins:
 
       sec_filings_by_form_type:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 1000
         other_params:
@@ -1079,20 +1081,20 @@ plugins:
 
       sec_filings_by_symbol:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 1000
 
       sec_filings_by_cik:
         query_params:
           cik: "0000320193"  # Apple
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
           limit: 1000
 
       latest_sec_filings:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-20"
           limit: 1000
 
@@ -1100,31 +1102,31 @@ plugins:
 
       cot_report:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       cot_analysis_by_date:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       ### Economic Streams ###
 
       economic_indicators:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
         other_params:
           indicator_names: ["realGDP", "retailMoneyFunds"]
 
       economic_calendar:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       treasury_rates:
         query_params:
-          from: "2025-01-02"
+          from: "2025-01-06"
           to: "2025-01-10"
 
       ### ESG Data Streams (Premium) ###
@@ -1182,52 +1184,43 @@ plugins:
       eod_bulk:
         other_params:
           date_gte: "2025-08-25"
+          date_lte: "2025-08-30"
+          max_retries: 3
 
       ### Quote Streams ###
 
       securities_quote:
-        symbols:
-          select_symbols: ["AAPL", "MSFT", "GOOGL"]
+        select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
       securities_quote_short:
-        symbols:
-          select_symbols: ["AAPL", "MSFT", "GOOGL"]
+        select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
       securities_price_change:
-        symbols:
-          select_symbols: ["AAPL", "MSFT", "GOOGL"]
+        select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
       securities_batch_quote:
-        symbols:
-          select_symbols: ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"]
+        select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
       securities_batch_quote_short:
-        symbols:
-          select_symbols: ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"]
+        select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
       aftermarket_trade:
-        symbols:
-          select_symbols: ["AAPL", "MSFT"]
+        select_symbols: ["NVDA", "META"]
 
       aftermarket_quote:
-        symbols:
-          select_symbols: ["AAPL", "MSFT"]
+        select_symbols: ["NVDA", "META"]
 
       batch_aftermarket_trade:
-        symbols:
-          select_symbols: ["AAPL", "MSFT", "GOOGL"]
+        select_symbols: ["NVDA", "META", "AAPL"]
 
       batch_aftermarket_quote:
-        symbols:
-          select_symbols: ["AAPL", "MSFT", "GOOGL"]
+        select_symbols: ["NVDA", "META", "AAPL"]
 
       etf_price_quotes:
-        symbols:
-          select_symbols: ["SPY", "QQQ", "IWM"]
+        select_symbols: ["SPY", "QQQ", "IWM"]
 
       mutual_fund_price_quotes:
-        symbols:
-          select_symbols: ["VFINX", "FXAIX"]
+        select_symbols: ["VFINX", "FXAIX"]
 
       ### ESG Streams ###
 

@@ -6,7 +6,6 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import (
-    FmpRestStream,
     FmpSurrogateKeyStream,
     SymbolPartitionTimeSliceStream,
     SymbolPartitionStream,
@@ -22,28 +21,19 @@ from tap_fmp.mixins import BaseSymbolPartitionMixin, IndexConfigMixin
 
 
 class IndexListStream(IndexConfigMixin, FmpSurrogateKeyStream):
-    """Stock Market Indexes List API - Comprehensive list of stock market indices."""
+    """Stream for pulling all index symbols using cached data."""
 
     name = "index_list"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
+        th.Property("symbol", th.StringType, required=True),
         th.Property("name", th.StringType),
         th.Property("exchange", th.StringType),
         th.Property("currency", th.StringType),
     ).to_dict()
 
-    def create_record_from_item(self, item: str) -> dict:
-        """Create a record dict from a crypto symbol."""
-        return {
-            "symbol": item,
-            "name": None,
-            "exchange": None,
-            "currency": None,
-        }
-
-    def get_url(self, context: Context | None) -> str:
+    def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/index-list"
 
 
@@ -112,12 +102,10 @@ class IndexShortQuoteStream(IndexSymbolPartitionMixin, SymbolPartitionStream):
         return f"{self.url_base}/stable/quote-short"
 
 
-class AllIndexQuotesStream(FmpRestStream):
+class AllIndexQuotesStream(FmpSurrogateKeyStream):
     """All Index Quotes API - Real-time quotes for a wide range of stock indexes."""
 
     name = "all_index_quotes"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -194,12 +182,10 @@ class Index1HourIntervalStream(
         return f"{self.url_base}/stable/historical-chart/1hour"
 
 
-class SP500ConstituentStream(FmpRestStream):
+class SP500ConstituentStream(FmpSurrogateKeyStream):
     """S&P 500 Index API - Detailed data on the S&P 500 index companies."""
 
     name = "sp500_constituent"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -235,12 +221,10 @@ class DowJonesConstituentStream(SP500ConstituentStream):
         return f"{self.url_base}/stable/dowjones-constituent"
 
 
-class HistoricalSP500ConstituentStream(FmpRestStream):
+class HistoricalSP500ConstituentStream(FmpSurrogateKeyStream):
     """Historical S&P 500 API - Historical data for the S&P 500 index changes."""
 
     name = "historical_sp500_constituent"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

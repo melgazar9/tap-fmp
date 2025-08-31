@@ -46,7 +46,7 @@ class LatestInsiderTradingStream(FmpRestStream):
 
     @property
     def partitions(self):
-        other_params = self.config.get(self.name, {}).get("other_params")
+        other_params = self.stream_config.get("other_params")
         if other_params and "dates" in other_params:
             return [{"date": d} for d in other_params["dates"]]
         else:

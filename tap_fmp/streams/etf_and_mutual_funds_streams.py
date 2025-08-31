@@ -16,12 +16,11 @@ class EtfListStream(EtfConfigMixin, FmpSurrogateKeyStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
+        th.Property("symbol", th.StringType, required=True),
         th.Property("name", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/etf-list"
 
 
@@ -267,9 +266,8 @@ class MutualFundAndEtfDisclosureNameSearchStream(FmpSurrogateKeyStream):
 
     @property
     def partitions(self):
-        stream_config = self.config.get(self.name, {})
-        query_params_name = stream_config.get("query_params", {}).get("name")
-        other_params_names = stream_config.get("other_params", {}).get("names")
+        query_params_name = self.stream_config.get("query_params", {}).get("name")
+        other_params_names = self.stream_config.get("other_params", {}).get("names")
 
         assert not (query_params_name and other_params_names), (
             f"Cannot specify name configurations in both query_params and "

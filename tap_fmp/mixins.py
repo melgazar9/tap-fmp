@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import typing as t
-import logging
 from abc import ABC, abstractmethod
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
@@ -63,26 +62,30 @@ class SelectableStreamMixin(ABC):
             return selected_items
         return None
 
+    @abstractmethod
     def create_record_from_item(self, item: str) -> dict:
-        """Create a record dict from a single item string."""
-        return {self.item_name_singular: item}
+        """Create a record dict from a single item string. Must be overridden by subclass."""
+        raise NotImplementedError(
+            "create_record_from_item must be implemented by subclass"
+        )
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         """Get records with selection logic applied."""
         selected_items = self.get_selected_items_list()
 
         if not selected_items:
-            logging.info(
-                f"No specific {self.item_name_plural} selected, fetching all {self.item_name_plural}..."
+            self.logger.info(
+                f"No specific {self.item_name_plural} selected, fetching all {self.item_name_plural} from API..."
             )
+            # Fetch directly from API to avoid circular reference
             yield from super().get_records(context)
         else:
-            logging.info(
+            self.logger.info(
                 f"Processing selected {self.item_name_plural}: {selected_items}"
             )
             for item in selected_items:
                 record = self.create_record_from_item(item)
-                record = self.post_process(record)
+                record = self.post_process(record, context)
                 self._check_missing_fields(self.schema, record)
                 yield record
 
@@ -166,6 +169,14 @@ class FinancialStatementSymbolPartitionMixin(BaseSymbolPartitionMixin):
         return self._tap.get_cached_financial_statement_symbols()
 
 
+class TranscriptSymbolPartitionMixin(BaseSymbolPartitionMixin):
+    """Mixin for earnings transcript streams that use only symbols with available transcript data."""
+
+    def get_cached_company_symbols(self) -> list[dict]:
+        """Get symbols from cached transcript symbols (optimized for transcript data)."""
+        return self._tap.get_cached_transcript_symbols()
+
+
 class BaseConfigMixin(SelectableStreamMixin):
     """Base class for config mixins with common selection logic."""
 
@@ -207,6 +218,9 @@ class BaseConfigMixin(SelectableStreamMixin):
             raise NotImplementedError("_item_name_plural must be set in subclass")
         return self._item_name_plural
 
+    def create_record_from_item(self, item: str) -> dict:
+        """Create a record dict from a symbol string. Default implementation for symbol-based records."""
+        return {"symbol": item}
 
 class CommodityConfigMixin(BaseConfigMixin):
     """Mixin providing commodity configuration properties."""
@@ -269,6 +283,27 @@ class CompanyConfigMixin(BaseConfigMixin):
         ]
 
 
+class FinancialStatementConfigMixin(BaseConfigMixin):
+    """Mixin providing financial statement symbol configuration properties."""
+
+    _selection_config_key = "financial_statement_symbols"
+    _selection_field_key = "select_symbols"
+    _item_name_singular = "financial statement symbol"
+    _item_name_plural = "financial statement symbols"
+
+
+    def get_symbols_for_batch_stream(self) -> list[str]:
+        """Get default financial statement symbols from cached list."""
+        cached_financial_statement_symbols = (
+            self._tap.get_cached_financial_statement_symbols()
+        )
+        return [
+            symbol.get("symbol")
+            for symbol in cached_financial_statement_symbols
+            if symbol.get("symbol")
+        ]
+
+
 class CompanyBatchStreamMixin:
     """Mixin for batch streams that use company symbols without selection logic."""
 
@@ -280,12 +315,6 @@ class CompanyBatchStreamMixin:
             for symbol in cached_company_symbols
             if symbol.get("symbol")
         ]
-
-    def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        """Handle batch symbol context and delegate to parent."""
-        if context and "symbols" in context:
-            self.query_params["symbols"] = context["symbols"]
-        yield from super().get_records(context)
 
 
 class ForexConfigMixin(BaseConfigMixin):
@@ -402,7 +431,7 @@ class Prices4HrMixin(BaseIntervalPriceSchemaMixin):
         return f"{self.url_base}/stable/historical-chart/4hour"
 
 
-class ChunkedSymbolPartitionMixin(ABC):
+class BatchSymbolPartitionMixin(ABC):
     """Mixin for streams that need to partition symbols into chunks for API limits."""
 
     _max_symbols_per_request: int = 100
@@ -423,6 +452,9 @@ class ChunkedSymbolPartitionMixin(ABC):
         else:
             symbols = self.get_symbols_for_batch_stream()
 
+        # Sort symbols for consistent incremental replication tracking
+        symbols = sorted(symbols)
+
         # Split symbols into chunks of _max_symbols_per_request
         partitions = []
         for i in range(0, len(symbols), self._max_symbols_per_request):
@@ -431,3 +463,35 @@ class ChunkedSymbolPartitionMixin(ABC):
             partitions.append({"symbols": symbols_str})
 
         return partitions
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        """Handle batch symbol context and delegate to parent."""
+        if context and "symbols" in context:
+            self.query_params["symbols"] = context["symbols"]
+        yield from super().get_records(context)
+
+
+class CikConfigMixin(BaseConfigMixin):
+    """Mixin providing CIK configuration properties."""
+
+    _selection_config_key = "ciks"
+    _selection_field_key = "select_ciks"
+    _item_name_singular = "cik"
+    _item_name_plural = "ciks"
+
+    def create_record_from_item(self, item: str) -> dict:
+        """Create a CIK record dict from a single CIK string."""
+        return {"cik": item, "company_name": None}
+
+
+class ExchangeConfigMixin(BaseConfigMixin):
+    """Mixin providing Exchange configuration properties."""
+
+    _selection_config_key = "exchanges"
+    _selection_field_key = "select_exchanges"
+    _item_name_singular = "exchange"
+    _item_name_plural = "exchanges"
+
+    def create_record_from_item(self, item: str) -> dict:
+        """Create an exchange record dict from a single exchange string."""
+        return {"exchange": item, "name": None}

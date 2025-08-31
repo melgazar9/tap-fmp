@@ -81,7 +81,7 @@ class EsgBenchmarkStream(FmpRestStream):
         return starting_year
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        cfg_years = self.config.get(self.name, {}).get("other_params", {}).get("years")
+        cfg_years = self.stream_config.get("other_params", {}).get("years")
         if cfg_years:
             if isinstance(cfg_years, str):
                 start_year = int(cfg_years)

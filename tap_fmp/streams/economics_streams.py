@@ -51,7 +51,7 @@ class EconomicIndicatorsStream(EconomicsStream):
     @property
     def partitions(self):
         cfg_indicator_names = (
-            self.config.get(self.name, {})
+            self.stream_config
             .get("other_params", {})
             .get("indicator_names")
         )

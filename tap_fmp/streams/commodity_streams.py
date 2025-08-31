@@ -12,12 +12,12 @@ from tap_fmp.client import (
 )
 from tap_fmp.mixins import (
     BaseSymbolPartitionMixin,
-    CommodityConfigMixin,
     ChartLightMixin,
     ChartFullMixin,
     Prices1minMixin,
     Prices5minMixin,
     Prices1HrMixin,
+    CommodityConfigMixin,
 )
 
 
@@ -28,22 +28,12 @@ class CommoditiesListStream(CommodityConfigMixin, FmpSurrogateKeyStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
+        th.Property("symbol", th.StringType, required=True),
         th.Property("name", th.StringType),
         th.Property("exchange", th.StringType),
         th.Property("trade_month", th.StringType),
         th.Property("currency", th.StringType),
     ).to_dict()
-
-    def create_record_from_item(self, item: str) -> dict:
-        """Create a record dict from a commodity symbol."""
-        return {
-            "symbol": item,
-            "name": None,
-            "exchange": None,
-            "trade_month": None,
-            "currency": None,
-        }
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/commodities-list"

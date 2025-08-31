@@ -19,7 +19,6 @@ from tap_fmp.streams.directory_streams import (
     FinancialStatementSymbolsStream,
     CikListStream,
     SymbolChangesStream,
-    ETFSymbolStream,
     ActivelyTradingStream,
     AvailableExchangesStream,
     AvailableSectorsStream,
@@ -228,10 +227,6 @@ from tap_fmp.streams.news_streams import (
     StockNewsStream,
     CryptoNewsStream,
     ForexNewsStream,
-    PressReleasesStream,
-    StockNewsStream,
-    CryptoNewsStream,
-    ForexNewsStream,
 )
 
 from tap_fmp.streams.technical_indicators_streams import (
@@ -284,6 +279,7 @@ from tap_fmp.streams.economics_streams import (
 )
 
 from tap_fmp.streams.etf_and_mutual_funds_streams import (
+    EtfListStream,
     EtfAndFundHoldingsStream,
     EtfAndMutualFundInformationStream,
     EtfAndFundCountryAllocationStream,
@@ -350,8 +346,8 @@ class TapFMP(Tap):
     name = "tap-fmp"
 
     _cached_company_symbols: t.List[dict] | None = None
-    _symbols_stream_instance: CompanySymbolsStream | None = None
-    _symbols_lock = threading.Lock()
+    _company_symbols_stream_instance: CompanySymbolsStream | None = None
+    _company_symbols_lock = threading.Lock()
 
     _cached_financial_statement_symbols: t.List[dict] | None = None
     _financial_statement_symbols_stream_instance: (
@@ -392,12 +388,16 @@ class TapFMP(Tap):
     _cot_symbols_lock = threading.Lock()
 
     _cached_etf_symbols: t.List[dict] | None = None
-    _etf_symbols_stream_instance: ETFSymbolStream | None = None
+    _etf_symbols_stream_instance: EtfListStream | None = None
     _etf_symbols_lock = threading.Lock()
 
     _cached_indices: t.List[dict] | None = None
     _index_stream_instance = None
     _indices_lock = threading.Lock()
+
+    _cached_transcript_symbols: t.List[dict] | None = None
+    _transcript_symbols_stream_instance: AvailableTranscriptSymbolsStream | None = None
+    _transcript_symbols_lock = threading.Lock()
 
     _exchange_variants_manager: ExchangeVariantsManager | None = None
     _exchange_variants_lock = threading.Lock()
@@ -410,7 +410,7 @@ class TapFMP(Tap):
         data_type = config["data_type"]
         sort_key = config["sort_key"]
         apply_filtering = config.get("apply_filtering", False)
-        filter_config_key = config.get("filter_config_key")
+        filter_config_key = config.get("filter_config_key", None)
 
         cached_data = getattr(self, cache_attr)
         if cached_data is None:
@@ -545,8 +545,8 @@ class TapFMP(Tap):
         return self._get_cached_data(
             {
                 "cache_attr": "_cached_company_symbols",
-                "lock": self._symbols_lock,
-                "stream_getter": self.get_symbols_stream,
+                "lock": self._company_symbols_lock,
+                "stream_getter": self.get_company_symbols_stream,
                 "data_type": "company symbols",
                 "sort_key": "symbol",
                 "apply_filtering": True,
@@ -554,11 +554,11 @@ class TapFMP(Tap):
             }
         )
 
-    def get_symbols_stream(self) -> CompanySymbolsStream:
-        if self._symbols_stream_instance is None:
-            self.logger.info("Creating SymbolsStream instance...")
-            self._symbols_stream_instance = CompanySymbolsStream(self)
-        return self._symbols_stream_instance
+    def get_company_symbols_stream(self) -> CompanySymbolsStream:
+        if self._company_symbols_stream_instance is None:
+            self.logger.info("Creating CompanySymbolsStream instance...")
+            self._company_symbols_stream_instance = CompanySymbolsStream(self)
+        return self._company_symbols_stream_instance
 
     def get_cached_financial_statement_symbols(self) -> t.List[dict]:
         """Thread-safe financial statement symbols caching for parallel execution."""
@@ -570,7 +570,7 @@ class TapFMP(Tap):
                 "data_type": "financial statement symbols",
                 "sort_key": "symbol",
                 "apply_filtering": True,
-                "filter_config_key": "company_symbols",
+                "filter_config_key": "financial_statement_symbols",
             }
         )
 
@@ -627,8 +627,6 @@ class TapFMP(Tap):
                 "stream_getter": self.get_cot_symbols_stream,
                 "data_type": "COT symbols",
                 "sort_key": "symbol",
-                "apply_filtering": True,
-                "filter_config_key": "cot_symbols",
             }
         )
 
@@ -652,11 +650,33 @@ class TapFMP(Tap):
             }
         )
 
-    def get_etf_symbols_stream(self) -> ETFSymbolStream:
+    def get_etf_symbols_stream(self) -> EtfListStream:
         if self._etf_symbols_stream_instance is None:
-            self.logger.info("Creating ETFSymbolStream instance...")
-            self._etf_symbols_stream_instance = ETFSymbolStream(self)
+            self.logger.info("Creating EtfListStream instance...")
+            self._etf_symbols_stream_instance = EtfListStream(self)
         return self._etf_symbols_stream_instance
+
+    def get_cached_transcript_symbols(self) -> t.List[dict]:
+        """Thread-safe transcript symbols caching for parallel execution."""
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_transcript_symbols",
+                "lock": self._transcript_symbols_lock,
+                "stream_getter": self.get_transcript_symbols_stream,
+                "data_type": "transcript symbols",
+                "sort_key": "symbol",
+                "apply_filtering": True,
+                "filter_config_key": "transcript_symbols",
+            }
+        )
+
+    def get_transcript_symbols_stream(self) -> AvailableTranscriptSymbolsStream:
+        if self._transcript_symbols_stream_instance is None:
+            self.logger.info("Creating AvailableTranscriptSymbolsStream instance...")
+            self._transcript_symbols_stream_instance = (
+                AvailableTranscriptSymbolsStream(self)
+            )
+        return self._transcript_symbols_stream_instance
 
     def get_cached_indices(self) -> t.List[dict]:
         """Thread-safe index caching for parallel execution."""
@@ -772,7 +792,6 @@ class TapFMP(Tap):
             FinancialStatementSymbolsStream(self),
             CikListStream(self),
             SymbolChangesStream(self),
-            ETFSymbolStream(self),
             ActivelyTradingStream(self),
             AvailableExchangesStream(self),
             AvailableSectorsStream(self),
@@ -983,10 +1002,6 @@ class TapFMP(Tap):
             StockNewsStream(self),
             CryptoNewsStream(self),
             ForexNewsStream(self),
-            PressReleasesStream(self),
-            StockNewsStream(self),
-            CryptoNewsStream(self),
-            ForexNewsStream(self),
 
 
             ### Technical Indicator Streams ###
@@ -1061,6 +1076,7 @@ class TapFMP(Tap):
 
             ### ETF and Mutual Fund Streams ###
 
+            EtfListStream(self),
             EtfAndFundHoldingsStream(self),
             EtfAndMutualFundInformationStream(self),
             EtfAndFundCountryAllocationStream(self),

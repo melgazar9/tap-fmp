@@ -6,16 +6,11 @@ from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpSurrogateKeyStream, TimeSliceStream
-from tap_fmp.mixins import (
-    ChunkedSymbolPartitionMixin,
-    CompanyConfigMixin,
-    CryptoConfigMixin,
-    ForexConfigMixin,
-)
+from tap_fmp.mixins import BatchSymbolPartitionMixin, CompanyBatchStreamMixin, CryptoConfigMixin, ForexConfigMixin
 
 
-class BaseNewsTimeSliceStream(FmpSurrogateKeyStream, TimeSliceStream):
-    replication_key = "published_date"
+class BaseNewsTimeSliceStream(TimeSliceStream, FmpSurrogateKeyStream):
+    replication_key = "replication_date"
     replication_method = "INCREMENTAL"
     is_timestamp_replication_key = True
     _paginate = True
@@ -31,19 +26,19 @@ class BaseNewsTimeSliceStream(FmpSurrogateKeyStream, TimeSliceStream):
         th.Property("site", th.StringType),
         th.Property("text", th.StringType),
         th.Property("url", th.StringType),
+        th.Property("replication_date", th.DateType, required=True),
     ).to_dict()
 
-
-class BaseSearchNewsStream(ChunkedSymbolPartitionMixin, BaseNewsTimeSliceStream):
-    """Base class for search news streams that use comma-separated symbols."""
-
-    _max_symbols_per_request = 100
-
-    def get_records(self, context: Context | None):
-        """Set symbols from partition context and delegate to parent."""
-        if context and "symbols" in context:
-            self.query_params["symbols"] = context["symbols"]
-        return super().get_records(context)
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        """
+        Inject replication_date key from the API request parameter. The replication_key is published_date, but if
+        published_date comes through null or as an empty string we set the replication date to the 'from' parameter.
+        """
+        if "published_date" in record and len(record["published_date"]):
+            record["replication_date"] = record["published_date"]
+        elif "from" in self.query_params:
+            record["replication_date"] = self.query_params["from"]
+        return super().post_process(record, context)
 
 
 class FmpArticlesStream(FmpSurrogateKeyStream):
@@ -86,7 +81,7 @@ class PressReleasesLatestStream(BaseNewsTimeSliceStream):
         return f"{self.url_base}/stable/news/press-releases-latest"
 
 
-class PressReleasesStream(CompanyConfigMixin, BaseSearchNewsStream):
+class PressReleasesStream(BatchSymbolPartitionMixin, CompanyBatchStreamMixin, BaseNewsTimeSliceStream):
     """Stream for Press Releases API."""
 
     name = "press_releases"
@@ -122,7 +117,7 @@ class ForexNewsLatestStream(BaseNewsTimeSliceStream):
         return f"{self.url_base}/stable/news/forex-latest"
 
 
-class StockNewsStream(CompanyConfigMixin, BaseSearchNewsStream):
+class StockNewsStream(BatchSymbolPartitionMixin, CompanyBatchStreamMixin, BaseNewsTimeSliceStream):
     """Stream for Stock News API."""
 
     name = "stock_news"
@@ -131,7 +126,7 @@ class StockNewsStream(CompanyConfigMixin, BaseSearchNewsStream):
         return f"{self.url_base}/stable/news/stock"
 
 
-class CryptoNewsStream(CryptoConfigMixin, BaseSearchNewsStream):
+class CryptoNewsStream(BatchSymbolPartitionMixin, CryptoConfigMixin, BaseNewsTimeSliceStream):
     """Stream for Crypto News API."""
 
     name = "crypto_news"
@@ -140,7 +135,7 @@ class CryptoNewsStream(CryptoConfigMixin, BaseSearchNewsStream):
         return f"{self.url_base}/stable/news/crypto"
 
 
-class ForexNewsStream(ForexConfigMixin, BaseSearchNewsStream):
+class ForexNewsStream(BatchSymbolPartitionMixin, ForexConfigMixin, BaseNewsTimeSliceStream):
     """Stream for Forex News API."""
 
     name = "forex_news"

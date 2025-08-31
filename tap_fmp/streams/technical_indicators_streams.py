@@ -58,7 +58,7 @@ class BaseTechnicalIndicatorStream(
     def partitions(self):
         """Create partitions combining symbols with timeframes and period lengths."""
         query_params = self.query_params
-        other_params = self.config.get(self.name, {}).get("other_params", {})
+        other_params = self.stream_config.get("other_params", {})
         base_partitions = super().partitions
 
         query_timeframe = query_params.get("timeframe")

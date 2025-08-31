@@ -27,7 +27,7 @@ class CryptoListStream(CryptoConfigMixin, FmpSurrogateKeyStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
+        th.Property("symbol", th.StringType, required=True),
         th.Property("name", th.StringType),
         th.Property("exchange", th.StringType),
         th.Property("ico_date", th.StringType),
@@ -35,19 +35,7 @@ class CryptoListStream(CryptoConfigMixin, FmpSurrogateKeyStream):
         th.Property("total_supply", th.NumberType),
     ).to_dict()
 
-    def create_record_from_item(self, item: str) -> dict:
-        """Create a record dict from a crypto symbol."""
-        return {
-            "symbol": item,
-            "name": None,
-            "exchange": None,
-            "ico_date": None,
-            "circulating_supply": None,
-            "total_supply": None,
-        }
-
     def get_url(self, context: Context | None = None) -> str:
-        """Get URL for the request."""
         return f"{self.url_base}/stable/cryptocurrency-list"
 
 

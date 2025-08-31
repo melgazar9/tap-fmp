@@ -41,17 +41,17 @@ class FmpRestStream(RESTStream, ABC):
         self._throttle_lock = threading.Lock()
         self._last_call_ts = 0.0
 
-    def _get_stream_config(self) -> dict:
+    @property
+    def stream_config(self) -> dict:
         """Get configuration for this specific stream."""
         return self.config.get(self.name, {})
 
     @property
     def use_cached_symbols(self) -> bool:
         """Whether to use cached symbols for this stream."""
-        stream_config = self._get_stream_config()
 
-        if "use_cached_symbols" in stream_config:
-            use_cached_symbols = stream_config["use_cached_symbols"]
+        if "use_cached_symbols" in self.stream_config:
+            use_cached_symbols = self.stream_config["use_cached_symbols"]
             if not isinstance(use_cached_symbols, bool):
                 raise ConfigValidationError(
                     f"Config for {self.name}.use_cached_symbols must be bool, "
@@ -119,22 +119,42 @@ class FmpRestStream(RESTStream, ABC):
             )
 
     def get_starting_timestamp(self, context: Context | None) -> str | None:
-        if self.replication_method == "INCREMENTAL":
-            state = self.get_context_state(context)
-            if state.get("replication_key_value"):
-                return self._format_replication_key(state["replication_key_value"])
-            elif state.get("starting_replication_value"):
-                return self._format_replication_key(state["starting_replication_value"])
-            else:
-                stream_config = self.config.get(self.name)
-                if stream_config:
-                    starting_timestamp = stream_config.get(
-                        self._replication_key_starting_name
-                    )
-                else:
-                    starting_timestamp = self.config.get("start_date")
-                return starting_timestamp
-        return None
+        """
+        Determine the starting timestamp for incremental streams.
+
+        Priority:
+        1. If replication_key bookmark exists in state, use it
+        2. Otherwise, use stream-specific start date from query_params or global start_date
+
+        Works with different replication key types: timestamp, date, year, part, etc.
+        """
+        if self.replication_method != "INCREMENTAL":
+            return None
+
+        state = self.get_context_state(context)
+        if state.get("replication_key_value"):
+            return self._format_replication_key(state["replication_key_value"])
+        elif state.get("starting_replication_value"):
+            return self._format_replication_key(state["starting_replication_value"])
+
+        query_params = self.stream_config.get("query_params", {})
+
+        stream_start = None
+        possible_keys = [
+            self.replication_key,
+            self._replication_key_starting_name,
+            "start_date",  # fallback
+        ]
+
+        for key in possible_keys:
+            if key in query_params:
+                stream_start = query_params[key]
+                break
+
+        global_start = self.config.get("start_date")
+
+        # Use stream config first, then global fallback
+        return stream_start or global_start
 
     @staticmethod
     def redact_api_key(msg):
@@ -148,28 +168,39 @@ class FmpRestStream(RESTStream, ABC):
                 time.sleep(wait + random.uniform(0, 0.1))
             self._last_call_ts = now
 
-    @backoff.on_exception(
-        backoff.expo,
-        (requests.exceptions.RequestException,),
-        base=5,
-        max_value=300,
-        jitter=backoff.full_jitter,
-        max_tries=12,
-        max_time=1800,
-        giveup=lambda e: (
-            isinstance(e, requests.exceptions.HTTPError)
-            and e.response is not None
-            and e.response.status_code not in (429, 500, 502, 503, 504)
-        ),
-        on_backoff=lambda details: logging.warning(
-            f"API request failed, retrying in {details['wait']:.1f}s "
-            f"(attempt {details['tries']}): {details['exception']}"
-        ),
-    )
     def _fetch_with_retry(
         self, url: str, query_params: dict, page: int | None = None
     ) -> list[dict]:
         """Centralized API call with retry logic."""
+
+        max_retries = self.other_params.get("max_retries", 12)
+
+        @backoff.on_exception(
+            backoff.expo,
+            (requests.exceptions.RequestException,),
+            base=5,
+            max_value=300,
+            jitter=backoff.full_jitter,
+            max_tries=max_retries,
+            max_time=1800,
+            giveup=lambda e: (
+                isinstance(e, requests.exceptions.HTTPError)
+                and e.response is not None
+                and e.response.status_code not in (429, 500, 502, 503, 504)
+            ),
+            on_backoff=lambda details: logging.warning(
+                f"API request failed, retrying in {details['wait']:.1f}s "
+                f"(attempt {details['tries']}): {details['exception']}"
+            ),
+        )
+        def fetch_with_backoff():
+            return self._make_http_request(url, query_params, page)
+        return fetch_with_backoff()
+
+    def _make_http_request(
+        self, url: str, query_params: dict, page: int | None = None
+    ) -> list[dict]:
+        """Make the HTTP request and process response."""
 
         if page is not None:
             query_params[self._paginate_key] = page
@@ -362,8 +393,7 @@ class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):
 
     @property
     def partitions(self):
-        config = self.config.get(self.name, {})
-        periods = config.get("query_params", {}).get("period") or config.get(
+        periods = self.stream_config.get("query_params", {}).get("period") or self.stream_config.get(
             "other_params", {}
         ).get("periods")
 
@@ -390,30 +420,31 @@ class TimeSliceStream(FmpRestStream):
 
     def create_time_slice_chunks(self, context: Context) -> list[tuple[str, str]]:
         """Generate (from, to) date ranges for the API, as list of (start, end) ISO strings."""
-        stream_cfg = self.config.get(self.name, {})
         tap_cfg = self.config
 
         if self.replication_method == "INCREMENTAL":
             start = self.get_starting_timestamp(context)
-            start_dt = datetime.fromisoformat(start).date()
+            if start:
+                start_dt = datetime.fromisoformat(start).date()
+            else:
+                start_dt = datetime(1970, 1, 1).date()
         else:
             start_dt = datetime(1970, 1, 1).date()
 
-        window_days = int(stream_cfg.get("time_slice_days", 90))
+        window_days = int(self.stream_config.get("time_slice_days", 90))
 
-        query_params = stream_cfg.get("query_params", {})
+        query_params = self.stream_config.get("query_params", {})
         start_date_cfg = query_params.get(
             self._replication_key_starting_name
         ) or tap_cfg.get("start_date")
 
-        end_date = query_params.get("to") or (
-            datetime.now() + timedelta(days=90)
-        ).strftime("%Y-%m-%d")
+        end_date = query_params.get("to") or datetime.now().strftime("%Y-%m-%d")
 
-        start_date = (
-            (max(start_dt, datetime.fromisoformat(start_date_cfg).date()))
-            - timedelta(days=1)
-        ).strftime("%Y-%m-%d")
+        if start_date_cfg:
+            config_start_dt = datetime.fromisoformat(start_date_cfg).date()
+            start_date = max(start_dt, config_start_dt).strftime("%Y-%m-%d")
+        else:
+            start_date = start_dt.strftime("%Y-%m-%d")
 
         if not start_date:
             raise ConfigValidationError(f"Missing start_date for {self.name}")
@@ -422,9 +453,10 @@ class TimeSliceStream(FmpRestStream):
         end_dt = datetime.fromisoformat(end_date)
 
         if start_dt > end_dt:
-            raise ConfigValidationError(
-                f"start_date {start_date} is after end_date {end_date} for {self.name}"
-            )
+            # If start_date from bookmark is after configured end_date, use start_date as both start and end
+            # This handles the case where incremental processing has moved beyond the configured end window
+            end_dt = start_dt
+            end_date = start_date
 
         slices = []
         current = start_dt
@@ -468,7 +500,7 @@ class TimeSliceStream(FmpRestStream):
                     f"Some data may be missing."
                 )
                 for record in records:
-                    record = self.post_process(record)
+                    record = self.post_process(record, context)
                     self._check_missing_fields(self.schema, record)
                     yield record
                 return
@@ -490,7 +522,7 @@ class TimeSliceStream(FmpRestStream):
 
         time_slices = self.create_time_slice_chunks(context)
         max_records = (
-            self.config.get(self.name, {})
+            self.stream_config
             .get("other_params", {})
             .get("max_records_per_request", 4000)
         )
@@ -527,7 +559,7 @@ class SymbolPartitionTimeSliceStream(SymbolPartitionMixin, TimeSliceStream):
         url = self.get_url(context)
         time_slices = self.create_time_slice_chunks(context)
         max_records = (
-            self.config.get(self.name, {})
+            self.stream_config
             .get("other_params", {})
             .get("max_records_per_request", 4000)
         )
@@ -543,92 +575,6 @@ class SymbolPartitionTimeSliceStream(SymbolPartitionMixin, TimeSliceStream):
                     f"{self._replication_key_starting_name}={from_date} {self._replication_key_ending_name}={to_date}: {e}"
                 )
                 continue
-
-
-class SymbolFetcher(FmpRestStream):
-    """
-    Fetch and caches FMP symbols in memory for the duration of a Meltano tap run.
-    """
-
-    def get_url(self, context: Context | None = None) -> str:
-        return f"{self.config.get('base_url')}/stable/stock-list"
-
-    def fetch_all_symbols(self, context: Context | None = None) -> list[dict]:
-        url = self.get_url(context)
-        return self._fetch_with_retry(url, self.query_params)
-
-    @staticmethod
-    def fetch_specific_symbols(symbol_list: list[str]) -> list[dict]:
-        """
-        Create symbol records for a specific list of symbols.
-        """
-        if isinstance(symbol_list, str):
-            return [{"symbol": symbol_list.upper(), "company_name": None}]
-        return [
-            {
-                "symbol": symbol.upper(),
-                "company_name": None,
-            }
-            for symbol in symbol_list
-        ]
-
-
-class CikFetcher(FmpRestStream):
-    """
-    Fetch and cache FMP CIKs in memory for the duration of a Meltano tap run.
-    """
-
-    _paginate = True
-
-    def get_url(self, context) -> str:
-        return f"{self.config.get('base_url')}/stable/cik-list"
-
-    def fetch_all_ciks(self, context) -> list[dict]:
-        url = self.get_url(context)
-        return list(self._handle_pagination(url, self.query_params, context))
-
-    @staticmethod
-    def fetch_specific_ciks(cik_list: list[str]) -> list[dict]:
-        """
-        Create CIK records for a specific list of CIKs.
-        """
-        if isinstance(cik_list, str):
-            return [{"cik": cik_list, "company_name": None}]
-        return [
-            {
-                "cik": cik,
-                "company_name": None,
-            }
-            for cik in cik_list
-        ]
-
-
-class ExchangeFetcher(FmpRestStream):
-    """
-    Fetch and cache FMP exchanges in memory for the duration of a Meltano tap run.
-    """
-
-    def get_url(self, context: Context | None = None) -> str:
-        return f"{self.url_base}/stable/all-exchange-market-hours"
-
-    def fetch_all_exchanges(self, context: Context | None = None) -> list[dict]:
-        url = self.get_url(context)
-        return self._fetch_with_retry(url, self.query_params)
-
-    @staticmethod
-    def fetch_specific_exchanges(exchange_list: list[str]) -> list[dict]:
-        """
-        Create exchange records for a specific list of exchanges.
-        """
-        if isinstance(exchange_list, str):
-            return [{"exchange": exchange_list, "name": None}]
-        return [
-            {
-                "exchange": exchange,
-                "name": None,
-            }
-            for exchange in exchange_list
-        ]
 
 
 class IncrementalDateStream(FmpSurrogateKeyStream):
@@ -656,8 +602,8 @@ class IncrementalDateStream(FmpSurrogateKeyStream):
         if "date" in self.query_params:
             return [{"date": self.query_params.get("date")}]
 
-        query_params = self.config.get(self.name, {}).get("query_params", {})
-        other_params = self.config.get(self.name, {}).get("other_params", {})
+        query_params = self.stream_config.get("query_params", {})
+        other_params = self.stream_config.get("other_params", {})
         date_range = other_params.get("date_range")
 
         if "date" in query_params and "date_range" in other_params:
@@ -691,3 +637,186 @@ class IncrementalDateStream(FmpSurrogateKeyStream):
         for date_dict in filtered_dates:
             self.query_params.update(date_dict)
             yield from super().get_records(context)
+
+
+class IncrementalYearStream(FmpSurrogateKeyStream):
+    """Base class for streams that iterate over years incrementally."""
+
+    replication_key = "year"
+    replication_method = "INCREMENTAL"
+
+    def _format_replication_key(self, replication_key_value):
+        """Convert various year formats to integer year."""
+        if (
+            isinstance(replication_key_value, int)
+            and 1900 <= replication_key_value <= 3000
+        ):
+            return replication_key_value
+        elif isinstance(replication_key_value, str):
+            try:
+                # Try parsing as date string first
+                if "-" in replication_key_value:
+                    return datetime.fromisoformat(
+                        replication_key_value.split("T")[0]
+                    ).year
+                # Try parsing as plain year
+                year = int(replication_key_value)
+                if 1900 <= year <= 3000:
+                    return year
+                else:
+                    raise ValueError(f"Year {year} out of valid range")
+            except (ValueError, TypeError):
+                pass
+        raise ValueError(
+            f"Could not format replication key value '{replication_key_value}' as year for stream {self.name}"
+        )
+
+    @property
+    def partitions(self):
+        """Get year partitions for iteration."""
+        # If year is explicitly set in query_params, use that single year
+        if "year" in self.query_params:
+            return [{"year": self.query_params.get("year")}]
+
+        other_params = self.stream_config.get("other_params", {})
+
+        current_year = datetime.today().year
+        default_start_year = 1970
+
+        global_start_date = self.config.get("start_date")
+        if global_start_date:
+            try:
+                global_start_year = datetime.fromisoformat(global_start_date).year
+                default_start_year = max(default_start_year, global_start_year)
+            except (ValueError, TypeError):
+                logging.warning(
+                    f"Could not parse start_date '{global_start_date}', using default"
+                )
+
+        all_years = [{"year": y} for y in range(default_start_year, current_year + 1)]
+
+        if other_params:
+            years_config = other_params.get("years")
+            if years_config == "*":
+                return all_years
+            elif isinstance(years_config, list):
+                if years_config:
+                    try:
+                        year_ints = [int(y) for y in years_config]
+                        return [{"year": y} for y in sorted(year_ints)]
+                    except (ValueError, TypeError) as e:
+                        raise ValueError(
+                            f"Invalid year format in stream {self.name}: {years_config}. Error: {self.redact_api_key(e)}"
+                        )
+                else:
+                    raise ValueError(f"Empty years list for stream {self.name}")
+            elif years_config is None:
+                return all_years
+            else:
+                raise ValueError(
+                    f"Years must be '*', a list, or None, got {type(years_config)} for stream {self.name}"
+                )
+        else:
+            return all_years
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        """Update query params with year from context and delegate to parent."""
+        if context and "year" in context:
+            self.query_params["year"] = context["year"]
+        yield from super().get_records(context)
+
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        """Inject year into record if not present."""
+        if context and "year" in context and "year" not in record:
+            record["year"] = context["year"]
+        elif "year" in self.query_params and "year" not in record:
+            record["year"] = self.query_params["year"]
+        return super().post_process(record, context)
+
+
+class BaseSymbolYearPartitionStream(SymbolPartitionStream):
+    """Abstract base class for streams that partition by symbol and year with configurable quarter/period logic."""
+
+    replication_method = "INCREMENTAL"
+    replication_key = "date"
+
+    # Configurable class attributes - override in subclasses
+    _partition_field_name: str = None  # "quarter" or "period"
+    _partition_values: list = None  # [1,2,3,4] or ["Q1","Q2","Q3","Q4"]
+
+    @property
+    def partitions(self):
+        """Get symbol + year + quarter/period partition combinations."""
+        query_params = self.stream_config.get("query_params", {})
+        other_params = self.stream_config.get("other_params", {})
+
+        symbols = self.get_cached_company_symbols()
+
+        # Get years (default: current year only)
+        if "year" in query_params:
+            years = [int(query_params["year"])]
+        elif "years" in other_params:
+            years = [int(y) for y in other_params["years"]]
+        else:
+            years = [int(y) for y in range(1970, datetime.today().year + 1)]
+
+        # Get partition values (quarters/periods)
+        if self._partition_field_name in query_params:
+            partition_values = [query_params[self._partition_field_name]]
+        elif f"{self._partition_field_name}s" in other_params:
+            partition_values = other_params[f"{self._partition_field_name}s"]
+        else:
+            partition_values = self._partition_values
+
+        assert years is not None, f"Years cannot be None for stream {self.name}."
+        assert partition_values is not None, f"Must set partition values in meltano.yml or as a stream class attribute for stream {self.name}."
+
+        partitions = []
+        for symbol in symbols:
+            for year in years:
+                for partition_value in partition_values:
+                    partitions.append(
+                        {
+                            "symbol": symbol["symbol"],
+                            "year": year,
+                            self._partition_field_name: partition_value,
+                        }
+                    )
+        return partitions
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        """Update query params with year and partition value from context."""
+        if context:
+            if "year" in context:
+                self.query_params["year"] = context["year"]
+            if self._partition_field_name in context:
+                self.query_params[self._partition_field_name] = context[
+                    self._partition_field_name
+                ]
+        yield from super().get_records(context)
+
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        """Inject year and partition field into record if not present."""
+        if context:
+            if "year" in context and "year" not in record:
+                record["year"] = context["year"]
+            if (
+                self._partition_field_name in context
+                and self._partition_field_name not in record
+            ):
+                record[self._partition_field_name] = context[self._partition_field_name]
+        return super().post_process(record, context)
+
+
+class SymbolYearQuarterPartitionStream(BaseSymbolYearPartitionStream):
+    """Stream that partitions by symbol, year, and quarter (integer: 1, 2, 3, 4)."""
+
+    _partition_field_name = "quarter"
+    _partition_values = [1, 2, 3, 4]
+
+
+class SymbolYearPeriodPartitionStream(BaseSymbolYearPartitionStream):
+    """Stream that partitions by symbol, year, and period (string: Q1, Q2, Q3, Q4)."""
+
+    _partition_field_name = "period"
+    _partition_values = ["Q1", "Q2", "Q3", "Q4"]
