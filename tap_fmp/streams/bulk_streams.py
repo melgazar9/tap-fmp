@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import typing as t
 import requests
+import backoff
+import logging
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 from tap_fmp.client import FmpSurrogateKeyStream, IncrementalDateStream
@@ -1381,7 +1383,7 @@ class EodBulkStream(IncrementalDateStream):
         return start_date
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        """Override to add date_lte filtering and skip dates that fail after retries."""
+        """Override to add date_lte filtering and skip dates that fail after 3 retries."""
         dates_dict = self._get_dates_dict()
         starting_date = self.get_starting_timestamp(context)
         other_params = self.stream_config.get("other_params", {})
@@ -1392,56 +1394,31 @@ class EodBulkStream(IncrementalDateStream):
         if date_lte:
             filtered_dates = [d for d in filtered_dates if d["date"] <= date_lte]
 
-        # Track consecutive 504 failures
-        consecutive_504_failures = 0
-        max_consecutive_failures = 3
-
         for date_dict in filtered_dates:
             current_date = date_dict.get("date", "unknown")
 
             try:
                 self.query_params.update(date_dict)
                 yield from super(IncrementalDateStream, self).get_records(context)
-                # Reset consecutive failures on success
-                consecutive_504_failures = 0
 
-            except (requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
-                is_504_timeout = (
-                    isinstance(e, requests.exceptions.HTTPError)
-                    and hasattr(e, "response")
-                    and e.response
-                    and e.response.status_code == 504
+            except Exception as e:
+                # Catch all exceptions that come from the 3-retry failure
+                self.logger.warning(
+                    f"EOD Bulk: Failed for date {current_date} after 3 retries, skipping to next date. "
+                    f"Error: {self.redact_api_key(e)}"
                 )
-
-                if is_504_timeout:
-                    consecutive_504_failures += 1
-
-                    if consecutive_504_failures >= max_consecutive_failures:
-                        self.logger.error(
-                            f"*** EOD BULK CRITICAL ERROR: {consecutive_504_failures} consecutive 504 Gateway "
-                            f"Timeout failures detected. Skipping date {current_date} and continuing to next date. "
-                            f"This indicates potential server issues at FMP API. ***"
-                        )
-                    else:
-                        self.logger.warning(
-                            f"EOD Bulk: 504 Gateway Timeout for date {current_date} "
-                            f"({consecutive_504_failures}/{max_consecutive_failures} consecutive failures). "
-                            f"Skipping this date. Error: {self.redact_api_key(str(e))}"
-                        )
-                else:
-                    # Reset consecutive failures for non-504 errors
-                    consecutive_504_failures = 0
-
-                    if isinstance(e, requests.exceptions.Timeout):
-                        self.logger.warning(
-                            f"EOD Bulk: Request timeout for date {current_date}, skipping. "
-                            f"Error: {self.redact_api_key(str(e))}"
-                        )
-                    else:
-                        self.logger.error(
-                            f"EOD Bulk: Unexpected error for date {current_date}, skipping: "
-                            f"{self.redact_api_key(str(e))}"
-                        )
+                # Yield minimal record to advance bookmark past failed date
+                yield {
+                    "surrogate_key": f"eod_bulk_skip_{current_date}",
+                    "symbol": "__TIMEOUT_FAILURE__",
+                    "date": current_date,
+                    "open": None,
+                    "low": None,
+                    "high": None,
+                    "close": None,
+                    "adj_close": None,
+                    "volume": None,
+                }
                 continue
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
