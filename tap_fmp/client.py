@@ -158,7 +158,8 @@ class FmpRestStream(RESTStream, ABC):
 
     @staticmethod
     def redact_api_key(msg):
-        return re.sub(r"(apikey=)[^&\s]+", r"\1<REDACTED>", msg)
+        msg_str = str(msg)
+        return re.sub(r"(apikey=)[^&\s]+", r"\1<REDACTED>", msg_str)
 
     def _throttle(self) -> None:
         with self._throttle_lock:
