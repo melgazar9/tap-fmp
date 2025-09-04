@@ -185,8 +185,8 @@ plugins:
 
       ### Form 13F Streams ###
 
-      - institutional_ownership_filings.*
-      - filings_extract.*
+      - institutional_ownership_latest_filings.*
+      - institutional_ownership_extract.*
       - holder_performance_summary.*
       - holder_industry_breakdown.*
       - positions_summary.*
@@ -689,13 +689,13 @@ plugins:
 
       ### Form 13F Streams ###
 
-      institutional_ownership_filings:
+      institutional_ownership_latest_filings:
         other_params:
           quarters: [3]
           years: ["2023"]
           page: 0
 
-      filings_extract:
+      institutional_ownership_extract:
         other_params:
           quarters: [3]
           years: ["2023"]

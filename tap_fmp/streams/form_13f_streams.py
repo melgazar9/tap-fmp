@@ -88,7 +88,7 @@ class Form13fSymbolPartitionStream(FmpRestStream):
 class InstitutionalOwnershipFilingsStream(FmpRestStream):
     """Institutional Ownership Filings API - Latest SEC filings related to institutional ownership."""
 
-    name = "institutional_ownership_filings"
+    name = "institutional_ownership_latest_filings"
     primary_keys = ["surrogate_key"]
     _paginate = True
     _add_surrogate_key = True
@@ -113,7 +113,7 @@ class InstitutionalOwnershipFilingsStream(FmpRestStream):
 class FilingsExtractStream(Form13fCikPartitionStream):
     """Filings Extract API - Extract detailed data directly from official SEC filings."""
 
-    name = "filings_extract"
+    name = "institutional_ownership_extract"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
 
