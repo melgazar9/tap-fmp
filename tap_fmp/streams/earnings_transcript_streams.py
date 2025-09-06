@@ -78,7 +78,7 @@ class TranscriptsDatesBySymbolStream(
 
     def get_url(self, context: Context | None = None) -> str:
         symbol = context.get("symbol") if context else None
-        return f"{self.url_base}/stable/earning-call-transcript-dates?symbol={symbol}"
+        return f"{self.url_base}/stable/earning-call-transcript-dates"
 
 
 class AvailableTranscriptSymbolsStream(FmpSurrogateKeyStream):
