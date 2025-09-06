@@ -7,7 +7,7 @@ from datetime import datetime
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.client import FmpRestStream
+from tap_fmp.client import FmpRestStream, FmpSurrogateKeyStream
 from tap_fmp.helpers import safe_int
 
 
@@ -139,17 +139,17 @@ class FilingsExtractStream(Form13fCikPartitionStream):
         return f"{self.url_base}/stable/institutional-ownership/extract"
 
 
-class Form13fFilingDates(FmpRestStream):
+class Form13fFilingDates(FmpSurrogateKeyStream):
     """Form 13F Filing Dates API - List of available SEC filings for institutional ownership."""
 
     name = "form_13f_filing_dates"
-    primary_keys = ["date", "year", "quarter"]
 
     schema = th.PropertiesList(
+        th.Property("cik", th.StringType),
         th.Property("date", th.DateType),
         th.Property("year", th.IntegerType),
         th.Property("quarter", th.IntegerType),
-    )
+    ).to_dict()
 
     @property
     def partitions(self):
@@ -161,6 +161,10 @@ class Form13fFilingDates(FmpRestStream):
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         self.query_params.update(context)
         return super().get_records(context)
+
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        record["cik"] = context.get("cik")
+        return record
 
 
 class Form13fFilingExtractsWithAnalytics(Form13fSymbolPartitionStream):

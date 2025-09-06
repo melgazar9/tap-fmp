@@ -116,6 +116,7 @@ from tap_fmp.streams.statements_streams import (
 from tap_fmp.streams.form_13f_streams import (
     InstitutionalOwnershipFilingsStream,
     FilingsExtractStream,
+    Form13fFilingDates,
     HolderPerformanceSummaryStream,
     HolderIndustryBreakdownStream,
     PositionsSummaryStream,
@@ -223,9 +224,13 @@ from tap_fmp.streams.forex_streams import (
 from tap_fmp.streams.news_streams import (
     FmpArticlesStream,
     GeneralNewsStream,
+    PressReleasesLatestStream,
     PressReleasesStream,
+    StockNewsLatestStream,
     StockNewsStream,
+    CryptoNewsLatestStream,
     CryptoNewsStream,
+    ForexNewsLatestStream,
     ForexNewsStream,
 )
 
@@ -896,6 +901,7 @@ class TapFMP(Tap):
 
             InstitutionalOwnershipFilingsStream(self),
             FilingsExtractStream(self),
+            Form13fFilingDates(self),
             HolderPerformanceSummaryStream(self),
             HolderIndustryBreakdownStream(self),
             PositionsSummaryStream(self),
@@ -998,9 +1004,13 @@ class TapFMP(Tap):
 
             FmpArticlesStream(self),
             GeneralNewsStream(self),
+            PressReleasesLatestStream(self),
             PressReleasesStream(self),
+            StockNewsLatestStream(self),
             StockNewsStream(self),
+            CryptoNewsLatestStream(self),
             CryptoNewsStream(self),
+            ForexNewsLatestStream(self),
             ForexNewsStream(self),
 
 

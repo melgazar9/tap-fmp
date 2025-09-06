@@ -2,7 +2,7 @@ import typing as t
 
 from tap_fmp.client import (
     FmpRestStream,
-    TimeSliceStream,
+    TimeSliceStream, FmpSurrogateKeyStream,
 )
 
 from singer_sdk.helpers.types import Context
@@ -42,7 +42,7 @@ class ExchangeMarketHoursStream(FmpRestStream):
         yield from super().get_records(context)
 
 
-class HolidaysByExchangeStream(TimeSliceStream):
+class HolidaysByExchangeStream(TimeSliceStream, FmpSurrogateKeyStream):
     name = "holidays_by_exchange"
 
     _use_cached_symbols_default = False
@@ -56,6 +56,7 @@ class HolidaysByExchangeStream(TimeSliceStream):
         th.Property("is_closed", th.BooleanType),
         th.Property("adj_open_time", th.StringType),
         th.Property("adj_close_time", th.StringType),
+        th.Property("is_fully_closed", th.BooleanType)
     ).to_dict()
 
     @property
