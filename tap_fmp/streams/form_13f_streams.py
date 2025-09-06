@@ -145,6 +145,7 @@ class Form13fFilingDates(FmpSurrogateKeyStream):
     name = "form_13f_filing_dates"
 
     schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("cik", th.StringType),
         th.Property("date", th.DateType),
         th.Property("year", th.IntegerType),
@@ -164,7 +165,7 @@ class Form13fFilingDates(FmpSurrogateKeyStream):
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         record["cik"] = context.get("cik")
-        return record
+        return super().post_process(record, context)
 
 
 class Form13fFilingExtractsWithAnalytics(Form13fSymbolPartitionStream):
