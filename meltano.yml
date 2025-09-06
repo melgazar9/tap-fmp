@@ -71,6 +71,9 @@ plugins:
       - symbol_changes.*
       - etf_list.*
       - actively_trading.*
+      - available_transcript_symbols.*
+      - transcripts_dates_by_symbol.*
+      - latest_earning_transcripts.*
       - earnings_transcripts.*  # limited to Premium, build or enterprise plans
       - available_exchanges.*
       - available_sectors.*
@@ -151,7 +154,7 @@ plugins:
       ### Market Hours Streams ###
 
       - exchange_market_hours.*
-      - holidays_by_exchanges.*
+      - holidays_by_exchange.*
       - all_exchange_market_hours.*
 
       ### Statement Streams ###
@@ -192,6 +195,7 @@ plugins:
       - positions_summary.*
       - industry_performance_summary.*
       - form_13f_filings_extracts_with_analytics.*
+      - form_13f_filing_dates.*
 
       ### Index Streams ###
 
@@ -249,15 +253,17 @@ plugins:
       ### Fundraiser Streams ###
 
       - latest_crowdfunding_campaigns.*
+#      - crowdfunding_campaign_search.*  # search by name
       - crowdfunding_by_cik.*
       - equity_offering_updates.*
+#      - equity_offering_search.*  # search by name
       - equity_offering_by_cik.*
 
       ### Crypto Streams ###
 
       - crypto_list.*
-      - full_crypto_quote.*
-      - crypto_quote_short.*
+      - crypto_quotes.*
+      - crypto_quotes_short.*
 #      - all_crypto_quotes.*
       - historical_crypto_light_chart.*
       - historical_crypto_full_chart.*
@@ -268,8 +274,8 @@ plugins:
       ### Forex Streams ###
 
       - forex_pairs.*
-      - forex_quote.*
-      - forex_quote_short.*
+      - forex_quotes.*
+      - forex_quotes_short.*
 #      - batch_forex_quotes.*
       - forex_light_chart.*
       - forex_full_chart.*
@@ -281,9 +287,13 @@ plugins:
 
       - fmp_articles.*
       - general_news.*
+      - press_releases_latest.*
       - press_releases.*
+      - stock_news_latest.*
       - stock_news.*
+      - crypto_news_latest.*
       - crypto_news.*
+      - forex_news_latest.*
       - forex_news.*
 
       ### Technical Indicator Streams ###
