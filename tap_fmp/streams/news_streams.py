@@ -31,7 +31,7 @@ class BaseNewsTimeSliceStream(TimeSliceStream, FmpSurrogateKeyStream):
         th.Property("site", th.StringType),
         th.Property("text", th.StringType),
         th.Property("url", th.StringType),
-        th.Property("replication_date", th.DateType, required=True),
+        th.Property("replication_date", th.DateTimeType, required=True),
     ).to_dict()
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:

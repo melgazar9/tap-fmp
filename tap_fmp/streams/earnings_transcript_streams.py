@@ -14,6 +14,7 @@ class LatestEarningTranscriptsStream(FmpSurrogateKeyStream):
     name = "latest_earning_transcripts"
     _paginate = True
     _paginate_key = "page"
+    _max_pages = 100
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -94,3 +95,11 @@ class AvailableTranscriptSymbolsStream(FmpSurrogateKeyStream):
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/earnings-transcript-list"
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        if "no_of_transcripts" in row and row["no_of_transcripts"] is not None and row["no_of_transcripts"] != "":
+            try:
+                row["no_of_transcripts"] = int(row["no_of_transcripts"])
+            except (ValueError, TypeError):
+                row["no_of_transcripts"] = None
+        return super().post_process(row, context)
