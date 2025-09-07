@@ -303,6 +303,8 @@ class HolderIndustryBreakdownStream(Form13fCikPartitionStream):
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
         th.Property("cik", th.StringType),
+        th.Property("year", th.IntegerType),
+        th.Property("quarter", th.IntegerType),
         th.Property("investor_name", th.StringType),
         th.Property("industry_title", th.StringType),
         th.Property("weight", th.NumberType),
@@ -319,6 +321,17 @@ class HolderIndustryBreakdownStream(Form13fCikPartitionStream):
         return (
             f"{self.url_base}/stable/institutional-ownership/holder-industry-breakdown"
         )
+
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        """Add context fields for CIK, year, and quarter."""
+        if context:
+            if "cik" in context:
+                record["cik"] = context["cik"]
+            if "year" in context:
+                record["year"] = safe_int(context["year"])
+            if "quarter" in context:
+                record["quarter"] = safe_int(context["quarter"])
+        return super().post_process(record, context)
 
 
 class PositionsSummaryStream(Form13fSymbolPartitionStream):
