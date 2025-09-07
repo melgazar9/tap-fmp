@@ -96,7 +96,11 @@ class AvailableTranscriptSymbolsStream(FmpSurrogateKeyStream):
         return f"{self.url_base}/stable/earnings-transcript-list"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
-        if "no_of_transcripts" in row and row["no_of_transcripts"] is not None and row["no_of_transcripts"] != "":
+        if (
+            "no_of_transcripts" in row
+            and row["no_of_transcripts"] is not None
+            and row["no_of_transcripts"] != ""
+        ):
             try:
                 row["no_of_transcripts"] = int(row["no_of_transcripts"])
             except (ValueError, TypeError):

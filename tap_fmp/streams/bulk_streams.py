@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import typing as t
-import requests
-import backoff
-import logging
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 from tap_fmp.client import FmpSurrogateKeyStream, IncrementalDateStream
