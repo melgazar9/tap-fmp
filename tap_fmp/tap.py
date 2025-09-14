@@ -541,7 +541,7 @@ class TapFMP(Tap):
                 ),
             ),
             description="Symbol configuration including selection and query params",
-            required=True,
+            required=False,
         ),
     ).to_dict()
 
