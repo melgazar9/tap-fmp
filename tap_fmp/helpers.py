@@ -35,7 +35,7 @@ def clean_json_keys(data: list[dict]) -> list[dict]:
 
 
 def generate_surrogate_key(data: dict, namespace=uuid.NAMESPACE_DNS) -> str:
-    key_values = [str(data.get(field, "")) for field in data.keys()]
+    key_values = [str(data.get(field, "")) for field in sorted(data.keys())]
     key_string = "|".join(key_values)
     return str(uuid.uuid5(namespace, key_string))
 
