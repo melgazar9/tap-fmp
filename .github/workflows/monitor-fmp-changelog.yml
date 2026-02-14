@@ -1,0 +1,118 @@
+name: Monitor FMP API Changelog
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch: # Allow manual triggering
+
+permissions:
+  issues: write
+
+jobs:
+  check-changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch and check FMP changelog
+        id: check
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: |
+          # Fetch the changelog
+          HTTP_CODE=$(curl -s -o changelog-response.json -w "%{http_code}" \
+            "https://financialmodelingprep.com/api/v3/changelog?apikey=${FMP_API_KEY}")
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::FMP changelog API returned HTTP $HTTP_CODE"
+            cat changelog-response.json
+            exit 1
+          fi
+
+          if ! jq empty changelog-response.json 2>/dev/null; then
+            echo "::error::FMP changelog API returned invalid JSON"
+            exit 1
+          fi
+
+          # Look at changes from the last 21 days
+          SINCE=$(date -d '21 days ago' +%Y-%m-%d)
+          echo "since=$SINCE" >> "$GITHUB_OUTPUT"
+
+          NEW_COUNT=$(jq --arg date "$SINCE" '[.[] | select(.date > $date)] | length' changelog-response.json)
+          echo "new_count=$NEW_COUNT" >> "$GITHUB_OUTPUT"
+
+          if [ "$NEW_COUNT" -gt 0 ]; then
+            echo "has_new=true" >> "$GITHUB_OUTPUT"
+
+            # Format entries for the issue body
+            jq -r --arg date "$SINCE" '
+              [.[] | select(.date > $date)] |
+              sort_by(.date) | reverse |
+              map(
+                "### " + .date + " — " + .text + "\n" +
+                "**Type:** " + (.type // "Unknown") + "\n" +
+                (.detail // "No details provided.") + "\n" +
+                if .url then "[Documentation](" + .url + ")\n" else "" end +
+                "---"
+              ) | join("\n\n")
+            ' changelog-response.json > new-entries.md
+          else
+            echo "has_new=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for existing open issue
+        if: steps.check.outputs.has_new == 'true'
+        id: existing
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'fmp-api-update',
+              state: 'open',
+              per_page: 1
+            });
+            // Don't create duplicate issues if one is already open
+            core.setOutput('exists', issues.length > 0 ? 'true' : 'false');
+
+      - name: Create GitHub issue
+        if: steps.check.outputs.has_new == 'true' && steps.existing.outputs.exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const entries = fs.readFileSync('new-entries.md', 'utf8');
+            const count = '${{ steps.check.outputs.new_count }}';
+
+            const body = [
+              `## FMP API Changelog Updates`,
+              ``,
+              `**${count} new change(s)** detected:`,
+              ``,
+              entries,
+              ``,
+              `## Next Steps`,
+              ``,
+              `1. Review the changes above`,
+              `2. Comment \`/analyze-changes\` to have Claude analyze the impact and open a PR with fixes`,
+              `3. Or manually update streams in \`tap_fmp/streams/\``,
+              ``,
+              `**Changelog**: https://site.financialmodelingprep.com/developer/docs/changelog`,
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[FMP API] ${count} changelog update(s) — ${new Date().toISOString().split('T')[0]}`,
+              body: body,
+              labels: ['fmp-api-update']
+            });
+
+      - name: Workflow summary
+        run: |
+          if [ "${{ steps.check.outputs.has_new }}" = "true" ]; then
+            echo "### FMP Changelog: ${{ steps.check.outputs.new_count }} new change(s)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### FMP Changelog: No new changes in the last 21 days" >> "$GITHUB_STEP_SUMMARY"
+          fi
