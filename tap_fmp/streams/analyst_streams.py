@@ -4,6 +4,7 @@ from tap_fmp.client import (
     FmpRestStream,
     FmpSurrogateKeyStream,
 )
+
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
@@ -18,6 +19,7 @@ class AnalystEstimatesStream(SymbolPeriodPartitionStream):
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType, required=True),
+        th.Property("period", th.StringType, required=True),
         th.Property("revenue_low", th.NumberType),
         th.Property("revenue_high", th.NumberType),
         th.Property("revenue_avg", th.NumberType),
@@ -39,6 +41,13 @@ class AnalystEstimatesStream(SymbolPeriodPartitionStream):
         th.Property("num_analysts_revenue", th.IntegerType),
         th.Property("num_analysts_eps", th.IntegerType),
     ).to_dict()
+
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        if context and "period" in context:
+            row["period"] = context["period"]
+        return super().post_process(row, context)
+
 
     @staticmethod
     def _get_periods(periods):

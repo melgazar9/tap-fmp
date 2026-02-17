@@ -110,10 +110,11 @@ class IPOsCalendarStream(TimeSliceCalendarStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ipos-calendar"
 
-
 class IPOsDisclosureStream(TimeSliceCalendarStream):
     name = "ipos_disclosure"
     replication_key = "filing_date"
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -129,10 +130,11 @@ class IPOsDisclosureStream(TimeSliceCalendarStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ipos-disclosure"
 
-
 class IPOsProspectusStream(TimeSliceCalendarStream):
     name = "ipos_prospectus"
     replication_key = "filing_date"
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -177,6 +179,7 @@ class StockSplitDetailsStream(CalendarStream):
         th.Property("date", th.DateType),
         th.Property("numerator", th.NumberType),
         th.Property("denominator", th.NumberType),
+        th.Property("split_type", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
@@ -192,6 +195,7 @@ class StockSplitsCalendarStream(TimeSliceCalendarStream):
         th.Property("date", th.DateType),
         th.Property("numerator", th.NumberType),
         th.Property("denominator", th.NumberType),
+        th.Property("split_type", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):

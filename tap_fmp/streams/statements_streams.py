@@ -19,6 +19,7 @@ class StatementStream(
     FinancialStatementSymbolPartitionMixin, SymbolPeriodPartitionStream
 ):
     _add_surrogate_key = True
+    primary_keys = ["surrogate_key"]
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         if context:
@@ -851,6 +852,8 @@ class OwnerEarningsStream(
     FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
 ):
     """Owner earnings data for companies."""
+
+    primary_keys = ["surrogate_key"]
 
     name = "owner_earnings"
     _add_surrogate_key = True

@@ -1352,6 +1352,7 @@ class EodBulkStream(IncrementalDateStream):
     """Stream for EOD Bulk API."""
 
     name = "eod_bulk"
+    primary_keys = ["symbol", "date"]
     _expect_csv = True
 
     schema = th.PropertiesList(

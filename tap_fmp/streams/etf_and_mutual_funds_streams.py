@@ -89,6 +89,7 @@ class EtfAndMutualFundInformationStream(
         th.Property("nav", th.NumberType),
         th.Property("nav_currency", th.StringType),
         th.Property("holdings_count", th.IntegerType),
+        th.Property("is_actively_trading", th.BooleanType),
         th.Property("updated_at", th.DateTimeType),
         th.Property(
             "sectors_list",

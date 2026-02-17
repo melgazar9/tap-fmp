@@ -100,8 +100,6 @@ class SectorPeSnapshotStream(IncrementalDateStream):
     """Stream for Sector PE Snapshot API."""
 
     name = "sector_pe_snapshot"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -119,8 +117,6 @@ class IndustryPeSnapshotStream(IncrementalDateStream):
     """Stream for Industry PE Snapshot API."""
 
     name = "industry_pe_snapshot"
-    primary_keys = ["surrogate_key"]
-    _add_surrogate_key = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
