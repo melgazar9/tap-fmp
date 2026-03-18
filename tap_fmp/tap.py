@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import os
+import typing as t
+import threading
+
 from singer_sdk import Tap
 from singer_sdk import typing as th
 
-import typing as t
-import threading
+from tap_fmp.disk_cache import DiskCache, compute_fingerprint
 from tap_fmp.helpers import ExchangeVariantsManager
 
 from tap_fmp.streams.search_streams import (
@@ -407,8 +410,35 @@ class TapFMP(Tap):
     _exchange_variants_manager: ExchangeVariantsManager | None = None
     _exchange_variants_lock = threading.Lock()
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        shared_cache_dir = os.environ.get("MELTANO_SHARED_CACHE_DIR")
+        self._disk_cache: DiskCache | None = (
+            DiskCache(
+                cache_dir=shared_cache_dir,
+                namespace="tap_fmp",
+                ttl_hours=float(os.environ.get("MELTANO_SHARED_CACHE_TTL_HOURS", "24")),
+            )
+            if shared_cache_dir
+            else None
+        )
+
+    def _build_cache_fingerprint(self, stream) -> str:
+        """Build a fingerprint from the stream's effective parsed config."""
+        qp = getattr(stream, "query_params", {})
+        op = getattr(stream, "other_params", {})
+        normalized_qp = {
+            k: str(v) for k, v in sorted(qp.items()) if k != "apikey"
+        }
+        return compute_fingerprint({
+            "stream_name": stream.name,
+            "base_url": self.config.get("base_url", ""),
+            "query_params": normalized_qp,
+            "other_params": {k: str(v) for k, v in sorted(op.items())},
+        })
+
     def _get_cached_data(self, config: dict) -> t.List[dict]:
-        """Generic thread-safe caching with configuration."""
+        """Generic thread-safe caching with configuration and optional L2 disk cache."""
         cache_attr = config["cache_attr"]
         lock = config["lock"]
         stream_getter = config["stream_getter"]
@@ -424,14 +454,22 @@ class TapFMP(Tap):
                 if cached_data is None:
                     self.logger.info(f"Fetching and caching {data_type}...")
                     stream = stream_getter()
-                    data = list(stream.get_records(context=None))
 
-                    if apply_filtering and filter_config_key:
-                        data = self._apply_country_currency_filtering(
-                            data, filter_config_key
-                        )
+                    def _fetch():
+                        data = list(stream.get_records(context=None))
+                        if apply_filtering and filter_config_key:
+                            data = self._apply_country_currency_filtering(
+                                data, filter_config_key
+                            )
+                        return sorted(data, key=lambda x: x.get(sort_key, ""))
 
-                    cached_data = sorted(data, key=lambda x: x.get(sort_key, ""))
+                    if self._disk_cache is not None:
+                        fingerprint = self._build_cache_fingerprint(stream)
+                        cache_key = f"symbols/{data_type.replace(' ', '_')}/{fingerprint}"
+                        cached_data = self._disk_cache.get_or_fetch(cache_key, _fetch)
+                    else:
+                        cached_data = _fetch()
+
                     setattr(self, cache_attr, cached_data)
                     self.logger.info(f"Cached {len(cached_data)} {data_type}.")
         return cached_data
