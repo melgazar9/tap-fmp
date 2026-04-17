@@ -1,7 +1,7 @@
 from tap_fmp.client import (
     FmpSurrogateKeyStream,
-    SymbolPartitionStream,
     SymbolYearQuarterPartitionStream,
+    BaseSymbolPartitionStream,
 )
 from tap_fmp.mixins import TranscriptSymbolPartitionMixin
 from singer_sdk.helpers.types import Context
@@ -62,7 +62,7 @@ class EarningsTranscriptStream(
 
 
 class TranscriptsDatesBySymbolStream(
-    FmpSurrogateKeyStream, TranscriptSymbolPartitionMixin, SymbolPartitionStream
+    FmpSurrogateKeyStream, TranscriptSymbolPartitionMixin, BaseSymbolPartitionStream
 ):
     """Stream for pulling transcript dates by symbol."""
 

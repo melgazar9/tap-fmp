@@ -6,17 +6,17 @@ from singer_sdk import typing as th
 
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.client import SymbolPartitionTimeSliceStream
+from tap_fmp.client import BaseSymbolPartitionTimeSliceStream
 from tap_fmp.mixins import BaseSymbolPartitionMixin
 
 
 class TechnicalIndicatorSymbolPartitionMixin(BaseSymbolPartitionMixin):
-    def get_cached_company_symbols(self) -> list[dict]:
+    def _partition_symbols(self) -> list[dict]:
         return self._tap.get_cached_company_symbols()
 
 
 class BaseTechnicalIndicatorStream(
-    TechnicalIndicatorSymbolPartitionMixin, SymbolPartitionTimeSliceStream
+    TechnicalIndicatorSymbolPartitionMixin, BaseSymbolPartitionTimeSliceStream
 ):
     """Base class for technical indicator streams."""
 

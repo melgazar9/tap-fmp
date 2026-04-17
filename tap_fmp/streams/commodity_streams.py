@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import (
+    BaseSymbolPartitionStream,
+    BaseSymbolPartitionTimeSliceStream,
     FmpSurrogateKeyStream,
-    SymbolPartitionStream,
-    SymbolPartitionTimeSliceStream,
 )
 from tap_fmp.mixins import (
     BaseSymbolPartitionMixin,
@@ -39,20 +41,10 @@ class CommoditiesListStream(CommodityConfigMixin, FmpSurrogateKeyStream):
         return f"{self.url_base}/stable/commodities-list"
 
 
-class CommodityPartitionStream(SymbolPartitionStream):
-    """Base class for commodity streams that need commodity symbol partitioning."""
-
-    @property
-    def partitions(self):
-        return self._tap.get_cached_commodities()
-
-
 class TimestampProcessingMixin:
     """Mixin for processing timestamp/date fields in commodity records."""
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
-        from datetime import datetime
-
         if "date" not in record and "timestamp" in record:
             try:
                 timestamp_val = int(record["timestamp"])
@@ -77,7 +69,7 @@ class CommoditySymbolPartitionMixin(TimestampProcessingMixin, BaseSymbolPartitio
     def selection_field_name(self) -> str:
         return "select_commodities"
 
-    def get_cached_symbols(self) -> list[dict]:
+    def _partition_symbols(self) -> list[dict]:
         return self._tap.get_cached_commodities()
 
 
@@ -96,11 +88,11 @@ class CommodityPriceMixin(
     def selection_field_name(self) -> str:
         return "select_commodities"
 
-    def get_cached_symbols(self) -> list[dict]:
+    def _partition_symbols(self) -> list[dict]:
         return self._tap.get_cached_commodities()
 
 
-class CommoditiesQuoteStream(CommodityPriceMixin, CommodityPartitionStream):
+class CommoditiesQuoteStream(CommodityPriceMixin, BaseSymbolPartitionStream):
     """Stream for Commodities Quote API."""
 
     name = "commodities_quotes"
@@ -131,7 +123,7 @@ class CommoditiesQuoteStream(CommodityPriceMixin, CommodityPartitionStream):
         return f"{self.url_base}/stable/quote"
 
 
-class CommoditiesQuoteShortStream(CommodityPriceMixin, CommodityPartitionStream):
+class CommoditiesQuoteShortStream(CommodityPriceMixin, BaseSymbolPartitionStream):
     name = "commodities_quote_short"
 
     schema = th.PropertiesList(
@@ -166,7 +158,7 @@ class AllCommoditiesQuotesStream(FmpSurrogateKeyStream):
 class CommoditiesLightChartStream(
     CommoditySymbolPartitionMixin,
     ChartLightMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     name = "commodities_light_chart"
 
@@ -174,7 +166,7 @@ class CommoditiesLightChartStream(
 class CommoditiesFullChartStream(
     CommoditySymbolPartitionMixin,
     ChartFullMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     name = "commodities_full_chart"
 
@@ -182,7 +174,7 @@ class CommoditiesFullChartStream(
 class Commodities1minStream(
     CommoditySymbolPartitionMixin,
     Prices1minMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     name = "commodities_1min"
 
@@ -190,7 +182,7 @@ class Commodities1minStream(
 class Commodities5minStream(
     CommoditySymbolPartitionMixin,
     Prices5minMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     name = "commodities_5min"
 
@@ -198,6 +190,6 @@ class Commodities5minStream(
 class Commodities1HrStream(
     CommoditySymbolPartitionMixin,
     Prices1HrMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     name = "commodities_1h"

@@ -7,17 +7,18 @@ from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import (
     FmpSurrogateKeyStream,
-    SymbolPartitionStream,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionStream,
+    BaseSymbolPartitionTimeSliceStream,
 )
-from tap_fmp.streams.chart_streams import (
+from tap_fmp.mixins import (
+    BaseSymbolPartitionMixin,
+    ChartFullMixin,
+    ChartLightMixin,
+    CryptoConfigMixin,
+    Prices1HrMixin,
     Prices1minMixin,
     Prices5minMixin,
-    Prices1HrMixin,
-    ChartLightMixin,
-    ChartFullMixin,
 )
-from tap_fmp.mixins import BaseSymbolPartitionMixin, CryptoConfigMixin
 
 
 class CryptoListStream(CryptoConfigMixin, FmpSurrogateKeyStream):
@@ -49,11 +50,11 @@ class CryptoSymbolPartitionMixin(BaseSymbolPartitionMixin):
     def selection_field_name(self) -> str:
         return "select_crypto_symbols"
 
-    def get_cached_symbols(self) -> list[dict]:
+    def _partition_symbols(self) -> list[dict]:
         return self._tap.get_cached_crypto_symbols()
 
 
-class FullCryptoQuoteStream(CryptoSymbolPartitionMixin, SymbolPartitionStream):
+class FullCryptoQuoteStream(CryptoSymbolPartitionMixin, BaseSymbolPartitionStream):
     """Stream for Full Crypto Quote API."""
 
     name = "crypto_quotes"
@@ -84,7 +85,7 @@ class FullCryptoQuoteStream(CryptoSymbolPartitionMixin, SymbolPartitionStream):
         return f"{self.url_base}/stable/quote"
 
 
-class CryptoQuoteShortStream(CryptoSymbolPartitionMixin, SymbolPartitionStream):
+class CryptoQuoteShortStream(CryptoSymbolPartitionMixin, BaseSymbolPartitionStream):
     """Stream for Crypto Quote Short API."""
 
     name = "crypto_quotes_short"
@@ -123,7 +124,7 @@ class AllCryptoQuotesStream(FmpSurrogateKeyStream):
 class HistoricalCryptoLightChartStream(
     CryptoSymbolPartitionMixin,
     ChartLightMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """Stream for Historical Crypto Light Chart API."""
 
@@ -135,7 +136,7 @@ class HistoricalCryptoLightChartStream(
 
 
 class HistoricalCryptoFullChartStream(
-    CryptoSymbolPartitionMixin, ChartFullMixin, SymbolPartitionTimeSliceStream
+    CryptoSymbolPartitionMixin, ChartFullMixin, BaseSymbolPartitionTimeSliceStream
 ):
     """Stream for Historical Crypto Full Chart API."""
 
@@ -149,7 +150,7 @@ class HistoricalCryptoFullChartStream(
 class Crypto1minStream(
     CryptoSymbolPartitionMixin,
     Prices1minMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """Stream for 1-Minute Interval Crypto Data API."""
 
@@ -159,7 +160,7 @@ class Crypto1minStream(
 class Crypto5minStream(
     CryptoSymbolPartitionMixin,
     Prices5minMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """Stream for 5-Minute Interval Crypto Data API."""
 
@@ -169,7 +170,7 @@ class Crypto5minStream(
 class Crypto1HrStream(
     CryptoSymbolPartitionMixin,
     Prices1HrMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """Stream for 1-Hour Interval Crypto Data API."""
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream
+from tap_fmp.client import FmpRestStream, CompanySymbolPartitionStream
 from datetime import datetime
 
 
@@ -53,7 +53,7 @@ class LatestInsiderTradingStream(FmpRestStream):
             return [{"date": datetime.today().date().strftime("%Y-%m-%d")}]
 
 
-class SearchInsiderTradesStream(SymbolPartitionStream):
+class SearchInsiderTradesStream(CompanySymbolPartitionStream):
     """Stream for Search Insider Trades API."""
 
     name = "insider_trades_search"
@@ -118,7 +118,7 @@ class AllInsiderTransactionTypesStream(FmpRestStream):
         return f"{self.url_base}/stable/insider-trading-transaction-type"
 
 
-class InsiderTradeStatisticsStream(SymbolPartitionStream):
+class InsiderTradeStatisticsStream(CompanySymbolPartitionStream):
     """Stream for Insider Trade Statistics API."""
 
     name = "insider_trade_statistics"
@@ -147,7 +147,7 @@ class InsiderTradeStatisticsStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/insider-trading/statistics"
 
 
-class AcquisitionOwnershipStream(SymbolPartitionStream):
+class AcquisitionOwnershipStream(CompanySymbolPartitionStream):
     """Stream for Acquisition Ownership API."""
 
     name = "acquisition_ownership"

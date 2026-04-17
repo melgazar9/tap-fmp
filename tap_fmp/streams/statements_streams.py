@@ -8,8 +8,8 @@ from datetime import datetime
 
 from tap_fmp.client import (
     FmpRestStream,
-    SymbolPartitionStream,
     SymbolPeriodPartitionStream,
+    BaseSymbolPartitionStream,
 )
 
 from tap_fmp.mixins import FinancialStatementSymbolPartitionMixin
@@ -40,7 +40,7 @@ class StatementStream(
         return super().post_process(row, context)
 
 
-class TtmStream(FinancialStatementSymbolPartitionMixin, SymbolPartitionStream):
+class TtmStream(FinancialStatementSymbolPartitionMixin, BaseSymbolPartitionStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
 
@@ -443,86 +443,53 @@ class KeyMetricsStream(StatementStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("date", th.DateType),
         th.Property("symbol", th.StringType, required=True),
+        th.Property("date", th.DateType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
-        th.Property("revenue_per_share", th.NumberType),
-        th.Property("net_income_per_share", th.NumberType),
-        th.Property("operating_cash_flow_per_share", th.NumberType),
-        th.Property("free_cash_flow_per_share", th.NumberType),
-        th.Property("cash_per_share", th.NumberType),
-        th.Property("book_value_per_share", th.NumberType),
-        th.Property("tangible_book_value_per_share", th.NumberType),
-        th.Property("shareholders_equity_per_share", th.NumberType),
-        th.Property("interest_debt_per_share", th.NumberType),
+        th.Property("reported_currency", th.StringType),
         th.Property("market_cap", th.NumberType),
         th.Property("enterprise_value", th.NumberType),
-        th.Property("pe_ratio", th.NumberType),
-        th.Property("price_to_sales_ratio", th.NumberType),
-        th.Property("pocf_ratio", th.NumberType),
-        th.Property("pfcf_ratio", th.NumberType),
-        th.Property("pb_ratio", th.NumberType),
-        th.Property("ptb_ratio", th.NumberType),
         th.Property("ev_to_sales", th.NumberType),
-        th.Property("enterprise_value_over_ebitda", th.NumberType),
         th.Property("ev_to_operating_cash_flow", th.NumberType),
         th.Property("ev_to_free_cash_flow", th.NumberType),
-        th.Property("earnings_yield", th.NumberType),
-        th.Property("free_cash_flow_yield", th.NumberType),
-        th.Property("debt_to_equity", th.NumberType),
-        th.Property("debt_to_assets", th.NumberType),
+        th.Property("ev_to_ebitda", th.NumberType),
         th.Property("net_debt_to_ebitda", th.NumberType),
         th.Property("current_ratio", th.NumberType),
-        th.Property("interest_coverage", th.NumberType),
         th.Property("income_quality", th.NumberType),
-        th.Property("dividend_yield", th.NumberType),
-        th.Property("payout_ratio", th.NumberType),
+        th.Property("graham_number", th.NumberType),
+        th.Property("graham_net_net", th.NumberType),
+        th.Property("tax_burden", th.NumberType),
+        th.Property("interest_burden", th.NumberType),
+        th.Property("working_capital", th.NumberType),
+        th.Property("invested_capital", th.NumberType),
+        th.Property("return_on_assets", th.NumberType),
+        th.Property("operating_return_on_assets", th.NumberType),
+        th.Property("return_on_tangible_assets", th.NumberType),
+        th.Property("return_on_equity", th.NumberType),
+        th.Property("return_on_invested_capital", th.NumberType),
+        th.Property("return_on_capital_employed", th.NumberType),
+        th.Property("earnings_yield", th.NumberType),
+        th.Property("free_cash_flow_yield", th.NumberType),
+        th.Property("capex_to_operating_cash_flow", th.NumberType),
+        th.Property("capex_to_depreciation", th.NumberType),
+        th.Property("capex_to_revenue", th.NumberType),
         th.Property("sales_general_and_administrative_to_revenue", th.NumberType),
         th.Property("research_and_development_to_revenue", th.NumberType),
-        th.Property("intangibles_to_total_assets", th.NumberType),
-        th.Property("capex_to_operating_cash_flow", th.NumberType),
-        th.Property("capex_to_revenue", th.NumberType),
-        th.Property("capex_to_depreciation", th.NumberType),
         th.Property("stock_based_compensation_to_revenue", th.NumberType),
-        th.Property("graham_number", th.NumberType),
-        th.Property("roic", th.NumberType),
-        th.Property("return_on_tangible_assets", th.NumberType),
-        th.Property("graham_net_net", th.NumberType),
-        th.Property("working_capital", th.NumberType),
-        th.Property("tangible_asset_value", th.NumberType),
-        th.Property("net_current_asset_value", th.NumberType),
-        th.Property("invested_capital", th.NumberType),
+        th.Property("intangibles_to_total_assets", th.NumberType),
         th.Property("average_receivables", th.NumberType),
         th.Property("average_payables", th.NumberType),
         th.Property("average_inventory", th.NumberType),
-        th.Property("days_sales_outstanding", th.NumberType),
-        th.Property("days_payables_outstanding", th.NumberType),
-        th.Property("days_of_inventory_on_hand", th.NumberType),
-        th.Property("receivables_turnover", th.NumberType),
-        th.Property("payables_turnover", th.NumberType),
-        th.Property("inventory_turnover", th.NumberType),
-        th.Property("roe", th.NumberType),
-        th.Property("capex_per_share", th.NumberType),
-        th.Property("reported_currency", th.StringType),
-        th.Property("return_on_assets", th.NumberType),
-        th.Property("return_on_invested_capital", th.NumberType),
-        th.Property("fiscal_year", th.IntegerType),
-        th.Property("free_cash_flow_to_firm", th.NumberType),
-        th.Property("return_on_equity", th.NumberType),
-        th.Property("days_of_payables_outstanding", th.NumberType),
-        th.Property("operating_cycle", th.NumberType),
-        th.Property("net_debt_toebitda", th.NumberType),
-        th.Property("days_of_inventory_outstanding", th.NumberType),
-        th.Property("ev_toebitda", th.NumberType),
-        th.Property("return_on_capital_employed", th.NumberType),
-        th.Property("free_cash_flow_to_equity", th.NumberType),
-        th.Property("tax_burden", th.NumberType),
-        th.Property("cash_conversion_cycle", th.NumberType),
-        th.Property("operating_return_on_assets", th.NumberType),
-        th.Property("interest_burden", th.NumberType),
         th.Property("days_of_sales_outstanding", th.NumberType),
-        th.Property("research_and_developement_to_revenue", th.NumberType),
-        th.Property("ev_to_ebitda", th.NumberType),
+        th.Property("days_of_payables_outstanding", th.NumberType),
+        th.Property("days_of_inventory_outstanding", th.NumberType),
+        th.Property("operating_cycle", th.NumberType),
+        th.Property("cash_conversion_cycle", th.NumberType),
+        th.Property("free_cash_flow_to_equity", th.NumberType),
+        th.Property("free_cash_flow_to_firm", th.NumberType),
+        th.Property("tangible_asset_value", th.NumberType),
+        th.Property("net_current_asset_value", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
@@ -604,7 +571,6 @@ class FinancialRatiosStream(StatementStream):
         th.Property("effective_tax_rate", th.NumberType),
         th.Property("enterprise_value_multiple", th.NumberType),
         th.Property("dividend_per_share", th.NumberType),
-        th.Property("net_income_perebt", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
@@ -612,7 +578,7 @@ class FinancialRatiosStream(StatementStream):
 
 
 class KeyMetricsTtmStream(
-    FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
+    FinancialStatementSymbolPartitionMixin, BaseSymbolPartitionStream
 ):
     """Key metrics TTM data for companies."""
 
@@ -649,7 +615,7 @@ class KeyMetricsTtmStream(
         th.Property("capex_to_depreciation_ttm", th.NumberType),
         th.Property("capex_to_revenue_ttm", th.NumberType),
         th.Property("sales_general_and_administrative_to_revenue_ttm", th.NumberType),
-        th.Property("research_and_developement_to_revenue_ttm", th.NumberType),
+        th.Property("research_and_development_to_revenue_ttm", th.NumberType),
         th.Property("stock_based_compensation_to_revenue_ttm", th.NumberType),
         th.Property("intangibles_to_total_assets_ttm", th.NumberType),
         th.Property("average_receivables_ttm", th.NumberType),
@@ -669,20 +635,9 @@ class KeyMetricsTtmStream(
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/key-metrics-ttm"
 
-    def post_process(self, row: dict, context: Context = None) -> dict:
-        row = {
-            (
-                (k[:-3].rstrip("_") + "_ttm")
-                if (k.lower().endswith("ttm") and not k.lower().endswith("_ttm"))
-                else k
-            ): v
-            for k, v in row.items()
-        }
-        return super().post_process(row, context)
-
 
 class FinancialRatiosTtmStream(
-    FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
+    FinancialStatementSymbolPartitionMixin, BaseSymbolPartitionStream
 ):
     """Financial ratios TTM data for companies."""
 
@@ -733,6 +688,7 @@ class FinancialRatiosTtmStream(
         th.Property("dividend_paid_and_capex_coverage_ratio_ttm", th.NumberType),
         th.Property("dividend_payout_ratio_ttm", th.NumberType),
         th.Property("dividend_yield_ttm", th.NumberType),
+        th.Property("dividend_per_share_ttm", th.NumberType),
         th.Property("enterprise_value_ttm", th.NumberType),
         th.Property("revenue_per_share_ttm", th.NumberType),
         th.Property("net_income_per_share_ttm", th.NumberType),
@@ -750,78 +706,14 @@ class FinancialRatiosTtmStream(
         th.Property("debt_to_market_cap_ttm", th.NumberType),
         th.Property("effective_tax_rate_ttm", th.NumberType),
         th.Property("enterprise_value_multiple_ttm", th.NumberType),
-        th.Property("working_capital_turnover_ratio_ttm", th.NumberType),
-        th.Property("operating_cash_flow_coverage_ratio_ttm", th.NumberType),
-        th.Property("payables_turnover_ttm", th.NumberType),
-        th.Property("free_cash_flow_operating_cash_flow_ratio_ttm", th.NumberType),
-        th.Property("asset_turnover_ttm", th.NumberType),
-        th.Property("cash_ratio_ttm", th.NumberType),
-        th.Property("current_ratio_ttm", th.NumberType),
-        th.Property("short_term_operating_cash_flow_coverage_ratio_ttm", th.NumberType),
-        th.Property("enterprise_value_ttm", th.NumberType),
-        th.Property("price_to_book_ratio_ttm", th.NumberType),
-        th.Property("price_to_sales_ratio_ttm", th.NumberType),
-        th.Property("forward_price_to_earnings_growth_ratio_ttm", th.NumberType),
-        th.Property("dividend_payout_ratio_ttm", th.NumberType),
-        th.Property("tangible_book_value_per_share_ttm", th.NumberType),
-        th.Property("interest_debt_per_share_ttm", th.NumberType),
-        th.Property("long_term_debt_to_capital_ratio_ttm", th.NumberType),
-        th.Property("pretax_profit_marginttm", th.NumberType),
-        th.Property("ebitda_marginttm", th.NumberType),
-        th.Property("continuous_operations_profit_marginttm", th.NumberType),
-        th.Property("price_to_earnings_ratio_ttm", th.NumberType),
-        th.Property("dividend_paid_and_capex_coverage_ratio_ttm", th.NumberType),
-        th.Property("debt_service_coverage_ratio_ttm", th.NumberType),
-        th.Property("capex_per_share_ttm", th.NumberType),
-        th.Property("quick_ratio_ttm", th.NumberType),
-        th.Property("net_profit_marginttm", th.NumberType),
-        th.Property("debt_to_capital_ratio_ttm", th.NumberType),
-        th.Property("book_value_per_share_ttm", th.NumberType),
-        th.Property("operating_cash_flow_sales_ratio_ttm", th.NumberType),
-        th.Property("bottom_line_profit_marginttm", th.NumberType),
-        th.Property("gross_profit_marginttm", th.NumberType),
-        th.Property("operating_profit_marginttm", th.NumberType),
-        th.Property("financial_leverage_ratio_ttm", th.NumberType),
-        th.Property("revenue_per_share_ttm", th.NumberType),
-        th.Property("price_to_free_cash_flow_ratio_ttm", th.NumberType),
-        th.Property("operating_cash_flow_ratio_ttm", th.NumberType),
-        th.Property("fixed_asset_turnover_ttm", th.NumberType),
-        th.Property("shareholders_equity_per_share_ttm", th.NumberType),
-        th.Property("cash_per_share_ttm", th.NumberType),
-        th.Property("debt_to_equity_ratio_ttm", th.NumberType),
-        th.Property("net_income_perebt_ttm", th.NumberType),
-        th.Property("price_to_fair_value_ttm", th.NumberType),
-        th.Property("debt_to_market_cap_ttm", th.NumberType),
-        th.Property("price_to_earnings_growth_ratio_ttm", th.NumberType),
-        th.Property("interest_coverage_ratio_ttm", th.NumberType),
-        th.Property("ebt_per_ebitttm", th.NumberType),
-        th.Property("free_cash_flow_per_share_ttm", th.NumberType),
-        th.Property("effective_tax_ratettm", th.NumberType),
-        th.Property("receivables_turnover_ttm", th.NumberType),
-        th.Property("inventory_turnover_ttm", th.NumberType),
-        th.Property("capital_expenditure_coverage_ratio_ttm", th.NumberType),
-        th.Property("solvency_ratio_ttm", th.NumberType),
-        th.Property("price_to_operating_cash_flow_ratio_ttm", th.NumberType),
-        th.Property("operating_cash_flow_per_share_ttm", th.NumberType),
-        th.Property("ebit_marginttm", th.NumberType),
-        th.Property("net_income_per_share_ttm", th.NumberType),
-        th.Property("dividend_yieldttm", th.NumberType),
-        th.Property("dividend_per_share_ttm", th.NumberType),
-        th.Property("debt_to_assets_ratio_ttm", th.NumberType),
-        th.Property("enterprise_value_multiplettm", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ratios-ttm"
 
-    def post_process(self, row: dict, context: Context = None) -> dict:
-        if "net_income_per_ebtttm" in row:
-            row["net_income_per_ebt_ttm"] = row.pop("net_income_per_ebtttm")
-        return super().post_process(row, context)
-
 
 class FinancialScoresStream(
-    FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
+    FinancialStatementSymbolPartitionMixin, BaseSymbolPartitionStream
 ):
     """Financial scores data for companies."""
 
@@ -841,7 +733,6 @@ class FinancialScoresStream(
         th.Property("total_liabilities", th.NumberType),
         th.Property("revenue", th.NumberType),
         th.Property("reported_currency", th.StringType),
-        th.Property("altmanz_score", th.NumberType),
     ).to_dict()
 
     def get_url(self, context: Context):
@@ -849,7 +740,7 @@ class FinancialScoresStream(
 
 
 class OwnerEarningsStream(
-    FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
+    FinancialStatementSymbolPartitionMixin, BaseSymbolPartitionStream
 ):
     """Owner earnings data for companies."""
 
@@ -865,10 +756,6 @@ class OwnerEarningsStream(
         th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("owners_earnings", th.NumberType),
-        th.Property("net_income", th.NumberType),
-        th.Property("depreciation_and_amortization", th.NumberType),
-        th.Property("capital_expenditure", th.NumberType),
-        th.Property("change_in_working_capital", th.NumberType),
         th.Property("average_ppe", th.NumberType),
         th.Property("growth_capex", th.NumberType),
         th.Property("owners_earnings_per_share", th.NumberType),
@@ -900,7 +787,6 @@ class EnterpriseValuesStream(StatementStream):
         th.Property("minus_cash_and_cash_equivalents", th.NumberType),
         th.Property("add_total_debt", th.NumberType),
         th.Property("enterprise_value", th.NumberType),
-        th.Property("period", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
@@ -931,23 +817,15 @@ class IncomeStatementGrowthStream(StatementStream):
         th.Property("growth_depreciation_and_amortization", th.NumberType),
         th.Property("growth_ebit", th.NumberType),
         th.Property("growth_ebitda", th.NumberType),
-        th.Property("growth_ebitda_ratio", th.NumberType),
         th.Property("growth_operating_income", th.NumberType),
-        th.Property("growth_operating_income_ratio", th.NumberType),
         th.Property("growth_total_other_income_expenses_net", th.NumberType),
         th.Property("growth_income_before_tax", th.NumberType),
-        th.Property("growth_income_before_tax_ratio", th.NumberType),
         th.Property("growth_income_tax_expense", th.NumberType),
         th.Property("growth_net_income", th.NumberType),
-        th.Property("growth_net_income_ratio", th.NumberType),
         th.Property("growth_eps", th.NumberType),
         th.Property("growth_eps_diluted", th.NumberType),
         th.Property("growth_weighted_average_shs_out", th.NumberType),
         th.Property("growth_weighted_average_shs_out_dil", th.NumberType),
-        th.Property("growthebitda", th.NumberType),
-        th.Property("growthebit", th.NumberType),
-        th.Property("growtheps_diluted", th.NumberType),
-        th.Property("growtheps", th.NumberType),
         th.Property("growth_non_operating_income_excluding_interest", th.NumberType),
         th.Property("growth_other_adjustments_to_net_income", th.NumberType),
         th.Property("growth_net_income_deductions", th.NumberType),
@@ -1150,7 +1028,7 @@ class FinancialStatementGrowthStream(StatementStream):
 
 
 class FinancialStatementReportDatesStream(
-    FinancialStatementSymbolPartitionMixin, SymbolPartitionStream
+    FinancialStatementSymbolPartitionMixin, BaseSymbolPartitionStream
 ):
     """Financial statements report dates."""
 
@@ -1160,7 +1038,6 @@ class FinancialStatementReportDatesStream(
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
-        th.Property("date", th.DateType),
         th.Property("period", th.StringType),
         th.Property("fiscal_year", th.IntegerType),
         th.Property("link_xlsx", th.StringType),
@@ -1195,7 +1072,7 @@ class FinancialReportsForm10kJsonStream(StatementStream):
                 }
             ),
         ),
-        th.Property("error_message", th.AnyType()),  # For API errors
+        th.Property("error_message", th.StringType),
     ).to_dict()
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:

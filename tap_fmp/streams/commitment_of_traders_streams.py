@@ -1,11 +1,11 @@
-from tap_fmp.client import SymbolPartitionTimeSliceStream, FmpRestStream
+from tap_fmp.client import CompanySymbolPartitionTimeSliceStream, FmpRestStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
 from tap_fmp.mixins import SelectableStreamMixin
 
 
-class CotPartitionStream(SymbolPartitionTimeSliceStream):
+class CotPartitionStream(CompanySymbolPartitionTimeSliceStream):
     @property
     def partitions(self):
         return [{"symbol": s["symbol"]} for s in self._tap.get_cached_cot_symbols()]
@@ -176,11 +176,6 @@ class CotAnalysisByDateStream(CotPartitionStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/commitment-of-traders-analysis"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        if "net_postion" in row:
-            row["net_position"] = row.pop("net_postion")
-        return super().post_process(row, context)
 
 
 class CotReportListStream(SelectableStreamMixin, FmpRestStream):

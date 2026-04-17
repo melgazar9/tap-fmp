@@ -7,8 +7,8 @@ from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import (
     FmpSurrogateKeyStream,
-    SymbolPartitionStream,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionStream,
+    BaseSymbolPartitionTimeSliceStream,
 )
 from tap_fmp.mixins import (
     BaseSymbolPartitionMixin,
@@ -47,15 +47,6 @@ class ForexPairsStream(ForexConfigMixin, FmpSurrogateKeyStream):
         return f"{self.url_base}/stable/forex-list"
 
 
-class ForexPartitionStream(SymbolPartitionStream):
-    @property
-    def partitions(self):
-        return [
-            {"symbol": forex_json.get("symbol")}
-            for forex_json in self._tap.get_cached_forex_pairs()
-        ]
-
-
 class ForexSymbolPartitionMixin(BaseSymbolPartitionMixin):
 
     @property
@@ -66,11 +57,11 @@ class ForexSymbolPartitionMixin(BaseSymbolPartitionMixin):
     def selection_field_name(self) -> str:
         return "select_forex_pairs"
 
-    def get_cached_symbols(self) -> list[dict]:
+    def _partition_symbols(self) -> list[dict]:
         return self._tap.get_cached_forex_pairs()
 
 
-class ForexQuoteStream(ForexSymbolPartitionMixin, ForexPartitionStream):
+class ForexQuoteStream(ForexSymbolPartitionMixin, BaseSymbolPartitionStream):
     """Stream for Forex Quote API."""
 
     name = "forex_quotes"
@@ -101,7 +92,7 @@ class ForexQuoteStream(ForexSymbolPartitionMixin, ForexPartitionStream):
         return f"{self.url_base}/stable/quote"
 
 
-class ForexQuoteShortStream(ForexSymbolPartitionMixin, ForexPartitionStream):
+class ForexQuoteShortStream(ForexSymbolPartitionMixin, BaseSymbolPartitionStream):
     """Stream for Forex Short Quote API."""
 
     name = "forex_quotes_short"
@@ -138,7 +129,7 @@ class BatchForexQuotesStream(FmpSurrogateKeyStream):
 class ForexLightChartStream(
     ForexSymbolPartitionMixin,
     ChartLightMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """Stream for Historical Forex Light Chart API."""
 
@@ -149,7 +140,7 @@ class ForexLightChartStream(
 
 
 class ForexFullChartStream(
-    ForexSymbolPartitionMixin, ChartFullMixin, SymbolPartitionTimeSliceStream
+    ForexSymbolPartitionMixin, ChartFullMixin, BaseSymbolPartitionTimeSliceStream
 ):
     """Stream for Historical Forex Full Chart API."""
 
@@ -159,7 +150,7 @@ class ForexFullChartStream(
 class Forex1minStream(
     ForexSymbolPartitionMixin,
     Prices1minMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """Stream for 1-Minute Interval Forex Chart API."""
 
@@ -169,7 +160,7 @@ class Forex1minStream(
 class Forex5minStream(
     ForexSymbolPartitionMixin,
     Prices5minMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """Stream for 5-Minute Interval Forex Chart API."""
 
@@ -179,7 +170,7 @@ class Forex5minStream(
 class Forex1HrStream(
     ForexSymbolPartitionMixin,
     Prices1HrMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """Stream for 1-Hour Interval Forex Chart API."""
 

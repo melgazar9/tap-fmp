@@ -163,16 +163,7 @@ class IncrementalYearPeriodStream(BaseBulkStream):
 
 
 class TtmBulkStream(BaseBulkStream):
-    def post_process(self, row: dict, context: Context = None) -> dict:
-        row = {
-            (
-                (k[:-3].rstrip("_") + "_ttm")
-                if (k.lower().endswith("ttm") and not k.lower().endswith("_ttm"))
-                else k
-            ): v
-            for k, v in row.items()
-        }
-        return super().post_process(row, context)
+    pass
 
 
 class CompanyProfileBulkStream(PaginatedBulkStream):
@@ -464,7 +455,7 @@ class KeyMetricsTtmBulkStream(TtmBulkStream):
         "capex_to_depreciation_ttm",
         "capex_to_revenue_ttm",
         "sales_general_and_administrative_to_revenue_ttm",
-        "research_and_developement_to_revenue_ttm",
+        "research_and_development_to_revenue_ttm",
         "stock_based_compensation_to_revenue_ttm",
         "intangibles_to_total_assets_ttm",
         "days_of_sales_outstanding_ttm",
@@ -504,7 +495,7 @@ class KeyMetricsTtmBulkStream(TtmBulkStream):
         th.Property("capex_to_depreciation_ttm", th.NumberType),
         th.Property("capex_to_revenue_ttm", th.NumberType),
         th.Property("sales_general_and_administrative_to_revenue_ttm", th.NumberType),
-        th.Property("research_and_developement_to_revenue_ttm", th.NumberType),
+        th.Property("research_and_development_to_revenue_ttm", th.NumberType),
         th.Property("stock_based_compensation_to_revenue_ttm", th.NumberType),
         th.Property("intangibles_to_total_assets_ttm", th.NumberType),
         th.Property("average_receivables_ttm", th.NumberType),

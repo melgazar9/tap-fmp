@@ -2,13 +2,13 @@
 
 import typing as t
 
-from tap_fmp.client import SymbolPartitionStream, FmpRestStream
+from tap_fmp.client import CompanySymbolPartitionStream, FmpRestStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 from datetime import datetime
 
 
-class EsgStream(SymbolPartitionStream):
+class EsgStream(CompanySymbolPartitionStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
 

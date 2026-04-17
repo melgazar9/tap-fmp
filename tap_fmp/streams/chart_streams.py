@@ -1,4 +1,4 @@
-from tap_fmp.client import SymbolPartitionTimeSliceStream
+from tap_fmp.client import CompanySymbolPartitionTimeSliceStream
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.mixins import (
@@ -18,11 +18,13 @@ from tap_fmp.mixins import (
 # -------------------------
 
 
-class SecuritiesChartLightStream(ChartLightMixin, SymbolPartitionTimeSliceStream):
+class SecuritiesChartLightStream(
+    ChartLightMixin, CompanySymbolPartitionTimeSliceStream
+):
     name = "securities_chart_light"
 
 
-class SecuritiesChartFullStream(ChartFullMixin, SymbolPartitionTimeSliceStream):
+class SecuritiesChartFullStream(ChartFullMixin, CompanySymbolPartitionTimeSliceStream):
     name = "securities_chart_full"
 
 
@@ -42,13 +44,13 @@ class DividendAdjustedPriceMixin(BaseAdjustedPriceSchemaMixin):
 
 
 class SecuritiesUnadjustedPriceStream(
-    UnadjustedPriceMixin, SymbolPartitionTimeSliceStream
+    UnadjustedPriceMixin, CompanySymbolPartitionTimeSliceStream
 ):
     name = "securities_unadjusted_price"
 
 
 class SecuritiesDividendAdjustedPriceStream(
-    DividendAdjustedPriceMixin, SymbolPartitionTimeSliceStream
+    DividendAdjustedPriceMixin, CompanySymbolPartitionTimeSliceStream
 ):
     name = "securities_dividend_adjusted_prices"
 
@@ -58,25 +60,25 @@ class SecuritiesDividendAdjustedPriceStream(
 # -------------------------
 
 
-class Securities1minStream(Prices1minMixin, SymbolPartitionTimeSliceStream):
+class Securities1minStream(Prices1minMixin, CompanySymbolPartitionTimeSliceStream):
     name = "securities_prices_1min"
 
 
-class Securities5minStream(Prices5minMixin, SymbolPartitionTimeSliceStream):
+class Securities5minStream(Prices5minMixin, CompanySymbolPartitionTimeSliceStream):
     name = "securities_prices_5min"
 
 
-class Securities15minStream(Prices15minMixin, SymbolPartitionTimeSliceStream):
+class Securities15minStream(Prices15minMixin, CompanySymbolPartitionTimeSliceStream):
     name = "securities_prices_15min"
 
 
-class Securities30minStream(Prices30minMixin, SymbolPartitionTimeSliceStream):
+class Securities30minStream(Prices30minMixin, CompanySymbolPartitionTimeSliceStream):
     name = "securities_prices_30min"
 
 
-class Securities1HrStream(Prices1HrMixin, SymbolPartitionTimeSliceStream):
+class Securities1HrStream(Prices1HrMixin, CompanySymbolPartitionTimeSliceStream):
     name = "securities_prices_1h"
 
 
-class Securities4HrStream(Prices4HrMixin, SymbolPartitionTimeSliceStream):
+class Securities4HrStream(Prices4HrMixin, CompanySymbolPartitionTimeSliceStream):
     name = "securities_prices_4h"

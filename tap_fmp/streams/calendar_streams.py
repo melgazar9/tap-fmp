@@ -1,9 +1,9 @@
-from tap_fmp.client import SymbolPartitionStream, TimeSliceStream
+from tap_fmp.client import CompanySymbolPartitionStream, TimeSliceStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
 
-class CalendarStream(SymbolPartitionStream):
+class CalendarStream(CompanySymbolPartitionStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
 
@@ -110,6 +110,7 @@ class IPOsCalendarStream(TimeSliceCalendarStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ipos-calendar"
 
+
 class IPOsDisclosureStream(TimeSliceCalendarStream):
     name = "ipos_disclosure"
     replication_key = "filing_date"
@@ -129,6 +130,7 @@ class IPOsDisclosureStream(TimeSliceCalendarStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/ipos-disclosure"
+
 
 class IPOsProspectusStream(TimeSliceCalendarStream):
     name = "ipos_prospectus"

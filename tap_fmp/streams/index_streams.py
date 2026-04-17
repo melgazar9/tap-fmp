@@ -7,17 +7,18 @@ from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import (
     FmpSurrogateKeyStream,
-    SymbolPartitionTimeSliceStream,
-    SymbolPartitionStream,
+    BaseSymbolPartitionStream,
+    BaseSymbolPartitionTimeSliceStream,
 )
-from tap_fmp.streams.chart_streams import (
-    ChartLightMixin,
+from tap_fmp.mixins import (
+    BaseSymbolPartitionMixin,
     ChartFullMixin,
+    ChartLightMixin,
+    IndexConfigMixin,
+    Prices1HrMixin,
     Prices1minMixin,
     Prices5minMixin,
-    Prices1HrMixin,
 )
-from tap_fmp.mixins import BaseSymbolPartitionMixin, IndexConfigMixin
 
 
 class IndexListStream(IndexConfigMixin, FmpSurrogateKeyStream):
@@ -47,11 +48,11 @@ class IndexSymbolPartitionMixin(BaseSymbolPartitionMixin):
     def selection_field_name(self) -> str:
         return "select_index_symbols"
 
-    def get_cached_symbols(self) -> list[dict]:
+    def _partition_symbols(self) -> list[dict]:
         return self._tap.get_cached_indices()
 
 
-class IndexQuoteStream(IndexSymbolPartitionMixin, SymbolPartitionStream):
+class IndexQuoteStream(IndexSymbolPartitionMixin, BaseSymbolPartitionStream):
     """Index Quote API - Real-time stock index quotes."""
 
     name = "index_quote"
@@ -83,7 +84,7 @@ class IndexQuoteStream(IndexSymbolPartitionMixin, SymbolPartitionStream):
         return f"{self.url_base}/stable/quote"
 
 
-class IndexShortQuoteStream(IndexSymbolPartitionMixin, SymbolPartitionStream):
+class IndexShortQuoteStream(IndexSymbolPartitionMixin, BaseSymbolPartitionStream):
     """Index Short Quote API - Concise stock index quotes."""
 
     name = "index_short_quote"
@@ -122,7 +123,7 @@ class AllIndexQuotesStream(FmpSurrogateKeyStream):
 class HistoricalIndexLightChartStream(
     IndexSymbolPartitionMixin,
     ChartLightMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """Historical Index Light Chart API - End-of-day historical prices for stock indexes."""
 
@@ -133,7 +134,7 @@ class HistoricalIndexLightChartStream(
 
 
 class HistoricalIndexFullChartStream(
-    IndexSymbolPartitionMixin, ChartFullMixin, SymbolPartitionTimeSliceStream
+    IndexSymbolPartitionMixin, ChartFullMixin, BaseSymbolPartitionTimeSliceStream
 ):
     """Historical Index Full Chart API - Full historical end-of-day prices for stock indexes."""
 
@@ -146,7 +147,7 @@ class HistoricalIndexFullChartStream(
 class Index1MinuteIntervalStream(
     IndexSymbolPartitionMixin,
     Prices1minMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """1-Minute Interval Index Price API - 1-minute interval intraday data for stock indexes."""
 
@@ -159,7 +160,7 @@ class Index1MinuteIntervalStream(
 class Index5MinuteIntervalStream(
     IndexSymbolPartitionMixin,
     Prices5minMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """5-Minute Interval Index Price API - 5-minute interval intraday data for stock indexes."""
 
@@ -172,7 +173,7 @@ class Index5MinuteIntervalStream(
 class Index1HourIntervalStream(
     IndexSymbolPartitionMixin,
     Prices1HrMixin,
-    SymbolPartitionTimeSliceStream,
+    BaseSymbolPartitionTimeSliceStream,
 ):
     """1-Hour Interval Index Price API - 1-hour interval intraday data for stock indexes."""
 

@@ -7,9 +7,9 @@ from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import (
     FmpRestStream,
-    SymbolPartitionStream,
     TimeSliceStream,
-    SymbolPartitionTimeSliceStream,
+    CompanySymbolPartitionStream,
+    CompanySymbolPartitionTimeSliceStream,
 )
 
 
@@ -27,18 +27,12 @@ class BaseSecFilingTimeSliceStream(TimeSliceStream):
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("cik", th.StringType),
-        th.Property("acceptance_time", th.DateTimeType),
-        th.Property("period_ending", th.DateType),
-        th.Property("company_name", th.StringType),
         th.Property("form_type", th.StringType),
         th.Property("filing_date", th.DateTimeType),
-        th.Property("ticker", th.StringType),
-        th.Property("exchange", th.StringType),
-        th.Property("filename", th.StringType),
+        th.Property("accepted_date", th.DateTimeType),
         th.Property("link", th.StringType),
-        th.Property("accepted_date", th.StringType),
+        th.Property("final_link", th.StringType),
         th.Property("has_financials", th.BooleanType),
-        th.Property("final_link", th.BooleanType),
     ).to_dict()
 
 
@@ -117,7 +111,7 @@ class SecFilingsByFormTypeStream(SecFilingFormTypePartitionMixin):
         return f"{self.url_base}/stable/sec-filings-search/form-type"
 
 
-class SecFilingsBySymbolStream(SymbolPartitionTimeSliceStream):
+class SecFilingsBySymbolStream(CompanySymbolPartitionTimeSliceStream):
     """Stream for SEC Filings By Symbol API."""
 
     name = "sec_filings_by_symbol"
@@ -154,17 +148,11 @@ class SecFilingsByCikStream(TimeSliceStream):
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("cik", th.StringType),
-        th.Property("acceptance_time", th.DateTimeType),
-        th.Property("final_link", th.StringType),
-        th.Property("accepted_date", th.DateTimeType),
-        th.Property("period_ending", th.DateType),
-        th.Property("company_name", th.StringType),
         th.Property("form_type", th.StringType),
         th.Property("filing_date", th.DateTimeType),
-        th.Property("ticker", th.StringType),
-        th.Property("exchange", th.StringType),
-        th.Property("filename", th.StringType),
+        th.Property("accepted_date", th.DateTimeType),
         th.Property("link", th.StringType),
+        th.Property("final_link", th.StringType),
     ).to_dict()
 
     @property
@@ -190,7 +178,6 @@ class SecFilingsByNameStream(FmpRestStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
-        th.Property("company", th.StringType),
         th.Property("name", th.StringType),
         th.Property("cik", th.StringType),
         th.Property("sic_code", th.StringType),
@@ -204,18 +191,14 @@ class SecFilingsByNameStream(FmpRestStream):
 
     @property
     def partitions(self) -> list[dict] | None:
-        ### I don't see a way to get all "name" values from FMP ###
-        names = self.stream_config.get("other_params", {}).get("names")
-        if not names:
-            names = ["Berkshire"]
-        return [{"company": name} for name in names]
+        return self._resolve_name_partitions(output_key="company")
 
     def get_records(self, context: Context | None):
         self.query_params.update(context)
         return super().get_records(context)
 
 
-class SecFilingsCompanySearchBySymbolStream(SymbolPartitionStream):
+class SecFilingsCompanySearchBySymbolStream(CompanySymbolPartitionStream):
     """Stream for SEC Filings Company Search By Symbol API."""
 
     name = "sec_filings_company_search_by_symbol"
@@ -267,7 +250,7 @@ class SecFilingsCompanySearchByCikStream(FmpRestStream):
         return super().get_records(context)
 
 
-class SecCompanyFullProfileStream(SymbolPartitionStream):
+class SecCompanyFullProfileStream(CompanySymbolPartitionStream):
     """Stream for SEC Company Full Profile API."""
 
     name = "sec_company_full_profile"
@@ -334,10 +317,7 @@ class IndustryClassificationListStream(FmpRestStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("sic", th.StringType),
         th.Property("industry_title", th.StringType),
-        th.Property("major_group", th.StringType),
-        th.Property("division", th.StringType),
         th.Property("office", th.StringType),
         th.Property("sic_code", th.StringType),
     ).to_dict()

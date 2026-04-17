@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream
+from tap_fmp.client import FmpRestStream, CompanySymbolPartitionStream
 
 
 class BaseSenateStream(FmpRestStream):
@@ -40,38 +40,7 @@ class SenateNamePartitionMixin(FmpRestStream):
 
     @property
     def partitions(self):
-        query_params_name = self.query_params.get("name")
-        other_params_names = self.config.get("other_params", {}).get("names")
-
-        assert not (query_params_name and other_params_names), (
-            f"Cannot specify name configurations in both query_params and "
-            f"other_params for stream {self.name}."
-        )
-
-        if query_params_name:
-            return (
-                [{"name": query_params_name}]
-                if isinstance(query_params_name, str)
-                else query_params_name
-            )
-        elif other_params_names:
-            return (
-                [{"name": name} for name in other_params_names]
-                if isinstance(other_params_names, list)
-                else other_params_names
-            )
-        else:
-            default_names = [
-                "Nancy",
-                "Chuck",
-                "Mitch",
-                "Kevin",
-                "Alexandria",
-                "Ted",
-                "Elizabeth",
-                "Bernie",
-            ]
-            return [{"name": name} for name in default_names]
+        return self._resolve_name_partitions()
 
     def get_records(self, context: Context | None):
         self.query_params.update(context)
@@ -96,7 +65,7 @@ class LatestHouseDisclosuresStream(BaseSenateStream):
         return f"{self.url_base}/stable/house-latest"
 
 
-class SenateTradingActivityStream(SymbolPartitionStream):
+class SenateTradingActivityStream(CompanySymbolPartitionStream):
     """Stream for Senate Trading Activity API."""
 
     name = "senate_trading_activity"
@@ -156,7 +125,7 @@ class SenateTradesByNameStream(SenateNamePartitionMixin):
         return f"{self.url_base}/stable/senate-trades-by-name"
 
 
-class HouseTradesStream(SymbolPartitionStream):
+class HouseTradesStream(CompanySymbolPartitionStream):
     """Stream for U.S. House Trades API."""
 
     name = "house_trades"

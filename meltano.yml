@@ -426,7 +426,7 @@ plugins:
       company_symbols:
         select_symbols: ["NVDA", "META", "AAPL"]
 
-      indices:
+      index_symbols:
         select_index_symbols: ["^GSPC", "^DJI", "^IXIC"]  # S&P 500, Dow Jones, NASDAQ
 
       etf_symbols:
@@ -510,7 +510,7 @@ plugins:
           # Starter: Symbol Limited to US Exchanges
           # Premium: Symbol Limited to US, UK, and Canada Exchanges
 
-      ratings_snapshot:
+      rating_snapshot:
         query_params:
           limit: 10  # max may change depending on plan
 
@@ -962,27 +962,6 @@ plugins:
 
       forex_news:
         query_params:
-          from: "2025-01-06"
-          to: "2025-01-07"
-          limit: 250
-
-      search_stock_news:
-        query_params:
-          symbols: ["AAPL", "META"]
-          from: "2025-01-06"
-          to: "2025-01-07"
-          limit: 250
-
-      search_crypto_news:
-        query_params:
-          symbols: ["BTCUSD", "ETHUSD"]
-          from: "2025-01-06"
-          to: "2025-01-07"
-          limit: 250
-
-      search_forex_news:
-        query_params:
-          symbols: "EURUSD"
           from: "2025-01-06"
           to: "2025-01-07"
           limit: 250

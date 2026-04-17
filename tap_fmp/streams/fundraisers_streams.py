@@ -73,28 +73,6 @@ class LatestCrowdfundingCampaignsStream(FmpRestStream):
         return f"{self.url_base}/stable/crowdfunding-offerings-latest"
 
 
-# class CrowdfundingCampaignSearchStream(FmpRestStream):
-#     """Stream for Crowdfunding Campaign Search API."""
-#
-#     name = "crowdfunding_campaign_search"
-#     primary_keys = ["surrogate_key"]
-#     _add_surrogate_key = True
-#
-#     schema = th.PropertiesList(
-#         th.Property("surrogate_key", th.StringType, required=True),
-#         th.Property("cik", th.StringType),
-#         th.Property("name", th.StringType),
-#         th.Property("date", th.DateTimeType),
-#     ).to_dict()
-#
-#     def get_url(self, context: Context | None = None) -> str:
-#         return f"{self.url_base}/stable/crowdfunding-offerings-search"
-#
-#     @property
-#     def partitions(self) -> list[dict] | None:
-#         return [{"name": n["name"]} for n in self.get_names()]
-
-
 class CrowdfundingByCikStream(FmpRestStream):
     """Stream for Crowdfunding By CIK API."""
 
@@ -234,28 +212,6 @@ class EquityOfferingUpdatesStream(FmpRestStream):
         if context:
             self.query_params.update(context)
         return super().get_records(context)
-
-
-# class EquityOfferingSearchStream(FmpRestStream):
-#     """Stream for Equity Offering Search API."""
-#
-#     name = "equity_offering_search"
-#     primary_keys = ["surrogate_key"]
-#     _add_surrogate_key = True
-#
-#     schema = th.PropertiesList(
-#         th.Property("surrogate_key", th.StringType, required=True),
-#         th.Property("cik", th.StringType),
-#         th.Property("name", th.StringType),
-#         th.Property("date", th.DateTimeType),
-#     ).to_dict()
-#
-#     def get_url(self, context: Context | None = None) -> str:
-#         return f"{self.url_base}/stable/fundraising-search"
-#
-#     @property
-#     def partitions(self) -> list[dict] | None:
-#         return [{"name": n["cik"]} for n in self.get_names()]
 
 
 class EquityOfferingByCikStream(FmpRestStream):

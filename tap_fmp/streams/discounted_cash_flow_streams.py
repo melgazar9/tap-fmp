@@ -1,9 +1,9 @@
-from tap_fmp.client import SymbolPartitionStream
+from tap_fmp.client import CompanySymbolPartitionStream
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
 
-class DcfValuationStream(SymbolPartitionStream):
+class DcfValuationStream(CompanySymbolPartitionStream):
     name = "dcf_valuation"
     primary_keys = ["symbol", "date"]
 
@@ -25,7 +25,7 @@ class LeveredDcfStream(DcfValuationStream):
         return f"{self.url_base}/stable/levered-discounted-cash-flow"
 
 
-class CustomDcfStream(SymbolPartitionStream):
+class CustomDcfStream(CompanySymbolPartitionStream):
     """There are many query parameters for this endpoint. For simplicity, we'll use the defaults."""
 
     name = "custom_dcf"
@@ -86,11 +86,6 @@ class CustomDcfStream(SymbolPartitionStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/custom-discounted-cash-flow"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        if "costof_debt" in row:
-            row["cost_of_debt"] = row.pop("costof_debt")
-        return super().post_process(row)
 
 
 class CustomDcfLeveredStream(CustomDcfStream):

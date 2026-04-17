@@ -2,9 +2,9 @@ import typing as t
 
 from tap_fmp.client import (
     FmpRestStream,
-    SymbolPartitionStream,
-    SymbolPartitionTimeSliceStream,
     IncrementalYearStream,
+    CompanySymbolPartitionStream,
+    CompanySymbolPartitionTimeSliceStream,
 )
 
 from singer_sdk.helpers.types import Context
@@ -13,12 +13,17 @@ from singer_sdk import typing as th
 from tap_fmp.mixins import BatchSymbolPartitionMixin, CompanyBatchStreamMixin
 
 
-class CompanySymbolPartitionStream(SymbolPartitionStream):
+class CompanySymbolSurrogateKeyStream(CompanySymbolPartitionStream):
+    """Company-symbol stream that uses an auto-generated surrogate key as PK.
+    Most company endpoints don't expose a stable natural primary key, so we
+    hash the record. Subclass this instead of `CompanySymbolPartitionStream`
+    when no natural PK is available."""
+
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
 
 
-class CompanyProfileBySymbolStream(CompanySymbolPartitionStream):
+class CompanyProfileBySymbolStream(CompanySymbolSurrogateKeyStream):
     name = "company_profile_by_symbol"
 
     schema = th.PropertiesList(
@@ -127,7 +132,7 @@ class CikProfileStream(FmpRestStream):
         return super().post_process(row, context)
 
 
-class CompanyNotesStream(CompanySymbolPartitionStream):
+class CompanyNotesStream(CompanySymbolSurrogateKeyStream):
     name = "company_notes"
 
     schema = th.PropertiesList(
@@ -142,7 +147,7 @@ class CompanyNotesStream(CompanySymbolPartitionStream):
         return f"{self.url_base}/stable/company-notes"
 
 
-class StockPeerComparisonStream(CompanySymbolPartitionStream):
+class StockPeerComparisonStream(CompanySymbolSurrogateKeyStream):
     name = "stock_peer_comparison"
 
     schema = th.PropertiesList(
@@ -176,7 +181,7 @@ class DelistedCompaniesStream(FmpRestStream):
         return f"{self.url_base}/stable/delisted-companies"
 
 
-class CompanyEmployeeCountStream(CompanySymbolPartitionStream):
+class CompanyEmployeeCountStream(CompanySymbolSurrogateKeyStream):
     name = "company_employee_count"
 
     schema = th.PropertiesList(
@@ -203,7 +208,7 @@ class CompanyHistoricalEmployeeCountStream(CompanyEmployeeCountStream):
         return f"{self.url_base}/stable/historical-employee-count"
 
 
-class CompanyMarketCapStream(SymbolPartitionStream):
+class CompanyMarketCapStream(CompanySymbolSurrogateKeyStream):
     name = "company_market_cap"
     primary_keys = ["symbol", "date"]
 
@@ -233,7 +238,7 @@ class CompanyBatchMarketCapStream(
         return f"{self.url_base}/stable/market-capitalization-batch"
 
 
-class HistoricalMarketCapStream(SymbolPartitionTimeSliceStream):
+class HistoricalMarketCapStream(CompanySymbolPartitionTimeSliceStream):
     name = "historical_market_cap"
     primary_keys = ["symbol", "date"]
 
@@ -247,7 +252,7 @@ class HistoricalMarketCapStream(SymbolPartitionTimeSliceStream):
         return f"{self.url_base}/stable/historical-market-capitalization"
 
 
-class CompanyShareAndLiquidityFloatStream(CompanySymbolPartitionStream):
+class CompanyShareAndLiquidityFloatStream(CompanySymbolSurrogateKeyStream):
     name = "company_share_and_liquidity_float"
 
     schema = th.PropertiesList(
@@ -307,17 +312,25 @@ class LatestMergersAndAcquisitionsStream(FmpRestStream):
 
 
 class SearchMergersAndAcquisitionsStream(LatestMergersAndAcquisitionsStream):
-    """Ignore this stream, it's just here as a placeholder to show it exists."""
+    """Search M&A events by name. Requires `other_params.names` in meltano.yml."""
 
     name = "search_mergers_and_acquisitions"
     primary_keys = ["surrogate_key"]
     _paginate = False
 
+    @property
+    def partitions(self):
+        return self._resolve_name_partitions()
+
+    def get_records(self, context: Context | None):
+        self.query_params.update(context)
+        return super().get_records(context)
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/mergers-acquisitions-search"
 
 
-class CompanyExecutiveStream(CompanySymbolPartitionStream):
+class CompanyExecutiveStream(CompanySymbolSurrogateKeyStream):
     name = "company_executives"
 
     schema = th.PropertiesList(
@@ -329,13 +342,14 @@ class CompanyExecutiveStream(CompanySymbolPartitionStream):
         th.Property("gender", th.StringType),
         th.Property("year_born", th.IntegerType),
         th.Property("active", th.BooleanType),
+        th.Property("title_since", th.DateTimeType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/key-executives"
 
 
-class ExecutiveCompensationStream(CompanySymbolPartitionStream):
+class ExecutiveCompensationStream(CompanySymbolSurrogateKeyStream):
     name = "executive_compensation"
 
     schema = th.PropertiesList(

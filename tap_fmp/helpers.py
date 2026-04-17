@@ -1,5 +1,6 @@
 import re
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from datetime import datetime, timedelta
 import logging
@@ -8,24 +9,108 @@ import typing as t
 import csv
 
 
-def clean_strings(lst):
-    cleaned_list = []
-    for s in lst:
-        cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", s)
+# Financial acronyms FMP can smash together in field names (e.g. "EBITDATTM").
+# The standard camelCase rules can't find a boundary between two all-caps runs,
+# so adjacent acronyms collapse into one token and the schema field silently
+# never populates. We split after a known acronym only when it's directly
+# followed by another uppercase letter.
+#
+# Acronyms that are prefixes of longer ones (e.g. EBIT ⊂ EBITDA, ROI ⊂ ROIC)
+# need a negative lookahead for the extension, otherwise regex backtracking
+# would match the shorter one and split mid-word ("ROIC" -> "ROI_C").
+_FINANCIAL_ACRONYMS = (
+    "EBITDA",
+    "NOPAT",
+    "ROIC",
+    "EBIT",
+    "EBT",
+    "TTM",
+    "EPS",
+    "ROE",
+    "ROA",
+    "ROI",
+    "EV",
+    "NAV",
+    "DCF",
+    "FCF",
+    "IPO",
+    "ESG",
+    "ETF",
+    "REIT",
+    "ADR",
+    "GAAP",
+    "IFRS",
+)
+
+
+def _compile_acronym_split_re(acronyms):
+    # Split after a known acronym when it's followed by either:
+    #   - another uppercase letter (smashed acronym pair, e.g. EBITDATTM),
+    #   - two+ lowercase letters (acronym glued to a word, e.g. EBITstart,
+    #     ADRholdings). Single trailing lowercase is ignored so plurals like
+    #     ETFs/NAVs/IPOs stay intact.
+    parts = []
+    for a in sorted(acronyms, key=len, reverse=True):
+        extensions = [o[len(a) :] for o in acronyms if o != a and o.startswith(a)]
+        parts.append(f"{a}(?!{'|'.join(extensions)})" if extensions else a)
+    return re.compile(r"(" + "|".join(parts) + r")(?=[A-Z]|[a-z]{2})")
+
+
+_ACRONYM_SPLIT_RE = _compile_acronym_split_re(_FINANCIAL_ACRONYMS)
+# All listed acronyms are 2+ uppercase letters, so a string with no two
+# adjacent uppercase letters can never match. Cheap pre-check to skip the
+# heavier alternation regex on the common case (camelCase keys).
+_HAS_UPPER_RUN_RE = re.compile(r"[A-Z]{2}")
+
+# Canonical renames for keys that the camelCase converter can't fix because the
+# original FMP key is itself malformed (typos, smashed lowercase, missing
+# separators). Applied AFTER clean_strings so left-hand side is the
+# converter's output and right-hand side is the documented column name.
+# Each entry should have a short comment explaining why FMP emits the bad form.
+_FMP_KEY_RENAMES = {
+    # FMP typo: "developement" -> "development"
+    "research_and_developement_to_revenue": "research_and_development_to_revenue",
+    "research_and_developement_to_revenue_ttm": "research_and_development_to_revenue_ttm",  # noqa: E501
+    # /stable/financial-growth emits these all-lowercase; converter can't split
+    "ebitgrowth": "ebit_growth",
+    "epsgrowth": "eps_growth",
+    "epsdiluted_growth": "eps_diluted_growth",
+    "rdexpense_growth": "rd_expense_growth",
+    "sgaexpenses_growth": "sga_expenses_growth",
+    # /stable/financial-growth emits "perShare" with lowercase "per"
+    "book_valueper_share_growth": "book_value_per_share_growth",
+    "ten_y_dividendper_share_growth_per_share": "ten_y_dividend_per_share_growth_per_share",  # noqa: E501
+    "five_y_dividendper_share_growth_per_share": "five_y_dividend_per_share_growth_per_share",  # noqa: E501
+    "three_y_dividendper_share_growth_per_share": "three_y_dividend_per_share_growth_per_share",  # noqa: E501
+    # custom-dcf emits "costofDebt" with lowercase "of"
+    "costof_debt": "cost_of_debt",
+    # commitment-of-traders analysis emits "netPostion" (typo)
+    "net_postion": "net_position",
+}
+
+
+@lru_cache(maxsize=4096)
+def _clean_one(s: str) -> str:
+    """Convert a single key to snake_case + apply FMP-typo renames.
+    Cached because FMP responses repeat the same ~50-200 key strings across
+    millions of records during a full sync; this is the hot path."""
+    cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", s)
+    if _HAS_UPPER_RUN_RE.search(cleaned):
+        cleaned = _ACRONYM_SPLIT_RE.sub(r"\1_", cleaned)
         cleaned = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", cleaned)
-        cleaned = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cleaned)
-        cleaned = re.sub(r"_+", "_", cleaned).strip("_").lower()
-        cleaned_list.append(cleaned)
-    return cleaned_list
+    cleaned = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cleaned)
+    cleaned = re.sub(r"_+", "_", cleaned).strip("_").lower()
+    return _FMP_KEY_RENAMES.get(cleaned, cleaned)
+
+
+def clean_strings(lst):
+    return [_clean_one(s) for s in lst]
 
 
 def clean_json_keys(data: list[dict]) -> list[dict]:
     def clean_nested_dict(obj):
         if isinstance(obj, dict):
-            return {
-                new_key: clean_nested_dict(value)
-                for new_key, value in zip(clean_strings(obj.keys()), obj.values())
-            }
+            return {_clean_one(k): clean_nested_dict(v) for k, v in obj.items()}
         elif isinstance(obj, list):
             return [clean_nested_dict(item) for item in obj]
         else:
@@ -147,6 +232,7 @@ class ExchangeVariantsManager:
         """Load exchange variants from PostgreSQL database."""
         try:
             import psycopg2
+            from psycopg2 import sql
             from psycopg2.extras import RealDictCursor
         except ImportError:
             self.logger.error(
@@ -166,15 +252,21 @@ class ExchangeVariantsManager:
             schema = self.db_config.get("schema", "public")
             table = self.db_config.get("table", "exchange_variants")
 
+            # Use psycopg2.sql.Identifier rather than f-string interpolation:
+            # config-sourced identifiers are still untrusted at the SQL layer
+            # (typo/escape errors, future config-from-env-var). Identifier()
+            # quotes them safely.
+            query = sql.SQL(
+                "SELECT DISTINCT symbol, currency, cik, exchange, "
+                "exchange_short_name, industry, country, ipo_date, is_fund "
+                "FROM {schema}.{table} ORDER BY symbol"
+            ).format(
+                schema=sql.Identifier(schema),
+                table=sql.Identifier(table),
+            )
+
             with psycopg2.connect(**connection_params) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                    query = f"""
-                        SELECT DISTINCT
-                            symbol, currency, cik, exchange, exchange_short_name,
-                            industry, country, ipo_date, is_fund
-                        FROM {schema}.{table}
-                        ORDER BY symbol
-                    """
                     cursor.execute(query)
                     rows = cursor.fetchall()
 

@@ -114,17 +114,19 @@ from tap_fmp.streams.statements_streams import (
     AsReportedBalanceStatementsStream,
     AsReportedCashflowStatementsStream,
     AsReportedFinancialStatementsStream,
+    FinancialStatementGrowthStream,
+    LatestFinancialStatementsStream,
 )
 
 from tap_fmp.streams.form_13f_streams import (
     InstitutionalOwnershipFilingsStream,
     FilingsExtractStream,
-    Form13fFilingDates,
+    Form13fFilingDatesStream,
     HolderPerformanceSummaryStream,
     HolderIndustryBreakdownStream,
     PositionsSummaryStream,
     IndustryPerformanceSummaryStream,
-    Form13fFilingExtractsWithAnalytics,
+    Form13fFilingExtractsWithAnalyticsStream,
 )
 
 from tap_fmp.streams.chart_streams import (
@@ -427,15 +429,15 @@ class TapFMP(Tap):
         """Build a fingerprint from the stream's effective parsed config."""
         qp = getattr(stream, "query_params", {})
         op = getattr(stream, "other_params", {})
-        normalized_qp = {
-            k: str(v) for k, v in sorted(qp.items()) if k != "apikey"
-        }
-        return compute_fingerprint({
-            "stream_name": stream.name,
-            "base_url": self.config.get("base_url", ""),
-            "query_params": normalized_qp,
-            "other_params": {k: str(v) for k, v in sorted(op.items())},
-        })
+        normalized_qp = {k: str(v) for k, v in sorted(qp.items()) if k != "apikey"}
+        return compute_fingerprint(
+            {
+                "stream_name": stream.name,
+                "base_url": self.config.get("base_url", ""),
+                "query_params": normalized_qp,
+                "other_params": {k: str(v) for k, v in sorted(op.items())},
+            }
+        )
 
     def _get_cached_data(self, config: dict) -> t.List[dict]:
         """Generic thread-safe caching with configuration and optional L2 disk cache."""
@@ -465,7 +467,9 @@ class TapFMP(Tap):
 
                     if self._disk_cache is not None:
                         fingerprint = self._build_cache_fingerprint(stream)
-                        cache_key = f"symbols/{data_type.replace(' ', '_')}/{fingerprint}"
+                        cache_key = (
+                            f"symbols/{data_type.replace(' ', '_')}/{fingerprint}"
+                        )
                         cached_data = self._disk_cache.get_or_fetch(cache_key, _fetch)
                     else:
                         cached_data = _fetch()
@@ -731,7 +735,7 @@ class TapFMP(Tap):
                 "data_type": "indices",
                 "sort_key": "symbol",
                 "apply_filtering": True,
-                "filter_config_key": "indices",
+                "filter_config_key": "index_symbols",
             }
         )
 
@@ -933,18 +937,20 @@ class TapFMP(Tap):
             AsReportedCashflowStatementsStream(self),
             AsReportedFinancialStatementsStream(self),
             BalanceSheetTtmStream(self),
+            FinancialStatementGrowthStream(self),
+            LatestFinancialStatementsStream(self),
 
 
             ### Form 13F Streams ###
 
             InstitutionalOwnershipFilingsStream(self),
             FilingsExtractStream(self),
-            Form13fFilingDates(self),
+            Form13fFilingDatesStream(self),
             HolderPerformanceSummaryStream(self),
             HolderIndustryBreakdownStream(self),
             PositionsSummaryStream(self),
             IndustryPerformanceSummaryStream(self),
-            Form13fFilingExtractsWithAnalytics(self),
+            Form13fFilingExtractsWithAnalyticsStream(self),
 
 
             ### Index Streams ###

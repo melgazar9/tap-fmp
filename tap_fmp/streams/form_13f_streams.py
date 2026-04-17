@@ -139,7 +139,7 @@ class FilingsExtractStream(Form13fCikPartitionStream):
         return f"{self.url_base}/stable/institutional-ownership/extract"
 
 
-class Form13fFilingDates(FmpSurrogateKeyStream):
+class Form13fFilingDatesStream(FmpSurrogateKeyStream):
     """Form 13F Filing Dates API - List of available SEC filings for institutional ownership."""
 
     name = "form_13f_filing_dates"
@@ -168,7 +168,7 @@ class Form13fFilingDates(FmpSurrogateKeyStream):
         return super().post_process(record, context)
 
 
-class Form13fFilingExtractsWithAnalytics(Form13fSymbolPartitionStream):
+class Form13fFilingExtractsWithAnalyticsStream(Form13fSymbolPartitionStream):
     name = "form_13f_filings_extracts_with_analytics"
 
     primary_keys = ["surrogate_key"]

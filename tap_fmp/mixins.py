@@ -14,7 +14,7 @@ class SelectableStreamMixin(ABC):
     Classes using this mixin must have:
     - self.config: dict
     - self.post_process(record: dict) -> dict method
-    - self._check_missing_fields(schema: dict, record: dict) method
+    - self._check_missing_fields(record: dict) method
     - self.schema: dict property
     """
 
@@ -86,7 +86,7 @@ class SelectableStreamMixin(ABC):
             for item in selected_items:
                 record = self.create_record_from_item(item)
                 record = self.post_process(record, context)
-                self._check_missing_fields(self.schema, record)
+                self._check_missing_fields(record)
                 yield record
 
 
@@ -99,11 +99,11 @@ class BaseSymbolPartitionMixin(ABC):
     name: str
 
     @abstractmethod
-    def get_cached_company_symbols(self) -> list[dict]:
-        """Get symbols from the specific cache method. Must be implemented by subclasses."""
-        raise NotImplementedError(
-            "get_cached_company_symbols must be implemented by subclass."
-        )
+    def _partition_symbols(self) -> list[dict]:
+        """Return the symbol universe to partition this stream over. Each
+        subclass calls the appropriate asset-specific tap cache (e.g.
+        `_tap.get_cached_indices`, `_tap.get_cached_etf_symbols`)."""
+        raise NotImplementedError("_partition_symbols must be implemented by subclass.")
 
     @property
     def selection_config_section(self) -> str | None:
@@ -149,31 +149,27 @@ class BaseSymbolPartitionMixin(ABC):
                 else [{"symbol": other_params_symbols}]
             )
         else:
-            cached_company_symbols = self.get_cached_company_symbols()
-            return [{"symbol": c.get("symbol")} for c in cached_company_symbols]
+            return [{"symbol": c.get("symbol")} for c in self._partition_symbols()]
 
 
-class SymbolPartitionMixin(BaseSymbolPartitionMixin):
-    """Mixin for streams that partition data by symbols, using company symbols as default."""
+class CompanySymbolPartitionMixin(BaseSymbolPartitionMixin):
+    """Partitions over the company stock universe."""
 
-    def get_cached_company_symbols(self) -> list[dict]:
-        """Get symbols from cached company symbols."""
+    def _partition_symbols(self) -> list[dict]:
         return self._tap.get_cached_company_symbols()
 
 
 class FinancialStatementSymbolPartitionMixin(BaseSymbolPartitionMixin):
-    """Mixin for financial statement streams that use only symbols with available financial data."""
+    """Partitions over symbols that have financial statements available."""
 
-    def get_cached_company_symbols(self) -> list[dict]:
-        """Get symbols from cached financial statement symbols (optimized for financial data)."""
+    def _partition_symbols(self) -> list[dict]:
         return self._tap.get_cached_financial_statement_symbols()
 
 
 class TranscriptSymbolPartitionMixin(BaseSymbolPartitionMixin):
-    """Mixin for earnings transcript streams that use only symbols with available transcript data."""
+    """Partitions over symbols that have earnings transcripts available."""
 
-    def get_cached_company_symbols(self) -> list[dict]:
-        """Get symbols from cached transcript symbols (optimized for transcript data)."""
+    def _partition_symbols(self) -> list[dict]:
         return self._tap.get_cached_transcript_symbols()
 
 

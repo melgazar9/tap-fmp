@@ -8,7 +8,10 @@ from singer_sdk.helpers.types import Context
 from singer_sdk.streams import RESTStream
 from singer_sdk import Tap
 from tap_fmp.helpers import clean_json_keys, generate_surrogate_key
-from tap_fmp.mixins import SymbolPartitionMixin
+from tap_fmp.mixins import (
+    BaseSymbolPartitionMixin,
+    CompanySymbolPartitionMixin,
+)
 import typing as t
 import logging
 import requests
@@ -18,15 +21,27 @@ import time
 import random
 import csv
 import io
+from functools import cached_property
+
+# Tokens matched by the Dagster sensor wired to ERROR-level log lines.
+# Tests import these constants instead of re-spelling the strings.
+SCHEMA_DRIFT_TOKEN = "*** SCHEMA_DRIFT ***"
+DATA_TRUNCATED_TOKEN = "*** DATA_TRUNCATED ***"
+
+# Process-global dedup for schema-drift alerts. Keyed by (stream_name,
+# frozenset(missing_fields)) so each unique drift fires exactly one ERROR log
+# per process. Without this, a drifted field would log millions of duplicate
+# lines (one per record) and flood Dagster.
+_SCHEMA_DRIFT_SEEN: set[tuple[str, frozenset[str]]] = set()
+_SCHEMA_DRIFT_LOCK = threading.Lock()
 
 
 class FmpRestStream(RESTStream, ABC):
     """FMP stream class with symbol partitioning support."""
 
-    _use_cached_symbols_default = False
     _paginate = False
     _add_surrogate_key = False
-    _max_pages = 10000  # prevent infinite loops
+    _max_pages = 10000
     _paginate_key = "page"
     _replication_key_starting_name = "from"
     _replication_key_ending_name = "to"
@@ -34,7 +49,6 @@ class FmpRestStream(RESTStream, ABC):
 
     def __init__(self, tap: Tap) -> None:
         super().__init__(tap)
-        self._all_symbols = None
         self.parse_config_params()
 
         self._min_interval = float(self.config.get("min_throttle_seconds", 0.01))
@@ -45,26 +59,6 @@ class FmpRestStream(RESTStream, ABC):
     def stream_config(self) -> dict:
         """Get configuration for this specific stream."""
         return self.config.get(self.name, {})
-
-    @property
-    def use_cached_symbols(self) -> bool:
-        """Whether to use cached symbols for this stream."""
-
-        if "use_cached_symbols" in self.stream_config:
-            use_cached_symbols = self.stream_config["use_cached_symbols"]
-            if not isinstance(use_cached_symbols, bool):
-                raise ConfigValidationError(
-                    f"Config for {self.name}.use_cached_symbols must be bool, "
-                    f"got {type(use_cached_symbols)}"
-                )
-            return use_cached_symbols
-
-        if hasattr(type(self), "_use_cached_symbols_default"):
-            return getattr(type(self), "_use_cached_symbols_default")
-
-        raise AttributeError(
-            f"use_cached_symbols is not defined for stream {self.name}"
-        )
 
     @property
     def url_base(self) -> str:
@@ -101,22 +95,64 @@ class FmpRestStream(RESTStream, ABC):
 
         self.query_params["apikey"] = self.config.get("api_key")
 
-    def _check_missing_fields(self, schema: dict, record: dict):
-        """Validate record against schema and handle missing fields."""
-        schema_fields = set(schema.get("properties", {}).keys())
-        record_keys = set(record.keys())
-        missing_in_record = schema_fields - record_keys
+    @cached_property
+    def _schema_field_set(self) -> frozenset[str]:
+        return frozenset(self.schema.get("properties", {}).keys())
+
+    def _resolve_name_partitions(self, output_key: str = "name") -> list[dict]:
+        """Build a `[{output_key: name}, ...]` partition list from
+        `query_params.name` (singular) or `stream_config.other_params.names`
+        (list). Raises `ConfigValidationError` if both are set or if neither
+        is set, since FMP exposes no way to enumerate valid name values for
+        these streams."""
+        query_name = self.query_params.get("name")
+        other_names = self.stream_config.get("other_params", {}).get("names")
+        if query_name and other_names:
+            raise ConfigValidationError(
+                f"Stream {self.name}: specify either query_params.name OR "
+                f"other_params.names, not both."
+            )
+        if query_name:
+            names = [query_name] if isinstance(query_name, str) else query_name
+            return [{output_key: n} for n in names]
+        if other_names:
+            names = other_names if isinstance(other_names, list) else [other_names]
+            return [{output_key: n} for n in names]
+        raise ConfigValidationError(
+            f"Stream {self.name} requires query_params.name or "
+            f"other_params.names in meltano.yml. FMP doesn't expose a way to "
+            f"enumerate valid name values for this stream."
+        )
+
+    def _check_missing_fields(self, record: dict):
+        """Log SCHEMA_DRIFT once per unique (stream, missing-field-set) when
+        the record carries fields absent from the declared schema. Also emits
+        a DEBUG log for schema fields absent from the record (only if DEBUG is
+        enabled, since it runs on every record)."""
+        schema_fields = self._schema_field_set
+        record_keys = record.keys()
         missing_in_schema = record_keys - schema_fields
 
-        if missing_in_record:
-            logging.debug(
-                f"Missing fields in record that are present in schema: {missing_in_record} for stream {self.name}"
-            )
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            missing_in_record = schema_fields - record_keys
+            if missing_in_record:
+                logging.debug(
+                    f"Missing fields in record that are present in schema: "
+                    f"{missing_in_record} for stream {self.name}"
+                )
 
         if missing_in_schema:
-            logging.warning(
-                f"*** URGENT: Missing fields in schema that are present record for {self.name}: {missing_in_schema} ***"
-            )
+            key = (self.name, frozenset(missing_in_schema))
+            with _SCHEMA_DRIFT_LOCK:
+                already_seen = key in _SCHEMA_DRIFT_SEEN
+                if not already_seen:
+                    _SCHEMA_DRIFT_SEEN.add(key)
+            if not already_seen:
+                self.logger.error(
+                    f"{SCHEMA_DRIFT_TOKEN} stream={self.name} "
+                    f"missing_fields={sorted(missing_in_schema)} "
+                    f"action=add_to_schema"
+                )
 
     def get_starting_timestamp(self, context: Context | None) -> str | None:
         """
@@ -312,7 +348,7 @@ class FmpRestStream(RESTStream, ABC):
 
             for record in records:
                 record = self.post_process(record, context)
-                self._check_missing_fields(self.schema, record)
+                self._check_missing_fields(record)
                 yield record
 
             page += 1
@@ -335,7 +371,7 @@ class FmpRestStream(RESTStream, ABC):
             records = self._fetch_with_retry(url, self.query_params)
             for record in records:
                 record = self.post_process(record, context)
-                self._check_missing_fields(self.schema, record)
+                self._check_missing_fields(record)
                 yield record
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
@@ -351,8 +387,11 @@ class FmpSurrogateKeyStream(FmpRestStream):
     _add_surrogate_key = True
 
 
-class SymbolPartitionStream(SymbolPartitionMixin, FmpRestStream):
-    _use_cached_symbols_default = True
+class BaseSymbolPartitionStream(BaseSymbolPartitionMixin, FmpRestStream):
+    """Generic per-symbol stream. Subclasses MUST mix in an asset partition
+    mixin (e.g. `CompanySymbolPartitionMixin`, `IndexSymbolPartitionMixin`,
+    `EtfSymbolPartitionMixin`) to supply `_partition_symbols`."""
+
     _symbol_in_path_params = False
     _symbol_in_query_params = True
 
@@ -375,8 +414,14 @@ class SymbolPartitionStream(SymbolPartitionMixin, FmpRestStream):
             records = self._fetch_with_retry(url, query_params)
             for record in records:
                 record = self.post_process(record, context)
-                self._check_missing_fields(self.schema, record)
+                self._check_missing_fields(record)
                 yield record
+
+
+class CompanySymbolPartitionStream(
+    CompanySymbolPartitionMixin, BaseSymbolPartitionStream
+):
+    """Per-symbol stream defaulting to the company stock universe."""
 
 
 class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):
@@ -490,20 +535,27 @@ class TimeSliceStream(FmpRestStream):
         if len(records) < max_records:
             for record in records:
                 record = self.post_process(record, context)
-                self._check_missing_fields(self.schema, record)
+                self._check_missing_fields(record)
                 yield record
         else:
             from_dt = datetime.fromisoformat(from_date)
             to_dt = datetime.fromisoformat(to_date)
             if (to_dt - from_dt).days <= 1:
-                # Can't split further, yield what we have but log a warning
-                logging.warning(
-                    f"Max records hit for {from_date} to {to_date} (symbol={query_params.get('symbol')})."
-                    f"Some data may be missing."
+                # Window can't be split further but FMP returned at the limit,
+                # implying truncation. Yield what we have so the partial window
+                # isn't lost, but escalate so a Dagster sensor can catch it and
+                # the user can refetch with a smaller window or higher limit.
+                self.logger.error(
+                    f"{DATA_TRUNCATED_TOKEN} stream={self.name} "
+                    f"window={from_date}..{to_date} "
+                    f"symbol={query_params.get('symbol')} "
+                    f"records_returned={len(records)} "
+                    f"max_records_per_request={max_records} "
+                    f"action=refetch_with_smaller_window_or_higher_limit"
                 )
                 for record in records:
                     record = self.post_process(record, context)
-                    self._check_missing_fields(self.schema, record)
+                    self._check_missing_fields(record)
                     yield record
                 return
             mid_dt = from_dt + (to_dt - from_dt) // 2
@@ -527,21 +579,20 @@ class TimeSliceStream(FmpRestStream):
             "max_records_per_request", 4000
         )
 
+        # No try/except around fetch_window: a transient API failure must
+        # propagate so Singer leaves state at the last fully-completed window.
+        # Catching here would silently skip the failed window and advance the
+        # bookmark on subsequent windows' records, leaving a permanent gap.
         for from_date, to_date in time_slices:
-            try:
-                yield from self.fetch_window(
-                    url, query_params, from_date, to_date, max_records, context
-                )
-            except Exception as e:
-                logging.error(
-                    f"Failed to fetch records for stream {self.name}"
-                    f"{self._replication_key_starting_name}={from_date} {self._replication_key_ending_name}={to_date}: {e}"
-                )
-                continue
+            yield from self.fetch_window(
+                url, query_params, from_date, to_date, max_records, context
+            )
 
 
-class SymbolPartitionTimeSliceStream(SymbolPartitionMixin, TimeSliceStream):
-    _use_cached_symbols_default = True
+class BaseSymbolPartitionTimeSliceStream(BaseSymbolPartitionMixin, TimeSliceStream):
+    """Generic per-symbol time-slice stream. Subclasses MUST mix in an asset
+    partition mixin to supply `_partition_symbols`."""
+
     _symbol_in_path_params = False
     _symbol_in_query_params = True
 
@@ -562,17 +613,18 @@ class SymbolPartitionTimeSliceStream(SymbolPartitionMixin, TimeSliceStream):
             "max_records_per_request", 4000
         )
 
+        # See note above: no try/except here. Failures must propagate so Singer
+        # bookmark stays at last fully-completed window.
         for from_date, to_date in time_slices:
-            try:
-                yield from self.fetch_window(
-                    url, query_params, from_date, to_date, max_records, context
-                )
-            except Exception as e:
-                logging.error(
-                    f"Failed to fetch records for symbol={context['symbol']}"
-                    f"{self._replication_key_starting_name}={from_date} {self._replication_key_ending_name}={to_date}: {e}"
-                )
-                continue
+            yield from self.fetch_window(
+                url, query_params, from_date, to_date, max_records, context
+            )
+
+
+class CompanySymbolPartitionTimeSliceStream(
+    CompanySymbolPartitionMixin, BaseSymbolPartitionTimeSliceStream
+):
+    """Per-symbol time-slice stream defaulting to the company stock universe."""
 
 
 class IncrementalDateStream(FmpSurrogateKeyStream):
@@ -630,7 +682,13 @@ class IncrementalDateStream(FmpSurrogateKeyStream):
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         dates_dict = self._get_dates_dict()
         starting_date = self.get_starting_timestamp(context)
-        filtered_dates = [d for d in dates_dict if d["date"] >= starting_date]
+        # `get_starting_timestamp` returns None on cold start (no bookmark and
+        # no configured start_date). `d["date"] >= None` raises TypeError, so
+        # treat None as "from the beginning" and pass every date through.
+        if starting_date is None:
+            filtered_dates = dates_dict
+        else:
+            filtered_dates = [d for d in dates_dict if d["date"] >= starting_date]
 
         for date_dict in filtered_dates:
             self.query_params.update(date_dict)
@@ -732,7 +790,7 @@ class IncrementalYearStream(FmpSurrogateKeyStream):
         return super().post_process(record, context)
 
 
-class BaseSymbolYearPartitionStream(SymbolPartitionStream):
+class BaseSymbolYearPartitionStream(CompanySymbolPartitionStream):
     """Abstract base class for streams that partition by symbol and year with configurable quarter/period logic."""
 
     replication_method = "INCREMENTAL"
@@ -748,7 +806,7 @@ class BaseSymbolYearPartitionStream(SymbolPartitionStream):
         query_params = self.stream_config.get("query_params", {})
         other_params = self.stream_config.get("other_params", {})
 
-        symbols = self.get_cached_company_symbols()
+        symbols = self._partition_symbols()
 
         # Get years (default: current year only)
         if "year" in query_params:

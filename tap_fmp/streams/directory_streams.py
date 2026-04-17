@@ -102,8 +102,6 @@ class AvailableExchangesStream(ExchangeConfigMixin, FmpSurrogateKeyStream):
         th.Property("closing_hour", th.StringType),
         th.Property("timezone", th.StringType),
         th.Property("is_market_open", th.BooleanType),
-        th.Property("closing_additional", th.StringType),
-        th.Property("opening_additional", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:

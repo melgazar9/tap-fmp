@@ -5,11 +5,11 @@ from __future__ import annotations
 import typing as t
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
-from tap_fmp.client import SymbolPartitionStream, FmpSurrogateKeyStream
+from tap_fmp.client import CompanySymbolPartitionStream, FmpSurrogateKeyStream
 from tap_fmp.mixins import BatchSymbolPartitionMixin, CompanyBatchStreamMixin
 
 
-class QuoteSymbolPartitionStream(SymbolPartitionStream, FmpSurrogateKeyStream):
+class QuoteSymbolPartitionStream(CompanySymbolPartitionStream, FmpSurrogateKeyStream):
     """Base class for quote streams with surrogate key support."""
 
 
@@ -23,7 +23,6 @@ class SecuritiesQuoteStream(QuoteSymbolPartitionStream):
         th.Property("symbol", th.StringType),
         th.Property("name", th.StringType),
         th.Property("price", th.NumberType),
-        th.Property("changes_percentage", th.NumberType),
         th.Property("change_percentage", th.NumberType),
         th.Property("change", th.NumberType),
         th.Property("day_low", th.NumberType),
@@ -35,13 +34,8 @@ class SecuritiesQuoteStream(QuoteSymbolPartitionStream):
         th.Property("price_avg200", th.NumberType),
         th.Property("exchange", th.StringType),
         th.Property("volume", th.NumberType),
-        th.Property("avg_volume", th.NumberType),
         th.Property("open", th.NumberType),
         th.Property("previous_close", th.NumberType),
-        th.Property("eps", th.NumberType),
-        th.Property("pe", th.NumberType),
-        th.Property("earnings_announcement", th.DateTimeType),
-        th.Property("shares_outstanding", th.NumberType),
         th.Property("timestamp", th.IntegerType),
     ).to_dict()
 
@@ -111,10 +105,6 @@ class SecuritiesPriceChangeStream(QuoteSymbolPartitionStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
-        th.Property("name", th.StringType),
-        th.Property("change", th.NumberType),
-        th.Property("price", th.NumberType),
-        th.Property("changes_percentage", th.NumberType),
         th.Property("1_d", th.NumberType),
         th.Property("5_d", th.NumberType),
         th.Property("1_m", th.NumberType),
@@ -144,7 +134,6 @@ class SecuritiesBatchQuoteStream(
         th.Property("symbol", th.StringType),
         th.Property("name", th.StringType),
         th.Property("price", th.NumberType),
-        th.Property("changes_percentage", th.NumberType),
         th.Property("change_percentage", th.NumberType),
         th.Property("change", th.NumberType),
         th.Property("day_low", th.NumberType),
@@ -156,13 +145,8 @@ class SecuritiesBatchQuoteStream(
         th.Property("price_avg200", th.NumberType),
         th.Property("exchange", th.StringType),
         th.Property("volume", th.NumberType),
-        th.Property("avg_volume", th.NumberType),
         th.Property("open", th.NumberType),
         th.Property("previous_close", th.NumberType),
-        th.Property("eps", th.NumberType),
-        th.Property("pe", th.NumberType),
-        th.Property("earnings_announcement", th.DateTimeType),
-        th.Property("shares_outstanding", th.NumberType),
         th.Property("timestamp", th.IntegerType),
     ).to_dict()
 
@@ -205,7 +189,6 @@ class BatchAftermarketTradeStream(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("price", th.NumberType),
-        th.Property("size", th.NumberType),
         th.Property("trade_size", th.NumberType),
         th.Property("timestamp", th.IntegerType),
     ).to_dict()
@@ -250,14 +233,12 @@ class MutualFundPriceQuotesStream(QuoteSymbolPartitionStream):
     """Stream for mutual fund price quotes."""
 
     name = "mutual_fund_price_quotes"
-    _use_cached_symbols_default = False
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("name", th.StringType),
         th.Property("price", th.NumberType),
-        th.Property("changes_percentage", th.NumberType),
         th.Property("change_percentage", th.NumberType),
         th.Property("change", th.NumberType),
         th.Property("day_low", th.NumberType),
@@ -282,7 +263,6 @@ class ETFPriceQuotesStream(QuoteSymbolPartitionStream):
     """Stream for ETF price quotes using ETF symbol list."""
 
     name = "etf_price_quotes"
-    _use_cached_symbols_default = False
 
     def get_symbols(self, context: Context | None = None) -> t.List[dict]:
         """Use cached ETF symbols instead of regular stock symbols."""
@@ -293,7 +273,6 @@ class ETFPriceQuotesStream(QuoteSymbolPartitionStream):
         th.Property("symbol", th.StringType),
         th.Property("name", th.StringType),
         th.Property("price", th.NumberType),
-        th.Property("changes_percentage", th.NumberType),
         th.Property("change_percentage", th.NumberType),
         th.Property("change", th.NumberType),
         th.Property("day_low", th.NumberType),

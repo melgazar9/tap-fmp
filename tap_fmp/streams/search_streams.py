@@ -3,7 +3,7 @@
 from __future__ import annotations
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
-from tap_fmp.client import FmpRestStream, SymbolPartitionStream
+from tap_fmp.client import FmpRestStream, CompanySymbolPartitionStream
 
 ### Skipping the below endpoints
 # Stock Symbol Search
@@ -38,7 +38,7 @@ class StockScreenerStream(FmpRestStream):
         return f"{self.url_base}/stable/company-screener"
 
 
-class ExchangeVariantsStream(SymbolPartitionStream):
+class ExchangeVariantsStream(CompanySymbolPartitionStream):
     name = "exchange_variants"
 
     schema = th.PropertiesList(
@@ -78,7 +78,6 @@ class ExchangeVariantsStream(SymbolPartitionStream):
         th.Property("is_actively_trading", th.BooleanType),
         th.Property("is_adr", th.BooleanType),
         th.Property("is_fund", th.BooleanType),
-        th.Property("updated_at", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):

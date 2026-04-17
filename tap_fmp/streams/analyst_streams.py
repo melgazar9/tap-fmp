@@ -1,8 +1,10 @@
+from singer_sdk.exceptions import ConfigValidationError
+
 from tap_fmp.client import (
-    SymbolPartitionStream,
     SymbolPeriodPartitionStream,
     FmpRestStream,
     FmpSurrogateKeyStream,
+    CompanySymbolPartitionStream,
 )
 
 from singer_sdk import typing as th
@@ -42,25 +44,41 @@ class AnalystEstimatesStream(SymbolPeriodPartitionStream):
         th.Property("num_analysts_eps", th.IntegerType),
     ).to_dict()
 
-
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         if context and "period" in context:
             row["period"] = context["period"]
         return super().post_process(row, context)
 
-
     @staticmethod
     def _get_periods(periods):
+        # FMP /stable/analyst-estimates accepts only "annual" or "quarter".
+        # Normalize input shape (None/"*"/str/list) to a list. Without the
+        # str-to-list step, parent's `for period in periods` iterates over
+        # characters of a configured string and produces 6 partitions like
+        # "a"/"n"/"n"/"u"/"a"/"l".
         if periods is None or periods == "*":
-            periods = ["annual", "quarter"]
-        return periods
+            return ["annual", "quarter"]
+        if isinstance(periods, str):
+            periods = [periods]
+        if isinstance(periods, (list, tuple, set)):
+            allowed = {"annual", "quarter"}
+            invalid = set(periods) - allowed
+            if invalid:
+                raise ConfigValidationError(
+                    f"Invalid period(s) for analyst-estimates: {sorted(invalid)}. "
+                    f"Allowed: {sorted(allowed)}"
+                )
+            return list(periods)
+        raise ConfigValidationError(
+            f"period(s) must be a string, list/tuple/set, or '*'; got {type(periods).__name__}"
+        )
 
     def get_url(self, context: Context):
         url = f"{self.url_base}/stable/analyst-estimates"
         return url
 
 
-class RatingSnapshotStream(SymbolPartitionStream):
+class RatingSnapshotStream(CompanySymbolPartitionStream):
     name = "rating_snapshot"
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
@@ -78,7 +96,7 @@ class RatingSnapshotStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/ratings-snapshot"
 
 
-class HistoricalRatingsStream(SymbolPartitionStream):
+class HistoricalRatingsStream(CompanySymbolPartitionStream):
     """Stream for historical ratings."""
 
     name = "historical_ratings"
@@ -101,7 +119,7 @@ class HistoricalRatingsStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/ratings-historical"
 
 
-class PriceTargetSummaryStream(SymbolPartitionStream):
+class PriceTargetSummaryStream(CompanySymbolPartitionStream):
     name = "price_target_summary"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
@@ -128,7 +146,7 @@ class PriceTargetSummaryStream(SymbolPartitionStream):
         return super().post_process(row, context)
 
 
-class PriceTargetConsensusStream(SymbolPartitionStream):
+class PriceTargetConsensusStream(CompanySymbolPartitionStream):
     """Stream for price target consensus."""
 
     name = "price_target_consensus"
@@ -149,7 +167,7 @@ class PriceTargetConsensusStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/price-target-consensus"
 
 
-class PriceTargetNewsStream(SymbolPartitionStream):
+class PriceTargetNewsStream(CompanySymbolPartitionStream):
     name = "price_target_news"
     primary_keys = ["surrogate_key"]
     _paginate = True
@@ -203,7 +221,7 @@ class PriceTargetLatestNewsStream(FmpSurrogateKeyStream):
         return f"{self.url_base}/stable/price-target-latest-news"
 
 
-class StockGradesStream(SymbolPartitionStream):
+class StockGradesStream(CompanySymbolPartitionStream):
     """Stream for stock grades."""
 
     name = "stock_grades"
@@ -225,7 +243,7 @@ class StockGradesStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/grades"
 
 
-class HistoricalStockGradesStream(SymbolPartitionStream):
+class HistoricalStockGradesStream(CompanySymbolPartitionStream):
     """Stream for historical stock grades."""
 
     name = "historical_stock_grades"
@@ -248,7 +266,7 @@ class HistoricalStockGradesStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/grades-historical"
 
 
-class StockGradesConsensusStream(SymbolPartitionStream):
+class StockGradesConsensusStream(CompanySymbolPartitionStream):
     """Stream for stock grades consensus."""
 
     name = "stock_grades_consensus"
@@ -271,7 +289,7 @@ class StockGradesConsensusStream(SymbolPartitionStream):
         return f"{self.url_base}/stable/grades-consensus"
 
 
-class StockGradeNewsStream(SymbolPartitionStream):
+class StockGradeNewsStream(CompanySymbolPartitionStream):
     """Stream for stock grade news."""
 
     name = "stock_grades_news"

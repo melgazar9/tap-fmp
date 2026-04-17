@@ -24,8 +24,6 @@ class ExchangeMarketHoursStream(FmpRestStream):
         th.Property("closing_hour", th.StringType),
         th.Property("timezone", th.StringType),
         th.Property("is_market_open", th.BooleanType),
-        th.Property("closing_additional", th.StringType),
-        th.Property("opening_additional", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
@@ -46,7 +44,6 @@ class ExchangeMarketHoursStream(FmpRestStream):
 class HolidaysByExchangeStream(TimeSliceStream, FmpSurrogateKeyStream):
     name = "holidays_by_exchange"
 
-    _use_cached_symbols_default = False
     _symbol_in_query_params = False
 
     schema = th.PropertiesList(
@@ -88,8 +85,6 @@ class AllExchangeMarketHoursStream(FmpRestStream):
         th.Property("closing_hour", th.StringType),
         th.Property("timezone", th.StringType),
         th.Property("is_market_open", th.BooleanType),
-        th.Property("closing_additional", th.StringType),
-        th.Property("opening_additional", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context):
