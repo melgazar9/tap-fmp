@@ -1050,7 +1050,7 @@ class BalanceSheetStatementGrowthBulkStream(IncrementalYearPeriodStream):
         "growth_common_stock",
         "growth_retained_earnings",
         "growth_accumulated_other_comprehensive_income_loss",
-        "growth_othertotal_stockholders_equity",
+        "growth_other_total_stockholders_equity",
         "growth_total_stockholders_equity",
         "growth_minority_interest",
         "growth_total_equity",
@@ -1112,7 +1112,7 @@ class BalanceSheetStatementGrowthBulkStream(IncrementalYearPeriodStream):
         th.Property(
             "growth_accumulated_other_comprehensive_income_loss", th.NumberType
         ),
-        th.Property("growth_othertotal_stockholders_equity", th.NumberType),
+        th.Property("growth_other_total_stockholders_equity", th.NumberType),
         th.Property("growth_total_stockholders_equity", th.NumberType),
         th.Property("growth_minority_interest", th.NumberType),
         th.Property("growth_total_equity", th.NumberType),
@@ -1182,7 +1182,8 @@ class CashFlowStatementBulkStream(IncrementalYearPeriodStream):
         "interest_paid",
     ]
 
-    _date_fields = ["filing_date", "accepted_date", "ipo_date"]
+    _date_fields = ["filing_date"]
+    _datetime_fields = ["accepted_date"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -1233,7 +1234,6 @@ class CashFlowStatementBulkStream(IncrementalYearPeriodStream):
         th.Property("free_cash_flow", th.NumberType),
         th.Property("income_taxes_paid", th.NumberType),
         th.Property("interest_paid", th.NumberType),
-        th.Property("ipo_date", th.DateType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
@@ -1256,18 +1256,18 @@ class CashFlowStatementGrowthBulkStream(IncrementalYearPeriodStream):
         "growth_accounts_payables",
         "growth_other_working_capital",
         "growth_other_non_cash_items",
-        "growth_net_cash_provided_by_operating_activites",
+        "growth_net_cash_provided_by_operating_activities",
         "growth_investments_in_property_plant_and_equipment",
         "growth_acquisitions_net",
         "growth_purchases_of_investments",
         "growth_sales_maturities_of_investments",
-        "growth_other_investing_activites",
-        "growth_net_cash_used_for_investing_activites",
+        "growth_other_investing_activities",
+        "growth_net_cash_used_for_investing_activities",
         "growth_debt_repayment",
         "growth_common_stock_issued",
         "growth_common_stock_repurchased",
         "growth_dividends_paid",
-        "growth_other_financing_activites",
+        "growth_other_financing_activities",
         "growth_net_cash_used_provided_by_financing_activities",
         "growth_effect_of_forex_changes_on_cash",
         "growth_net_change_in_cash",
@@ -1302,20 +1302,20 @@ class CashFlowStatementGrowthBulkStream(IncrementalYearPeriodStream):
         th.Property("growth_accounts_payables", th.NumberType),
         th.Property("growth_other_working_capital", th.NumberType),
         th.Property("growth_other_non_cash_items", th.NumberType),
-        th.Property("growth_net_cash_provided_by_operating_activites", th.NumberType),
+        th.Property("growth_net_cash_provided_by_operating_activities", th.NumberType),
         th.Property(
             "growth_investments_in_property_plant_and_equipment", th.NumberType
         ),
         th.Property("growth_acquisitions_net", th.NumberType),
         th.Property("growth_purchases_of_investments", th.NumberType),
         th.Property("growth_sales_maturities_of_investments", th.NumberType),
-        th.Property("growth_other_investing_activites", th.NumberType),
-        th.Property("growth_net_cash_used_for_investing_activites", th.NumberType),
+        th.Property("growth_other_investing_activities", th.NumberType),
+        th.Property("growth_net_cash_used_for_investing_activities", th.NumberType),
         th.Property("growth_debt_repayment", th.NumberType),
         th.Property("growth_common_stock_issued", th.NumberType),
         th.Property("growth_common_stock_repurchased", th.NumberType),
         th.Property("growth_dividends_paid", th.NumberType),
-        th.Property("growth_other_financing_activites", th.NumberType),
+        th.Property("growth_other_financing_activities", th.NumberType),
         th.Property(
             "growth_net_cash_used_provided_by_financing_activities", th.NumberType
         ),

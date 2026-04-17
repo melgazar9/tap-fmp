@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 from datetime import datetime
@@ -12,7 +14,11 @@ from tap_fmp.client import (
     BaseSymbolPartitionStream,
 )
 
+from tap_fmp.helpers import blank_strings_to_none
 from tap_fmp.mixins import FinancialStatementSymbolPartitionMixin
+
+
+_STATEMENT_DATE_FIELDS = ("filing_date", "accepted_date")
 
 
 class StatementStream(
@@ -32,10 +38,7 @@ class StatementStream(
         if "fiscal_year" in row:
             row["fiscal_year"] = int(row["fiscal_year"])
 
-        date_fields = ["filing_date", "accepted_date"]
-        for field in date_fields:
-            if field in row and row[field] == "":
-                row[field] = None
+        blank_strings_to_none(row, _STATEMENT_DATE_FIELDS)
 
         return super().post_process(row, context)
 
@@ -888,7 +891,7 @@ class BalanceSheetGrowthStream(StatementStream):
         th.Property(
             "growth_accumulated_other_comprehensive_income_loss", th.NumberType
         ),
-        th.Property("growth_othertotal_stockholders_equity", th.NumberType),
+        th.Property("growth_other_total_stockholders_equity", th.NumberType),
         th.Property("growth_total_stockholders_equity", th.NumberType),
         th.Property("growth_minority_interest", th.NumberType),
         th.Property("growth_total_equity", th.NumberType),
@@ -933,20 +936,20 @@ class CashFlowGrowthStream(StatementStream):
         th.Property("growth_accounts_payables", th.NumberType),
         th.Property("growth_other_working_capital", th.NumberType),
         th.Property("growth_other_non_cash_items", th.NumberType),
-        th.Property("growth_net_cash_provided_by_operating_activites", th.NumberType),
+        th.Property("growth_net_cash_provided_by_operating_activities", th.NumberType),
         th.Property(
             "growth_investments_in_property_plant_and_equipment", th.NumberType
         ),
         th.Property("growth_acquisitions_net", th.NumberType),
         th.Property("growth_purchases_of_investments", th.NumberType),
         th.Property("growth_sales_maturities_of_investments", th.NumberType),
-        th.Property("growth_other_investing_activites", th.NumberType),
-        th.Property("growth_net_cash_used_for_investing_activites", th.NumberType),
+        th.Property("growth_other_investing_activities", th.NumberType),
+        th.Property("growth_net_cash_used_for_investing_activities", th.NumberType),
         th.Property("growth_debt_repayment", th.NumberType),
         th.Property("growth_common_stock_issued", th.NumberType),
         th.Property("growth_common_stock_repurchased", th.NumberType),
         th.Property("growth_dividends_paid", th.NumberType),
-        th.Property("growth_other_financing_activites", th.NumberType),
+        th.Property("growth_other_financing_activities", th.NumberType),
         th.Property(
             "growth_net_cash_used_provided_by_financing_activities", th.NumberType
         ),
@@ -1132,8 +1135,8 @@ class RevenueProductSegmentationStream(StatementStream):
         return f"{self.url_base}/stable/revenue-product-segmentation"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
-        if "data" in row:
-            row["data"] = str(row["data"])
+        if "data" in row and row["data"] is not None:
+            row["data"] = json.dumps(row["data"], default=str)
         return super().post_process(row, context)
 
 
@@ -1166,8 +1169,8 @@ class AsReportedIncomeStatementsStream(StatementStream):
         return f"{self.url_base}/stable/income-statement-as-reported"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
-        if "data" in row:
-            row["data"] = str(row["data"])
+        if "data" in row and row["data"] is not None:
+            row["data"] = json.dumps(row["data"], default=str)
         return super().post_process(row, context)
 
 

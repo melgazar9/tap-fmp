@@ -6,7 +6,11 @@ import typing as t
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 from tap_fmp.client import CompanySymbolPartitionStream, FmpSurrogateKeyStream
-from tap_fmp.mixins import BatchSymbolPartitionMixin, CompanyBatchStreamMixin
+from tap_fmp.mixins import (
+    BatchSymbolPartitionMixin,
+    CompanyBatchStreamMixin,
+    SHORT_QUOTE_SCHEMA,
+)
 
 
 class QuoteSymbolPartitionStream(CompanySymbolPartitionStream, FmpSurrogateKeyStream):
@@ -47,14 +51,7 @@ class SecuritiesQuoteShortStream(QuoteSymbolPartitionStream):
     """Stream for short format securities quotes."""
 
     name = "securities_quote_short"
-
-    schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
-        th.Property("price", th.NumberType),
-        th.Property("change", th.NumberType),
-        th.Property("volume", th.NumberType),
-    ).to_dict()
+    schema = SHORT_QUOTE_SCHEMA
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/quote-short"
@@ -165,14 +162,7 @@ class SecuritiesBatchQuoteShortStream(
     """Stream for batch short securities quotes with automatic chunking."""
 
     name = "securities_batch_quote_short"
-
-    schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
-        th.Property("price", th.NumberType),
-        th.Property("change", th.NumberType),
-        th.Property("volume", th.NumberType),
-    ).to_dict()
+    schema = SHORT_QUOTE_SCHEMA
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/batch-quote-short"
@@ -257,6 +247,43 @@ class MutualFundPriceQuotesStream(QuoteSymbolPartitionStream):
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/quote"
+
+
+class BatchMutualFundQuotesStream(FmpSurrogateKeyStream):
+    name = "batch_mutualfund_quotes"
+    schema = SHORT_QUOTE_SCHEMA
+
+    def get_url(self, context: Context | None = None) -> str:
+        return f"{self.url_base}/stable/batch-mutualfund-quotes"
+
+
+class BatchEtfQuotesStream(FmpSurrogateKeyStream):
+    name = "batch_etf_quotes"
+    schema = SHORT_QUOTE_SCHEMA
+
+    def get_url(self, context: Context | None = None) -> str:
+        return f"{self.url_base}/stable/batch-etf-quotes"
+
+
+class BatchExchangeQuoteStream(FmpSurrogateKeyStream):
+    name = "batch_exchange_quote"
+    schema = SHORT_QUOTE_SCHEMA
+
+    @property
+    def partitions(self):
+        return [
+            {"exchange": e.get("exchange")}
+            for e in self._tap.get_cached_exchanges()
+            if e.get("exchange")
+        ]
+
+    def get_url(self, context: Context | None = None) -> str:
+        return f"{self.url_base}/stable/batch-exchange-quote"
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        if context:
+            self.query_params.update(context)
+        yield from super().get_records(context)
 
 
 class ETFPriceQuotesStream(QuoteSymbolPartitionStream):

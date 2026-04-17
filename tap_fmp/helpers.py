@@ -86,6 +86,16 @@ _FMP_KEY_RENAMES = {
     "costof_debt": "cost_of_debt",
     # commitment-of-traders analysis emits "netPostion" (typo)
     "net_postion": "net_position",
+    # commitment-of-traders report emits "spead" (typo) in two fields
+    "change_in_noncomm_spead_all": "change_in_noncomm_spread_all",
+    "traders_noncomm_spead_ol": "traders_noncomm_spread_ol",
+    # balance-sheet-growth-bulk emits "othertotal" glued (lowercase)
+    "growth_othertotal_stockholders_equity": "growth_other_total_stockholders_equity",
+    # cash-flow-growth-bulk emits "activites" typo (missing 'i')
+    "growth_net_cash_provided_by_operating_activites": "growth_net_cash_provided_by_operating_activities",
+    "growth_other_investing_activites": "growth_other_investing_activities",
+    "growth_net_cash_used_for_investing_activites": "growth_net_cash_used_for_investing_activities",
+    "growth_other_financing_activites": "growth_other_financing_activities",
 }
 
 
@@ -117,6 +127,15 @@ def clean_json_keys(data: list[dict]) -> list[dict]:
             return obj
 
     return [clean_nested_dict(d) for d in data]
+
+
+def blank_strings_to_none(row: dict, fields: t.Iterable[str]) -> None:
+    """Mutate row in place: replace "" with None for listed date-like fields.
+    singer_sdk DateType/DateTimeType validation rejects empty strings, but FMP
+    returns "" for unknown historical dates; normalize before validation."""
+    for field in fields:
+        if row.get(field) == "":
+            row[field] = None
 
 
 def generate_surrogate_key(data: dict, namespace=uuid.NAMESPACE_DNS) -> str:

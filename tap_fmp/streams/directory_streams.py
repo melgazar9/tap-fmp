@@ -97,15 +97,15 @@ class AvailableExchangesStream(ExchangeConfigMixin, FmpSurrogateKeyStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("exchange", th.StringType, required=True),
-        th.Property("name", th.StringType, required=True),
-        th.Property("opening_hour", th.StringType),
-        th.Property("closing_hour", th.StringType),
-        th.Property("timezone", th.StringType),
-        th.Property("is_market_open", th.BooleanType),
+        th.Property("name", th.StringType),
+        th.Property("country_name", th.StringType),
+        th.Property("country_code", th.StringType),
+        th.Property("symbol_suffix", th.StringType),
+        th.Property("delay", th.StringType),
     ).to_dict()
 
     def get_url(self, context: Context | None = None) -> str:
-        return f"{self.url_base}/stable/all-exchange-market-hours"
+        return f"{self.url_base}/stable/available-exchanges"
 
 
 class AvailableSectorsStream(SelectableStreamMixin, FmpRestStream):

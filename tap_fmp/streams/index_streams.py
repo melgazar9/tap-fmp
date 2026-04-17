@@ -18,6 +18,7 @@ from tap_fmp.mixins import (
     Prices1HrMixin,
     Prices1minMixin,
     Prices5minMixin,
+    SHORT_QUOTE_SCHEMA,
 )
 
 
@@ -90,14 +91,7 @@ class IndexShortQuoteStream(IndexSymbolPartitionMixin, BaseSymbolPartitionStream
     name = "index_short_quote"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
-
-    schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
-        th.Property("price", th.NumberType),
-        th.Property("change", th.NumberType),
-        th.Property("volume", th.NumberType),
-    ).to_dict()
+    schema = SHORT_QUOTE_SCHEMA
 
     def get_url(self, context: Context | None) -> str:
         return f"{self.url_base}/stable/quote-short"
@@ -107,14 +101,7 @@ class AllIndexQuotesStream(FmpSurrogateKeyStream):
     """All Index Quotes API - Real-time quotes for a wide range of stock indexes."""
 
     name = "all_index_quotes"
-
-    schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
-        th.Property("price", th.NumberType),
-        th.Property("change", th.NumberType),
-        th.Property("volume", th.NumberType),
-    ).to_dict()
+    schema = SHORT_QUOTE_SCHEMA
 
     def get_url(self, context: Context | None) -> str:
         return f"{self.url_base}/stable/batch-index-quotes"

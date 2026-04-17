@@ -1,6 +1,10 @@
 from tap_fmp.client import CompanySymbolPartitionStream, TimeSliceStream
+from tap_fmp.helpers import blank_strings_to_none
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
+
+
+_DIVIDEND_DATE_FIELDS = ("record_date", "payment_date", "declaration_date")
 
 
 class CalendarStream(CompanySymbolPartitionStream):
@@ -22,9 +26,9 @@ class DividendsCompanyStream(CalendarStream):
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
-        th.Property("record_date", th.StringType),
-        th.Property("payment_date", th.StringType),
-        th.Property("declaration_date", th.StringType),
+        th.Property("record_date", th.DateType),
+        th.Property("payment_date", th.DateType),
+        th.Property("declaration_date", th.DateType),
         th.Property("adj_dividend", th.NumberType),
         th.Property("dividend", th.NumberType),
         th.Property("yield", th.NumberType),
@@ -34,6 +38,10 @@ class DividendsCompanyStream(CalendarStream):
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/dividends"
 
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        blank_strings_to_none(row, _DIVIDEND_DATE_FIELDS)
+        return super().post_process(row, context)
+
 
 class DividendsCalendarStream(TimeSliceCalendarStream):
     name = "dividends_calendar"
@@ -42,9 +50,9 @@ class DividendsCalendarStream(TimeSliceCalendarStream):
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
-        th.Property("record_date", th.StringType),
-        th.Property("payment_date", th.StringType),
-        th.Property("declaration_date", th.StringType),
+        th.Property("record_date", th.DateType),
+        th.Property("payment_date", th.DateType),
+        th.Property("declaration_date", th.DateType),
         th.Property("adj_dividend", th.NumberType),
         th.Property("dividend", th.NumberType),
         th.Property("yield", th.NumberType),
@@ -53,6 +61,10 @@ class DividendsCalendarStream(TimeSliceCalendarStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/dividends-calendar"
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        blank_strings_to_none(row, _DIVIDEND_DATE_FIELDS)
+        return super().post_process(row, context)
 
 
 class EarningsReportStream(CalendarStream):
@@ -84,7 +96,7 @@ class EarningsCalendarStream(TimeSliceCalendarStream):
         th.Property("eps_estimated", th.NumberType),
         th.Property("revenue_actual", th.NumberType),
         th.Property("revenue_estimated", th.NumberType),
-        th.Property("last_updated", th.DateType, required=True),
+        th.Property("last_updated", th.DateType),
     ).to_dict()
 
     def get_url(self, context: Context):

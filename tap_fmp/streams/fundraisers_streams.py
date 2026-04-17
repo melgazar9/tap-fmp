@@ -206,12 +206,49 @@ class EquityOfferingUpdatesStream(FmpRestStream):
     def partitions(self):
         if self.stream_config.get("other_params", {}).get("use_cached_ciks"):
             return [{"cik": c["cik"]} for c in self._tap.get_cached_ciks()]
-        return {}
+        return None
 
     def get_records(self, context: Context | None):
         if context:
             self.query_params.update(context)
         return super().get_records(context)
+
+
+class _FundraiserSearchBase(FmpRestStream):
+    """Shared base for the name-search fundraiser endpoints.
+
+    FMP's *-search endpoints return a minimal lookup shape {cik, name, date};
+    follow up with the matching *-by-cik stream for full detail.
+    """
+
+    primary_keys = ["surrogate_key"]
+    _add_surrogate_key = True
+
+    schema = th.PropertiesList(
+        th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("cik", th.StringType),
+        th.Property("name", th.StringType),
+        th.Property("date", th.DateType),
+    ).to_dict()
+
+    @property
+    def partitions(self):
+        names = self.stream_config.get("other_params", {}).get("names")
+        if names:
+            return [{"name": n} for n in names]
+        return None
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        if context:
+            self.query_params.update(context)
+        return super().get_records(context)
+
+
+class CrowdfundingCampaignSearchStream(_FundraiserSearchBase):
+    name = "crowdfunding_campaign_search"
+
+    def get_url(self, context: Context | None = None) -> str:
+        return f"{self.url_base}/stable/crowdfunding-offerings-search"
 
 
 class EquityOfferingByCikStream(FmpRestStream):
@@ -279,3 +316,10 @@ class EquityOfferingByCikStream(FmpRestStream):
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         self.query_params.update(context)
         return super().get_records(context)
+
+
+class EquityOfferingSearchStream(_FundraiserSearchBase):
+    name = "equity_offering_search"
+
+    def get_url(self, context: Context | None = None) -> str:
+        return f"{self.url_base}/stable/fundraising-search"

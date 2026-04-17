@@ -198,8 +198,10 @@ from tap_fmp.streams.commodity_streams import (
 from tap_fmp.streams.fundraisers_streams import (
     LatestCrowdfundingCampaignsStream,
     CrowdfundingByCikStream,
+    CrowdfundingCampaignSearchStream,
     EquityOfferingUpdatesStream,
     EquityOfferingByCikStream,
+    EquityOfferingSearchStream,
 )
 
 from tap_fmp.streams.crypto_streams import (
@@ -345,6 +347,9 @@ from tap_fmp.streams.quote_streams import (
     SecuritiesBatchQuoteShortStream,
     BatchAftermarketTradeStream,
     BatchAftermarketQuoteStream,
+    BatchMutualFundQuotesStream,
+    BatchEtfQuotesStream,
+    BatchExchangeQuoteStream,
     MutualFundPriceQuotesStream,
     ETFPriceQuotesStream,
 )
@@ -1014,8 +1019,10 @@ class TapFMP(Tap):
 
             LatestCrowdfundingCampaignsStream(self),
             CrowdfundingByCikStream(self),
+            CrowdfundingCampaignSearchStream(self),
             EquityOfferingUpdatesStream(self),
             EquityOfferingByCikStream(self),
+            EquityOfferingSearchStream(self),
 
 
             ### Crypto Streams ###
@@ -1180,6 +1187,9 @@ class TapFMP(Tap):
             SecuritiesBatchQuoteShortStream(self),
             BatchAftermarketTradeStream(self),
             BatchAftermarketQuoteStream(self),
+            BatchMutualFundQuotesStream(self),
+            BatchEtfQuotesStream(self),
+            BatchExchangeQuoteStream(self),
             MutualFundPriceQuotesStream(self),
             ETFPriceQuotesStream(self),
         ]

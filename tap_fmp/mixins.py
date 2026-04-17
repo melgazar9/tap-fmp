@@ -327,6 +327,15 @@ class ForexConfigMixin(BaseConfigMixin):
         return [pair.get("symbol") for pair in cached_forex_pairs if pair.get("symbol")]
 
 
+SHORT_QUOTE_SCHEMA = th.PropertiesList(
+    th.Property("surrogate_key", th.StringType, required=True),
+    th.Property("symbol", th.StringType),
+    th.Property("price", th.NumberType),
+    th.Property("change", th.NumberType),
+    th.Property("volume", th.NumberType),
+).to_dict()
+
+
 class BasePriceSchemaMixin:
     """Base schema for price data with symbol/date/price/volume."""
 

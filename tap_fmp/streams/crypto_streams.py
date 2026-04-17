@@ -18,6 +18,7 @@ from tap_fmp.mixins import (
     Prices1HrMixin,
     Prices1minMixin,
     Prices5minMixin,
+    SHORT_QUOTE_SCHEMA,
 )
 
 
@@ -89,14 +90,7 @@ class CryptoQuoteShortStream(CryptoSymbolPartitionMixin, BaseSymbolPartitionStre
     """Stream for Crypto Quote Short API."""
 
     name = "crypto_quotes_short"
-
-    schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
-        th.Property("price", th.NumberType),
-        th.Property("change", th.NumberType),
-        th.Property("volume", th.NumberType),
-    ).to_dict()
+    schema = SHORT_QUOTE_SCHEMA
 
     def get_url(self, context: Context | None = None) -> str:
         """Get URL for the request."""
@@ -107,14 +101,7 @@ class AllCryptoQuotesStream(FmpSurrogateKeyStream):
     """Stream for All Crypto Quotes API."""
 
     name = "all_crypto_quotes"
-
-    schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType, required=True),
-        th.Property("symbol", th.StringType),
-        th.Property("price", th.NumberType),
-        th.Property("change", th.NumberType),
-        th.Property("volume", th.NumberType),
-    ).to_dict()
+    schema = SHORT_QUOTE_SCHEMA
 
     def get_url(self, context: Context | None = None) -> str:
         """Get URL for the request."""

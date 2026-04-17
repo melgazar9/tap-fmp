@@ -34,11 +34,23 @@ class ForexPairsStream(ForexConfigMixin, FmpSurrogateKeyStream):
     ).to_dict()
 
     def create_record_from_item(self, item: str) -> dict:
-        """Create a record dict from a forex symbol."""
+        """Create a record dict from a forex symbol.
+
+        Parses standard 6-char ISO pairs (e.g., "EURUSD" -> EUR, USD) or
+        dot-separated pairs (e.g., "EUR.USD"). Falls back to None when the
+        symbol does not match a known pattern.
+        """
+        from_ccy = to_ccy = None
+        if "." in item:
+            parts = item.split(".", 1)
+            if len(parts) == 2 and len(parts[0]) == 3 and len(parts[1]) == 3:
+                from_ccy, to_ccy = parts[0].upper(), parts[1].upper()
+        elif len(item) == 6 and item.isalpha():
+            from_ccy, to_ccy = item[:3].upper(), item[3:].upper()
         return {
             "symbol": item,
-            "from_currency": None,
-            "to_currency": None,
+            "from_currency": from_ccy,
+            "to_currency": to_ccy,
             "from_name": None,
             "to_name": None,
         }

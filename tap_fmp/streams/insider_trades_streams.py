@@ -7,6 +7,7 @@ from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import FmpRestStream, CompanySymbolPartitionStream
 from datetime import datetime
+import typing as t
 
 
 class LatestInsiderTradingStream(FmpRestStream):
@@ -51,6 +52,11 @@ class LatestInsiderTradingStream(FmpRestStream):
             return [{"date": d} for d in other_params["dates"]]
         else:
             return [{"date": datetime.today().date().strftime("%Y-%m-%d")}]
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        if context and "date" in context:
+            self.query_params["date"] = context["date"]
+        yield from super().get_records(context)
 
 
 class SearchInsiderTradesStream(CompanySymbolPartitionStream):

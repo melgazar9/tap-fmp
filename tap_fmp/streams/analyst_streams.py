@@ -1,3 +1,5 @@
+import json
+
 from singer_sdk.exceptions import ConfigValidationError
 
 from tap_fmp.client import (
@@ -142,7 +144,9 @@ class PriceTargetSummaryStream(CompanySymbolPartitionStream):
         return f"{self.url_base}/stable/price-target-summary"
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
-        row["publishers"] = str(row["publishers"])
+        publishers = row.get("publishers")
+        if publishers is not None and not isinstance(publishers, str):
+            row["publishers"] = json.dumps(publishers, default=str)
         return super().post_process(row, context)
 
 

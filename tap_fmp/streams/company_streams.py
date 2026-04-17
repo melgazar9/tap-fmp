@@ -211,6 +211,7 @@ class CompanyHistoricalEmployeeCountStream(CompanyEmployeeCountStream):
 class CompanyMarketCapStream(CompanySymbolSurrogateKeyStream):
     name = "company_market_cap"
     primary_keys = ["symbol", "date"]
+    _add_surrogate_key = False
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType),
