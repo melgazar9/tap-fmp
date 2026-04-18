@@ -361,8 +361,10 @@ class TapFMP(Tap):
     name = "tap-fmp"
 
     _cached_company_symbols: t.List[dict] | None = None
+    _cached_raw_company_symbols: t.List[dict] | None = None
     _company_symbols_stream_instance: CompanySymbolsStream | None = None
     _company_symbols_lock = threading.Lock()
+    _raw_company_symbols_lock = threading.Lock()
 
     _cached_financial_statement_symbols: t.List[dict] | None = None
     _financial_statement_symbols_stream_instance: (
@@ -592,19 +594,34 @@ class TapFMP(Tap):
         ),
     ).to_dict()
 
-    def get_cached_company_symbols(self) -> t.List[dict]:
-        """Thread-safe company symbol caching for parallel execution."""
+    def get_cached_raw_company_symbols(self) -> t.List[dict]:
+        """Unfiltered stock-list universe. Primary cache; the filtered view
+        derives from this. Reference streams that feed the country/currency
+        filter (e.g. exchange_variants) partition over this directly."""
         return self._get_cached_data(
             {
-                "cache_attr": "_cached_company_symbols",
-                "lock": self._company_symbols_lock,
+                "cache_attr": "_cached_raw_company_symbols",
+                "lock": self._raw_company_symbols_lock,
                 "stream_getter": self.get_company_symbols_stream,
                 "data_type": "company symbols",
                 "sort_key": "symbol",
-                "apply_filtering": True,
-                "filter_config_key": "company_symbols",
             }
         )
+
+    def get_cached_company_symbols(self) -> t.List[dict]:
+        """Country/currency-filtered view of the company universe, derived
+        in-memory from get_cached_raw_company_symbols. Per-symbol data
+        streams (prices, fundamentals, analyst data, etc.) use this."""
+        if self._cached_company_symbols is None:
+            with self._company_symbols_lock:
+                if self._cached_company_symbols is None:
+                    raw = self.get_cached_raw_company_symbols()
+                    self._cached_company_symbols = (
+                        self._apply_country_currency_filtering(
+                            raw, "company_symbols"
+                        )
+                    )
+        return self._cached_company_symbols
 
     def get_company_symbols_stream(self) -> CompanySymbolsStream:
         if self._company_symbols_stream_instance is None:
@@ -787,7 +804,16 @@ class TapFMP(Tap):
         self.logger.info(
             f"Loading exchange variants for filtering {config_key} symbols..."
         )
-        exchange_variants_data = self.get_cached_exchange_variants()
+        try:
+            exchange_variants_data = self.get_cached_exchange_variants()
+        except RuntimeError as e:
+            self.logger.warning(
+                f"Exchange variants unavailable for filtering {config_key} ({e}). "
+                f"Returning unfiltered {len(symbols)} symbols. This is expected on "
+                f"first run before the exchange_variants table/CSV has been seeded; "
+                f"re-run once exchange_variants has landed to enable filtering."
+            )
+            return symbols
         self.logger.info(f"Loaded {len(exchange_variants_data)} exchange variants")
 
         variants_by_symbol = {d["symbol"]: d for d in exchange_variants_data}

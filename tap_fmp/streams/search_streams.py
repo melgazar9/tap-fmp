@@ -40,6 +40,7 @@ class StockScreenerStream(FmpRestStream):
 
 class ExchangeVariantsStream(CompanySymbolPartitionStream):
     name = "exchange_variants"
+    _raw_partition = True
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType),

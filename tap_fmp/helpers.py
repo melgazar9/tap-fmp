@@ -326,25 +326,19 @@ class ExchangeVariantsManager:
             return None
 
     def _load_from_api(self) -> t.Optional[t.List[t.Dict[str, t.Any]]]:
-        """Load exchange variants from API (existing fallback behavior)."""
-        try:
-            if not self.tap_instance:
-                self.logger.error("No tap instance available for API fallback")
-                return None
-
-            # Import here to avoid circular imports
-            from tap_fmp.streams.search_streams import ExchangeVariantsStream
-
-            self.logger.info("Loading exchange variants from FMP API...")
-            exchange_variants_stream = ExchangeVariantsStream(self.tap_instance)
-            data = list(exchange_variants_stream.get_records(context=None))
-
-            self.logger.info(f"Loaded {len(data)} exchange variants from API")
-            return data
-
-        except Exception as e:
-            self.logger.error(f"API loading failed: {e}")
-            return None
+        """No-op bootstrap path. Populating the filter cache inline would mean
+        ~89k serial per-symbol API calls against /stable/search-exchange-variants
+        (hours with throttling) and duplicate the work the exchange_variants
+        stream does during its own sync. The stream sync itself is the
+        canonical populator — run `--select exchange_variants` first, then
+        subsequent runs read from DB/CSV."""
+        self.logger.warning(
+            "exchange_variants not available via DB or CSV; API bootstrap is "
+            "disabled (would require ~89k serial calls). Run `meltano el "
+            "tap-fmp target-postgres --select exchange_variants` first to "
+            "populate the table, or supply distinct_exchange_variants.csv."
+        )
+        return None
 
     def clear_cache(self) -> None:
         """Clear the internal cache."""

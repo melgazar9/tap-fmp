@@ -153,9 +153,25 @@ class BaseSymbolPartitionMixin(ABC):
 
 
 class CompanySymbolPartitionMixin(BaseSymbolPartitionMixin):
-    """Partitions over the company stock universe."""
+    """Partitions over the company stock universe.
+
+    By default returns the FILTERED universe (country/currency filter
+    applied) — correct for per-symbol data streams (prices, fundamentals,
+    analyst data, etc.).
+
+    Reference/universe streams whose output FEEDS the filter (e.g.
+    `ExchangeVariantsStream`) must override `_raw_partition = True` so they
+    partition over the unfiltered universe. Otherwise the filter is gated on
+    data the stream itself produces — a circular bootstrap dependency that
+    causes the reference table to be populated with only the filtered
+    subset.
+    """
+
+    _raw_partition: t.ClassVar[bool] = False
 
     def _partition_symbols(self) -> list[dict]:
+        if self._raw_partition:
+            return self._tap.get_cached_raw_company_symbols()
         return self._tap.get_cached_company_symbols()
 
 
