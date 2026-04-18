@@ -13,7 +13,7 @@ from tap_fmp.disk_cache import DiskCache, compute_fingerprint
 from tap_fmp.helpers import ExchangeVariantsManager
 
 from tap_fmp.streams.search_streams import (
-    StockScreenerStream,
+    CompanyScreenerStream,
     ExchangeVariantsStream,
 )
 
@@ -863,7 +863,7 @@ class TapFMP(Tap):
         return [
             ### Search Streams ###
 
-            StockScreenerStream(self),
+            CompanyScreenerStream(self),
             ExchangeVariantsStream(self),
 
 

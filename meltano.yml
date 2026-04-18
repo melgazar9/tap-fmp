@@ -63,7 +63,7 @@ plugins:
     select:
       ### Search Streams ###
 
-      - stock_screener.*
+      - company_screener.*
       - exchange_variants.*
 
 
@@ -475,7 +475,7 @@ plugins:
 
       ### Search Streams ###
 
-      stock_screener:
+      company_screener:
         query_params:
           volumeMoreThan: 1000000
           limit: 1000

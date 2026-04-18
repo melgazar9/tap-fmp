@@ -13,8 +13,8 @@ from tap_fmp.client import FmpRestStream, CompanySymbolPartitionStream
 # ISIN
 
 
-class StockScreenerStream(FmpRestStream):
-    name = "stock_screener"
+class CompanyScreenerStream(FmpRestStream):
+    name = "company_screener"
 
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
