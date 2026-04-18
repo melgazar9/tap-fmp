@@ -421,9 +421,8 @@ class BaseSymbolPartitionStream(BaseSymbolPartitionMixin, FmpRestStream):
 class CompanySymbolPartitionStream(
     CompanySymbolPartitionMixin, BaseSymbolPartitionStream
 ):
-    """Per-symbol stream over the company stock universe. Defaults to
-    filtered partitions; reference streams whose output feeds the filter
-    set `_raw_partition = True` to opt into the unfiltered universe."""
+    """Per-symbol stream over the company stock universe. See
+    `CompanySymbolPartitionMixin` for the `_raw_partition` opt-in."""
 
 
 class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):

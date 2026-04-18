@@ -363,7 +363,7 @@ class TapFMP(Tap):
     _cached_company_symbols: t.List[dict] | None = None
     _cached_raw_company_symbols: t.List[dict] | None = None
     _company_symbols_stream_instance: CompanySymbolsStream | None = None
-    _company_symbols_lock = threading.Lock()
+    _filtered_company_symbols_lock = threading.Lock()
     _raw_company_symbols_lock = threading.Lock()
 
     _cached_financial_statement_symbols: t.List[dict] | None = None
@@ -613,7 +613,7 @@ class TapFMP(Tap):
         in-memory from get_cached_raw_company_symbols. Per-symbol data
         streams (prices, fundamentals, analyst data, etc.) use this."""
         if self._cached_company_symbols is None:
-            with self._company_symbols_lock:
+            with self._filtered_company_symbols_lock:
                 if self._cached_company_symbols is None:
                     raw = self.get_cached_raw_company_symbols()
                     self._cached_company_symbols = (
@@ -780,9 +780,13 @@ class TapFMP(Tap):
         return self._exchange_variants_manager
 
     def get_cached_exchange_variants(self) -> t.List[dict]:
-        """Get exchange variants using priority system: DB > CSV > API."""
-        manager = self.get_exchange_variants_manager()
-        return manager.get_exchange_variants()
+        """Resolve exchange variants (DB → CSV → raise)."""
+        return self.get_exchange_variants_manager().get_exchange_variants()
+
+    def get_cached_exchange_variants_by_symbol(self) -> t.Dict[str, dict]:
+        """Symbol → variant dict, memoized across the 5 filtered-universe
+        caches so the 89k-entry dict is built once per tap run."""
+        return self.get_exchange_variants_manager().get_variants_by_symbol()
 
     def _apply_country_currency_filtering(
         self, symbols: list[dict], config_key: str
@@ -805,18 +809,17 @@ class TapFMP(Tap):
             f"Loading exchange variants for filtering {config_key} symbols..."
         )
         try:
-            exchange_variants_data = self.get_cached_exchange_variants()
+            variants_by_symbol = self.get_cached_exchange_variants_by_symbol()
         except RuntimeError as e:
-            self.logger.warning(
+            self.logger.error(
                 f"Exchange variants unavailable for filtering {config_key} ({e}). "
-                f"Returning unfiltered {len(symbols)} symbols. This is expected on "
-                f"first run before the exchange_variants table/CSV has been seeded; "
-                f"re-run once exchange_variants has landed to enable filtering."
+                f"Returning unfiltered {len(symbols)} symbols — downstream data "
+                f"will include non-{filter_countries}/{filter_currencies} records. "
+                f"Expected only on first run; re-run after exchange_variants "
+                f"has landed to enable filtering."
             )
             return symbols
-        self.logger.info(f"Loaded {len(exchange_variants_data)} exchange variants")
-
-        variants_by_symbol = {d["symbol"]: d for d in exchange_variants_data}
+        self.logger.info(f"Loaded {len(variants_by_symbol)} exchange variants")
 
         filtered_symbols = []
         for s in symbols:

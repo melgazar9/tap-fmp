@@ -169,6 +169,7 @@ class ExchangeVariantsManager:
         self._cache: t.List[t.Dict[str, t.Any]] = []
         self._cache_timestamp: t.Optional[datetime] = None
         self._cache_lock = threading.Lock()
+        self._variants_by_symbol: t.Optional[t.Dict[str, t.Dict[str, t.Any]]] = None
 
         self.exchange_config = config.get("exchange_variants_source", {})
         self.db_config = config.get("database_config", {})
@@ -181,7 +182,9 @@ class ExchangeVariantsManager:
         self.cache_ttl_hours = self.exchange_config.get("cache_ttl_hours", 72)
 
     def get_exchange_variants(self) -> t.List[t.Dict[str, t.Any]]:
-        """Get exchange variants using priority: DB > CSV > API."""
+        """Resolve exchange variants: DB → CSV → raise. The stream sync is
+        the canonical populator; callers that reach this code on a cold
+        table should run `--select exchange_variants` first."""
         with self._cache_lock:
             if self._is_cache_valid():
                 self.logger.info("Using cached exchange variants data")
@@ -193,8 +196,7 @@ class ExchangeVariantsManager:
                 if data:
                     self._update_cache(data)
                     return self._cache
-                else:
-                    self.logger.warning("Database loading failed, trying next source")
+                self.logger.warning("Database loading failed, trying next source")
 
             if self.use_csv and self._has_csv_file():
                 self.logger.info("Loading exchange variants from CSV")
@@ -202,17 +204,14 @@ class ExchangeVariantsManager:
                 if data:
                     self._update_cache(data)
                     return self._cache
-                else:
-                    self.logger.warning("CSV loading failed, falling back to API")
+                self.logger.warning("CSV loading failed, no further sources")
 
-            # Fallback to API (existing behavior)
-            self.logger.info("Loading exchange variants from API (fallback)")
-            data = self._load_from_api()
-            if data:
-                self._update_cache(data)
-                return self._cache
-            else:
-                raise RuntimeError("All exchange variants sources failed")
+            raise RuntimeError(
+                "exchange_variants unavailable from any configured source "
+                "(DB/CSV). Run `meltano el tap-fmp target-postgres --select "
+                "exchange_variants` to populate the table, or supply "
+                "distinct_exchange_variants.csv."
+            )
 
     def _is_cache_valid(self) -> bool:
         """Check if current cache is still valid."""
@@ -226,7 +225,16 @@ class ExchangeVariantsManager:
         """Update internal cache with new data."""
         self._cache = data
         self._cache_timestamp = datetime.now()
+        self._variants_by_symbol = None  # invalidate derived index
         self.logger.info(f"Cache updated with {len(data)} exchange variants")
+
+    def get_variants_by_symbol(self) -> t.Dict[str, t.Dict[str, t.Any]]:
+        """Symbol → variant dict, built once per cache refresh. Used by all
+        per-universe filters so they don't each rebuild an 89k-entry dict."""
+        if self._variants_by_symbol is None:
+            variants = self.get_exchange_variants()
+            self._variants_by_symbol = {d["symbol"]: d for d in variants}
+        return self._variants_by_symbol
 
     def _has_database_config(self) -> bool:
         """Check if database configuration is complete."""
@@ -325,26 +333,12 @@ class ExchangeVariantsManager:
             self.logger.error(f"CSV loading failed: {e}")
             return None
 
-    def _load_from_api(self) -> t.Optional[t.List[t.Dict[str, t.Any]]]:
-        """No-op bootstrap path. Populating the filter cache inline would mean
-        ~89k serial per-symbol API calls against /stable/search-exchange-variants
-        (hours with throttling) and duplicate the work the exchange_variants
-        stream does during its own sync. The stream sync itself is the
-        canonical populator — run `--select exchange_variants` first, then
-        subsequent runs read from DB/CSV."""
-        self.logger.warning(
-            "exchange_variants not available via DB or CSV; API bootstrap is "
-            "disabled (would require ~89k serial calls). Run `meltano el "
-            "tap-fmp target-postgres --select exchange_variants` first to "
-            "populate the table, or supply distinct_exchange_variants.csv."
-        )
-        return None
-
     def clear_cache(self) -> None:
         """Clear the internal cache."""
         with self._cache_lock:
             self._cache = []
             self._cache_timestamp = None
+            self._variants_by_symbol = None
             self.logger.info("Exchange variants cache cleared")
 
     def get_cache_info(self) -> t.Dict[str, t.Any]:
@@ -373,5 +367,4 @@ class ExchangeVariantsManager:
             priority.append("database")
         if self.use_csv and self._has_csv_file():
             priority.append("csv")
-        priority.append("api")
         return priority
