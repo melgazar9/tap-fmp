@@ -128,7 +128,7 @@ class BaseSymbolPartitionMixin(ABC):
                 return [{"symbol": symbol} for symbol in selected_symbols]
 
         query_params_symbol = self.query_params.get("symbol")
-        other_params_symbols = self.config.get("other_params", {}).get("symbols")
+        other_params_symbols = self.stream_config.get("other_params", {}).get("symbols")
 
         if query_params_symbol and other_params_symbols:
             raise ValueError(

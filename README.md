@@ -66,10 +66,10 @@ The tap allows you to specify lists of symbols for various streams. This is usef
 
 You can also configure specific parameters for each stream. This allows you to customize the data extraction for each stream.
 
-For example, you can configure the `stock_screener` stream to only return stocks with a volume greater than 1,000,000 and a limit of 1000 results:
+For example, you can configure the `company_screener` stream to only return stocks with a volume greater than 1,000,000 and a limit of 1000 results:
 
 ```yaml
-      stock_screener:
+      company_screener:
         query_params:
           volumeMoreThan: 1000000
           limit: 1000

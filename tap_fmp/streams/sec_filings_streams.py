@@ -60,7 +60,7 @@ class SecFilingFormTypePartitionMixin(BaseSecFilingTimeSliceStream):
     @property
     def partitions(self):
         query_params_form_type = self.query_params.get("formType")
-        other_params_form_types = self.config.get("other_params", {}).get("form_types")
+        other_params_form_types = self.stream_config.get("other_params", {}).get("form_types")
 
         assert not (query_params_form_type and other_params_form_types), (
             f"Cannot specify form_type configurations in both query_params and "
