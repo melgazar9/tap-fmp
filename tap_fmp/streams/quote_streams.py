@@ -17,10 +17,10 @@ class QuoteSymbolPartitionStream(CompanySymbolPartitionStream, FmpSurrogateKeySt
     """Base class for quote streams with surrogate key support."""
 
 
-class SecuritiesQuoteStream(QuoteSymbolPartitionStream):
-    """Stream for real-time securities quotes."""
+class CompanyQuoteStream(QuoteSymbolPartitionStream):
+    """Stream for real-time company quotes."""
 
-    name = "securities_quote"
+    name = "company_quote"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -47,10 +47,10 @@ class SecuritiesQuoteStream(QuoteSymbolPartitionStream):
         return f"{self.url_base}/stable/quote"
 
 
-class SecuritiesQuoteShortStream(QuoteSymbolPartitionStream):
-    """Stream for short format securities quotes."""
+class CompanyQuoteShortStream(QuoteSymbolPartitionStream):
+    """Stream for short format company quotes."""
 
-    name = "securities_quote_short"
+    name = "company_quote_short"
     schema = SHORT_QUOTE_SCHEMA
 
     def get_url(self, context: Context | None = None) -> str:
@@ -94,10 +94,10 @@ class AftermarketQuoteStream(QuoteSymbolPartitionStream):
         return f"{self.url_base}/stable/aftermarket-quote"
 
 
-class SecuritiesPriceChangeStream(QuoteSymbolPartitionStream):
-    """Stream for securities price changes."""
+class CompanyPriceChangeStream(QuoteSymbolPartitionStream):
+    """Stream for company price changes."""
 
-    name = "securities_price_change"
+    name = "company_price_change"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -119,12 +119,12 @@ class SecuritiesPriceChangeStream(QuoteSymbolPartitionStream):
         return f"{self.url_base}/stable/stock-price-change"
 
 
-class SecuritiesBatchQuoteStream(
+class CompanyBatchQuoteStream(
     CompanyBatchStreamMixin, BatchSymbolPartitionMixin, FmpSurrogateKeyStream
 ):
-    """Stream for batch securities quote data with automatic chunking."""
+    """Stream for batch company quote data with automatic chunking."""
 
-    name = "securities_batch_quote"
+    name = "company_batch_quote"
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -156,12 +156,12 @@ class SecuritiesBatchQuoteStream(
         return super().post_process(record, context)
 
 
-class SecuritiesBatchQuoteShortStream(
+class CompanyBatchQuoteShortStream(
     CompanyBatchStreamMixin, BatchSymbolPartitionMixin, FmpSurrogateKeyStream
 ):
-    """Stream for batch short securities quotes with automatic chunking."""
+    """Stream for batch short company quotes with automatic chunking."""
 
-    name = "securities_batch_quote_short"
+    name = "company_batch_quote_short"
     schema = SHORT_QUOTE_SCHEMA
 
     def get_url(self, context: Context | None = None) -> str:

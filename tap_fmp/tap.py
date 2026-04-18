@@ -130,16 +130,16 @@ from tap_fmp.streams.form_13f_streams import (
 )
 
 from tap_fmp.streams.chart_streams import (
-    SecuritiesChartLightStream,
-    SecuritiesChartFullStream,
-    SecuritiesUnadjustedPriceStream,
-    SecuritiesDividendAdjustedPriceStream,
-    Securities1minStream,
-    Securities5minStream,
-    Securities15minStream,
-    Securities30minStream,
-    Securities1HrStream,
-    Securities4HrStream,
+    CompanyChartLightStream,
+    CompanyChartFullStream,
+    CompanyUnadjustedPriceStream,
+    CompanyDividendAdjustedPriceStream,
+    Company1minStream,
+    Company5minStream,
+    Company15minStream,
+    Company30minStream,
+    Company1HrStream,
+    Company4HrStream,
 )
 
 from tap_fmp.streams.index_streams import (
@@ -338,13 +338,13 @@ from tap_fmp.streams.bulk_streams import (
 )
 
 from tap_fmp.streams.quote_streams import (
-    SecuritiesQuoteStream,
-    SecuritiesQuoteShortStream,
+    CompanyQuoteStream,
+    CompanyQuoteShortStream,
     AftermarketTradeStream,
     AftermarketQuoteStream,
-    SecuritiesPriceChangeStream,
-    SecuritiesBatchQuoteStream,
-    SecuritiesBatchQuoteShortStream,
+    CompanyPriceChangeStream,
+    CompanyBatchQuoteStream,
+    CompanyBatchQuoteShortStream,
     BatchAftermarketTradeStream,
     BatchAftermarketQuoteStream,
     BatchMutualFundQuotesStream,
@@ -1134,16 +1134,16 @@ class TapFMP(Tap):
 
             ### Chart Streams ###
 
-            SecuritiesChartLightStream(self),
-            SecuritiesChartFullStream(self),
-            SecuritiesUnadjustedPriceStream(self),
-            SecuritiesDividendAdjustedPriceStream(self),
-            Securities1minStream(self),
-            Securities5minStream(self),
-            Securities15minStream(self),
-            Securities30minStream(self),
-            Securities1HrStream(self),
-            Securities4HrStream(self),
+            CompanyChartLightStream(self),
+            CompanyChartFullStream(self),
+            CompanyUnadjustedPriceStream(self),
+            CompanyDividendAdjustedPriceStream(self),
+            Company1minStream(self),
+            Company5minStream(self),
+            Company15minStream(self),
+            Company30minStream(self),
+            Company1HrStream(self),
+            Company4HrStream(self),
 
             ### Commitment of Traders Streams ###
 
@@ -1207,13 +1207,13 @@ class TapFMP(Tap):
 
             ### Quote Streams ###
 
-            SecuritiesQuoteStream(self),
-            SecuritiesQuoteShortStream(self),
+            CompanyQuoteStream(self),
+            CompanyQuoteShortStream(self),
             AftermarketTradeStream(self),
             AftermarketQuoteStream(self),
-            SecuritiesPriceChangeStream(self),
-            SecuritiesBatchQuoteStream(self),
-            SecuritiesBatchQuoteShortStream(self),
+            CompanyPriceChangeStream(self),
+            CompanyBatchQuoteStream(self),
+            CompanyBatchQuoteShortStream(self),
             BatchAftermarketTradeStream(self),
             BatchAftermarketQuoteStream(self),
             BatchMutualFundQuotesStream(self),

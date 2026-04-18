@@ -137,16 +137,16 @@ plugins:
 
       # Starter Symbols are Limited to US Exchanges, Premium/Build Limited to US, UK, and Canada Exchanges
 
-#      - securities_chart_light.*
-#      - securities_chart_full.*
-#      - securities_unadjusted_price.*
-#      - securities_dividend_adjusted_prices.*
-#      - securities_prices_1min.*  # Only available for Premium plans and up
-      - securities_prices_5min.*
-#      - securities_prices_15min.*
-#      - securities_prices_30min.*
-      - securities_prices_1h.*
-#      - securities_prices_4h.*
+#      - company_chart_light.*
+#      - company_chart_full.*
+#      - company_unadjusted_price.*
+#      - company_dividend_adjusted_prices.*
+#      - company_prices_1min.*  # Only available for Premium plans and up
+      - company_prices_5min.*
+#      - company_prices_15min.*
+#      - company_prices_30min.*
+      - company_prices_1h.*
+#      - company_prices_4h.*
 
       ### DCF Streams ###
 
@@ -391,13 +391,13 @@ plugins:
 
       ### Quote Streams ###
 
-      - securities_quote.*
-      - securities_quote_short.*
+      - company_quote.*
+      - company_quote_short.*
       - aftermarket_trade.*
       - aftermarket_quote.*
-      - securities_price_change.*
-      - securities_batch_quote.*
-      - securities_batch_quote_short.*
+      - company_price_change.*
+      - company_batch_quote.*
+      - company_batch_quote_short.*
       - batch_aftermarket_trade.*
       - batch_aftermarket_quote.*
       - mutual_fund_price_quotes.*
@@ -1182,19 +1182,19 @@ plugins:
 
       ### Quote Streams ###
 
-      securities_quote:
+      company_quote:
         select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
-      securities_quote_short:
+      company_quote_short:
         select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
-      securities_price_change:
+      company_price_change:
         select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
-      securities_batch_quote:
+      company_batch_quote:
         select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
-      securities_batch_quote_short:
+      company_batch_quote_short:
         select_symbols: ["NVDA", "META", "AAPL", "MSFT"]
 
       aftermarket_trade:

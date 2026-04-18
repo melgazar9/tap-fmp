@@ -18,14 +18,14 @@ from tap_fmp.mixins import (
 # -------------------------
 
 
-class SecuritiesChartLightStream(
+class CompanyChartLightStream(
     ChartLightMixin, CompanySymbolPartitionTimeSliceStream
 ):
-    name = "securities_chart_light"
+    name = "company_chart_light"
 
 
-class SecuritiesChartFullStream(ChartFullMixin, CompanySymbolPartitionTimeSliceStream):
-    name = "securities_chart_full"
+class CompanyChartFullStream(ChartFullMixin, CompanySymbolPartitionTimeSliceStream):
+    name = "company_chart_full"
 
 
 # -------------------------
@@ -43,16 +43,16 @@ class DividendAdjustedPriceMixin(BaseAdjustedPriceSchemaMixin):
         return f"{self.url_base}/stable/historical-price-eod/dividend-adjusted"
 
 
-class SecuritiesUnadjustedPriceStream(
+class CompanyUnadjustedPriceStream(
     UnadjustedPriceMixin, CompanySymbolPartitionTimeSliceStream
 ):
-    name = "securities_unadjusted_price"
+    name = "company_unadjusted_price"
 
 
-class SecuritiesDividendAdjustedPriceStream(
+class CompanyDividendAdjustedPriceStream(
     DividendAdjustedPriceMixin, CompanySymbolPartitionTimeSliceStream
 ):
-    name = "securities_dividend_adjusted_prices"
+    name = "company_dividend_adjusted_prices"
 
 
 # -------------------------
@@ -60,25 +60,25 @@ class SecuritiesDividendAdjustedPriceStream(
 # -------------------------
 
 
-class Securities1minStream(Prices1minMixin, CompanySymbolPartitionTimeSliceStream):
-    name = "securities_prices_1min"
+class Company1minStream(Prices1minMixin, CompanySymbolPartitionTimeSliceStream):
+    name = "company_prices_1min"
 
 
-class Securities5minStream(Prices5minMixin, CompanySymbolPartitionTimeSliceStream):
-    name = "securities_prices_5min"
+class Company5minStream(Prices5minMixin, CompanySymbolPartitionTimeSliceStream):
+    name = "company_prices_5min"
 
 
-class Securities15minStream(Prices15minMixin, CompanySymbolPartitionTimeSliceStream):
-    name = "securities_prices_15min"
+class Company15minStream(Prices15minMixin, CompanySymbolPartitionTimeSliceStream):
+    name = "company_prices_15min"
 
 
-class Securities30minStream(Prices30minMixin, CompanySymbolPartitionTimeSliceStream):
-    name = "securities_prices_30min"
+class Company30minStream(Prices30minMixin, CompanySymbolPartitionTimeSliceStream):
+    name = "company_prices_30min"
 
 
-class Securities1HrStream(Prices1HrMixin, CompanySymbolPartitionTimeSliceStream):
-    name = "securities_prices_1h"
+class Company1HrStream(Prices1HrMixin, CompanySymbolPartitionTimeSliceStream):
+    name = "company_prices_1h"
 
 
-class Securities4HrStream(Prices4HrMixin, CompanySymbolPartitionTimeSliceStream):
-    name = "securities_prices_4h"
+class Company4HrStream(Prices4HrMixin, CompanySymbolPartitionTimeSliceStream):
+    name = "company_prices_4h"
