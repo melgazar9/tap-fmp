@@ -174,7 +174,7 @@ class ExchangeVariantsManager:
         self.exchange_config = config.get("exchange_variants_source", {})
         self.db_config = config.get("database_config", {})
 
-        self.use_csv = self.exchange_config.get("use_csv", True)
+        self.use_csv = self.exchange_config.get("use_csv", False)
         self.csv_path = self.exchange_config.get(
             "csv_path", "distinct_exchange_variants.csv"
         )
@@ -237,12 +237,15 @@ class ExchangeVariantsManager:
         return self._variants_by_symbol
 
     def _has_database_config(self) -> bool:
-        """Check if database configuration is complete."""
-        required_fields = ["host", "database", "username", "password"]
-        return all(
-            self.db_config.get(field) is not None and self.db_config.get(field) != ""
-            for field in required_fields
-        )
+        required = ("host", "database", "username", "password")
+        missing = [f for f in required if not self.db_config.get(f)]
+        if missing and self.use_database:
+            self.logger.warning(
+                "database_config incomplete — missing %s; DB source skipped. "
+                "Set these in meltano config or via env vars.",
+                ", ".join(missing),
+            )
+        return not missing
 
     def _has_csv_file(self) -> bool:
         """Check if CSV file exists."""
