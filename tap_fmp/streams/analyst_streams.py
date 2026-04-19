@@ -204,7 +204,7 @@ class PriceTargetLatestNewsStream(FmpSurrogateKeyStream):
     replication_method = "INCREMENTAL"
     is_timestamp_replication_key = True
     _paginate = True
-    _max_pages = 100
+    _max_pages = 100  # FMP docs: Page maxed at 100 (inclusive); empirically verified
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -330,7 +330,7 @@ class StockGradeLatestNewsStream(FmpRestStream):
     is_timestamp_replication_key = True
     _add_surrogate_key = True
     _paginate = True
-    _max_pages = 100
+    _max_pages = 100  # FMP docs: Page maxed at 100 (inclusive); empirically verified
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

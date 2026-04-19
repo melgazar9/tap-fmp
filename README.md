@@ -78,6 +78,113 @@ For example, you can configure the `company_screener` stream to only return stoc
 
 You can also configure date ranges, limits, and other parameters for most streams. Please refer to the `meltano.yml` file for a full list of available options for each stream.
 
+## Endpoint Limits & Pagination Reference
+
+Every FMP endpoint that accepts `limit` and/or `page` has two independent caps:
+
+- **Max limit** — the maximum records the API will return in a single request. Sending a higher value is silently truncated.
+- **Max page (inclusive)** — the highest valid 0-indexed page. Pages `0..max_page` inclusive are accessible; `max_page + 1` returns HTTP 400.
+
+The tap's `_max_pages` attribute represents the **inclusive** maximum page index (matching FMP's "Page maxed at N" semantics). The pagination loop iterates `while page <= _max_pages`, so `_max_pages = 100` fetches pages 0 through 100 (101 total).
+
+**Source legend**
+- `docs` — FMP's public API docs state the cap explicitly ("Maximum N records per request" and/or "Page maxed at N")
+- `empirical` — verified by direct API probe (limit/page pushed beyond expected cap; observed the silent truncation or HTTP 400 threshold)
+- `docs + empirical` — docs value confirmed by probe
+
+### Streams with pagination (`_max_pages = 100`, pages 0..100 inclusive)
+
+| Stream | Endpoint | Max limit | Max page | Source |
+|---|---|---:|---:|---|
+| `latest_earning_transcripts` | `/stable/earning-call-transcript-latest` | 100 | 100 | docs + empirical |
+| `latest_financial_statements` | `/stable/latest-financial-statements` | 250 | 100 | docs + empirical |
+| `latest_insider_trading` | `/stable/insider-trading/latest` | 1000 | 100 | docs + empirical |
+| `insider_trades_search` | `/stable/insider-trading/search` | 1000 | 100 | docs + empirical |
+| `institutional_ownership_latest_filings` | `/stable/institutional-ownership/latest` | 1000 | 100 | empirical (docs only stated page max) |
+| `latest_8k_filings` | `/stable/sec-filings-8k` | 1000 | 100 | docs + empirical |
+| `latest_sec_filings` | `/stable/sec-filings-financials` | 1000 | 100 | docs + empirical |
+| `sec_filings_by_cik` | `/stable/sec-filings-search/cik` | 1000 | 100 | docs + empirical |
+| `sec_filings_by_form_type` | `/stable/sec-filings-search/form-type` | 1000 | 100 | docs + empirical |
+| `sec_filings_by_symbol` | `/stable/sec-filings-search/symbol` | 1000 | 100 | docs + empirical |
+| `latest_senate_disclosures` | `/stable/senate-latest` | 250 | 100 | docs + empirical |
+| `latest_house_disclosures` | `/stable/house-latest` | 250 | 100 | docs + empirical |
+| `crypto_news` | `/stable/news/crypto` | 250 | 100 | docs + empirical |
+| `crypto_news_latest` | `/stable/news/crypto-latest` | 250 | 100 | docs + empirical |
+| `forex_news` | `/stable/news/forex` | 250 | 100 | docs + empirical |
+| `forex_news_latest` | `/stable/news/forex-latest` | 250 | 100 | docs + empirical |
+| `general_news` | `/stable/news/general-latest` | 250 | 100 | docs + empirical |
+| `press_releases` | `/stable/news/press-releases` | 250 | 100 | docs + empirical |
+| `press_releases_latest` | `/stable/news/press-releases-latest` | 250 | 100 | docs + empirical |
+| `stock_news` | `/stable/news/stock` | 250 | 100 | docs + empirical |
+| `stock_news_latest` | `/stable/news/stock-latest` | 250 | 100 | docs + empirical |
+
+### Streams that paginate but have no documented page cap
+
+Pagination proceeds until the API returns empty or the tap's default `_max_pages` fallback triggers. Records silently cap at the listed `limit` per request.
+
+| Stream | Endpoint | Max limit | Source |
+|---|---|---:|---|
+| `company_screener` | `/stable/company-screener` | 10000 | empirical (docs URL example showed 1000; API accepts up to 10000) |
+| `cik_list` | `/stable/cik-list` | 10000 | docs + empirical |
+| `fmp_articles` | `/stable/fmp-articles` | 200 | empirical (docs URL example showed 20; API caps silently at 200) |
+| `latest_crowdfunding_campaigns` | `/stable/crowdfunding-offerings-latest` | 1000 | empirical |
+| `equity_offering_updates` | `/stable/fundraising-latest` | 100 | empirical |
+| `form_13f_filings_extracts_with_analytics` | `/stable/institutional-ownership/extract-analytics/holder` | 100 | empirical |
+| `holder_performance_summary` | `/stable/institutional-ownership/holder-performance-summary` | N/A (no `limit` param; paginate-only) | docs |
+| `delisted_companies` | `/stable/delisted-companies` | 100 | docs + empirical |
+| `all_shares_float` | `/stable/shares-float-all` | 5000 | docs + empirical |
+| `latest_mergers_and_acquisitions` | `/stable/mergers-acquisitions-latest` | 1000 | docs |
+
+### Non-paginated streams with an explicit `limit` cap
+
+These stream classes do not paginate (`_paginate = False`); the tap makes a single request and the API caps records at the values shown.
+
+| Stream | Endpoint | Max limit | Source |
+|---|---|---:|---|
+| `symbol_changes` | `/stable/symbol-change` | ~5281 (full universe; `page` is silently ignored) | empirical |
+| `analyst_estimates` | `/stable/analyst-estimates` | 1000 | docs |
+| `historical_ratings` | `/stable/ratings-historical` | 10000 | docs |
+| `historical_stock_grades` | `/stable/grades-historical` | 1000 | docs |
+| `dividends_calendar` | `/stable/dividends-calendar` | 4000 | docs |
+| `dividends_company` | `/stable/dividends` | 1000 | docs |
+| `earnings_report` | `/stable/earnings` | 1000 | docs |
+| `earnings_calendar` | `/stable/earnings-calendar` | 4000 | docs |
+| `stock_split_details` | `/stable/splits` | 1000 | docs |
+| `stock_splits_calendar` | `/stable/splits-calendar` | 4000 | docs |
+| `historical_market_cap` | `/stable/historical-market-capitalization` | 5000 | docs + empirical |
+| `company_employee_count` | `/stable/employee-count` | 10000 | docs |
+| `company_historical_employee_count` | `/stable/historical-employee-count` | 10000 | docs |
+| `rating_snapshot` | `/stable/ratings-snapshot` | 1 | docs |
+| `income_statement` | `/stable/income-statement` | 1000 | docs |
+| `balance_sheet` | `/stable/balance-sheet-statement` | 1000 | docs |
+| `cash_flow` | `/stable/cash-flow-statement` | 1000 | docs |
+| `income_statement_ttm` | `/stable/income-statement-ttm` | 1000 | docs |
+| `balance_sheet_ttm` | `/stable/balance-sheet-statement-ttm` | 1000 | docs |
+| `cash_flow_ttm` | `/stable/cash-flow-statement-ttm` | 1000 | docs |
+| `income_statement_growth` | `/stable/income-statement-growth` | 1000 | docs |
+| `balance_sheet_growth` | `/stable/balance-sheet-statement-growth` | 1000 | docs |
+| `cash_flow_growth` | `/stable/cash-flow-statement-growth` | 1000 | docs |
+| `financial_statement_growth` | `/stable/financial-growth` | 1000 | docs |
+| `as_reported_income_statement` | `/stable/income-statement-as-reported` | 1000 | docs |
+| `as_reported_balance_statement` | `/stable/balance-sheet-statement-as-reported` | 1000 | docs |
+| `as_reported_cashflow_statement` | `/stable/cash-flow-statement-as-reported` | 1000 | docs |
+| `as_reported_financial_statement` | `/stable/financial-statement-full-as-reported` | 1000 | docs |
+| `financial_ratios` | `/stable/ratios` | 1000 | docs |
+| `key_metrics` | `/stable/key-metrics` | 1000 | docs |
+| `enterprise_values` | `/stable/enterprise-values` | 1000 | docs |
+| `revenue_product_segmentation` | `/stable/revenue-product-segmentation` | 1000 | docs |
+| `revenue_geographic_segmentation` | `/stable/revenue-geographic-segmentation` | 1000 | docs |
+
+### Historical OHLC streams (`/stable/historical-price-eod/*`)
+
+These endpoints return up to **5000 records per request** (docs) and do **not** accept a `limit` query parameter. The tap windows by `from`/`to` (via `TimeSliceStream`) to stay under the 5000-row cap.
+
+Affected streams: `company_chart_full`, `company_chart_light`, `company_dividend_adjusted_prices`, `company_unadjusted_price`, `historical_crypto_full_chart`, `historical_crypto_light_chart`, `forex_full_chart`, `forex_light_chart`, `historical_index_full_chart`, `historical_index_light_chart`, `commodities_full_chart`, `commodities_light_chart`.
+
+### Streams with no applicable limit
+
+All other streams not listed above either (a) return a fixed small result per query (e.g., per-symbol profile, current quote) or (b) have no documented/exercised `limit` cap. Setting `limit:` on these has no effect. See `meltano.yml` for the canonical per-stream configuration.
+
 ### Configure using environment variables
 
 This Singer tap will automatically import any environment variables within the working directory's

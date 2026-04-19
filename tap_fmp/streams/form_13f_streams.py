@@ -92,7 +92,7 @@ class InstitutionalOwnershipFilingsStream(FmpRestStream):
     primary_keys = ["surrogate_key"]
     _paginate = True
     _add_surrogate_key = True
-    _max_pages = 100
+    _max_pages = 100  # FMP docs: Page maxed at 100 (inclusive); empirically verified
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

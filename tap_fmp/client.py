@@ -322,12 +322,12 @@ class FmpRestStream(RESTStream, ABC):
         max_consecutive_empty = 2
 
         max_page = (
-            self.configured_page + 1
+            self.configured_page
             if self.configured_page is not None
             else self._max_pages
         )
 
-        while page < max_page:
+        while page <= max_page:
             records = self._fetch_with_retry(url, query_params, page)
 
             if not isinstance(records, list):
@@ -353,9 +353,9 @@ class FmpRestStream(RESTStream, ABC):
 
             page += 1
 
-        if page >= self._max_pages:
+        if page > self._max_pages:
             self.logger.warning(
-                f"Reached maximum pages ({self._max_pages}). Some data may be missing."
+                f"Reached maximum page index ({self._max_pages}, inclusive). Some data may be missing."
             )
 
     @staticmethod

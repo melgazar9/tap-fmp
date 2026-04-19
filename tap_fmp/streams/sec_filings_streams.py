@@ -21,7 +21,7 @@ class BaseSecFilingTimeSliceStream(TimeSliceStream):
     _add_surrogate_key = True
     _symbol_in_query_params = False
     _paginate = True
-    _max_pages = 100
+    _max_pages = 100  # FMP docs: Page maxed at 100 (inclusive); empirically verified
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
