@@ -1,5 +1,4 @@
 import typing as t
-from datetime import datetime, timezone
 
 from tap_fmp.client import (
     FmpRestStream,
@@ -344,18 +343,11 @@ class CompanyExecutiveStream(CompanySymbolSurrogateKeyStream):
         th.Property("gender", th.StringType),
         th.Property("year_born", th.IntegerType),
         th.Property("active", th.BooleanType),
-        th.Property("title_since", th.DateTimeType),
+        th.Property("title_since", th.IntegerType),
     ).to_dict()
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/key-executives"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        # FMP returns `title_since` as a Unix epoch integer; schema declares DateTimeType.
-        ts = row.get("title_since")
-        if isinstance(ts, (int, float)):
-            row["title_since"] = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
-        return super().post_process(row, context)
 
 
 class ExecutiveCompensationStream(CompanySymbolSurrogateKeyStream):
