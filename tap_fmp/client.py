@@ -39,9 +39,11 @@ _SCHEMA_DRIFT_LOCK = threading.Lock()
 class FmpRestStream(RESTStream, ABC):
     """FMP stream class with symbol partitioning support."""
 
+    # FMP caps paginated endpoints at page index 100 inclusive (docs: "Page maxed at 100").
+    # Subclasses on those endpoints override `_max_pages = 100`.
     _paginate = False
     _add_surrogate_key = False
-    _max_pages = 10000
+    _max_pages = 10000  # maximum page index, inclusive — tap-side fallback for uncapped endpoints
     _paginate_key = "page"
     _replication_key_starting_name = "from"
     _replication_key_ending_name = "to"
@@ -353,7 +355,7 @@ class FmpRestStream(RESTStream, ABC):
 
             page += 1
 
-        if page > self._max_pages:
+        if self.configured_page is None and page > self._max_pages:
             self.logger.warning(
                 f"Reached maximum page index ({self._max_pages}, inclusive). Some data may be missing."
             )

@@ -21,7 +21,7 @@ class BaseSecFilingTimeSliceStream(TimeSliceStream):
     _add_surrogate_key = True
     _symbol_in_query_params = False
     _paginate = True
-    _max_pages = 100  # FMP docs: Page maxed at 100 (inclusive); empirically verified
+    _max_pages = 100
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -119,6 +119,7 @@ class SecFilingsBySymbolStream(CompanySymbolPartitionTimeSliceStream):
     replication_key = "filing_date"
     _add_surrogate_key = True
     _paginate = True
+    _max_pages = 100
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -143,6 +144,7 @@ class SecFilingsByCikStream(TimeSliceStream):
     replication_key = "filing_date"
     _add_surrogate_key = True
     _paginate = True
+    _max_pages = 100
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

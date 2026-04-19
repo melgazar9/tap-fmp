@@ -18,7 +18,7 @@ class LatestInsiderTradingStream(FmpRestStream):
     replication_method = "INCREMENTAL"
     replication_key = "filing_date"
     _paginate = True
-    _max_pages = 100  # FMP docs: Page maxed at 100 (inclusive); empirically verified
+    _max_pages = 100
     _add_surrogate_key = True
 
     schema = th.PropertiesList(
@@ -66,7 +66,7 @@ class SearchInsiderTradesStream(CompanySymbolPartitionStream):
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
     _paginate = True
-    _max_pages = 100  # FMP docs: Page maxed at 100 (inclusive); empirically verified
+    _max_pages = 100
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

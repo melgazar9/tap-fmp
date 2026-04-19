@@ -240,6 +240,7 @@ class CashFlowStream(StatementStream):
 class LatestFinancialStatementsStream(FmpRestStream):
     name = "latest_financial_statements"
     _paginate = True
+    _max_pages = 100
     _add_surrogate_key = True
 
     schema = th.PropertiesList(

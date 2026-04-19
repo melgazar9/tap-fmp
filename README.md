@@ -117,6 +117,8 @@ The tap's `_max_pages` attribute represents the **inclusive** maximum page index
 | `press_releases_latest` | `/stable/news/press-releases-latest` | 250 | 100 | docs + empirical |
 | `stock_news` | `/stable/news/stock` | 250 | 100 | docs + empirical |
 | `stock_news_latest` | `/stable/news/stock-latest` | 250 | 100 | docs + empirical |
+| `price_target_latest_news` | `/stable/price-target-latest-news` | (FMP news-family default ~250) | 100 | source-set (stream not selected in dev meltano.yml) |
+| `stock_grades_latest_news` | `/stable/grades-latest-news` | (FMP news-family default ~250) | 100 | source-set (stream not selected in dev meltano.yml) |
 
 ### Streams that paginate but have no documented page cap
 
@@ -126,6 +128,7 @@ Pagination proceeds until the API returns empty or the tap's default `_max_pages
 |---|---|---:|---|
 | `company_screener` | `/stable/company-screener` | 10000 | empirical (docs URL example showed 1000; API accepts up to 10000) |
 | `cik_list` | `/stable/cik-list` | 10000 | docs + empirical |
+| `analyst_estimates` | `/stable/analyst-estimates` | 1000 | docs |
 | `fmp_articles` | `/stable/fmp-articles` | 200 | empirical (docs URL example showed 20; API caps silently at 200) |
 | `latest_crowdfunding_campaigns` | `/stable/crowdfunding-offerings-latest` | 1000 | empirical |
 | `equity_offering_updates` | `/stable/fundraising-latest` | 100 | empirical |
@@ -142,7 +145,6 @@ These stream classes do not paginate (`_paginate = False`); the tap makes a sing
 | Stream | Endpoint | Max limit | Source |
 |---|---|---:|---|
 | `symbol_changes` | `/stable/symbol-change` | ~5281 (full universe; `page` is silently ignored) | empirical |
-| `analyst_estimates` | `/stable/analyst-estimates` | 1000 | docs |
 | `historical_ratings` | `/stable/ratings-historical` | 10000 | docs |
 | `historical_stock_grades` | `/stable/grades-historical` | 1000 | docs |
 | `dividends_calendar` | `/stable/dividends-calendar` | 4000 | docs |
