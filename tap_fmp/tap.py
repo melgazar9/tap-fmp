@@ -617,9 +617,7 @@ class TapFMP(Tap):
                 if self._cached_company_symbols is None:
                     raw = self.get_cached_raw_company_symbols()
                     self._cached_company_symbols = (
-                        self._apply_country_currency_filtering(
-                            raw, "company_symbols"
-                        )
+                        self._apply_country_currency_filtering(raw, "company_symbols")
                     )
         return self._cached_company_symbols
 

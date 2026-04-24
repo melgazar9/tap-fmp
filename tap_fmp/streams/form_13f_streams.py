@@ -126,7 +126,7 @@ class FilingsExtractStream(Form13fCikPartitionStream):
         th.Property("security_cusip", th.StringType),
         th.Property("symbol", th.StringType),
         th.Property("name_of_issuer", th.StringType),
-        th.Property("shares", th.IntegerType),
+        th.Property("shares", th.NumberType),
         th.Property("title_of_class", th.StringType),
         th.Property("shares_type", th.StringType),
         th.Property("put_call_share", th.StringType),

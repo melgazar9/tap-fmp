@@ -18,9 +18,7 @@ from tap_fmp.mixins import (
 # -------------------------
 
 
-class CompanyChartLightStream(
-    ChartLightMixin, CompanySymbolPartitionTimeSliceStream
-):
+class CompanyChartLightStream(ChartLightMixin, CompanySymbolPartitionTimeSliceStream):
     name = "company_chart_light"
 
 
