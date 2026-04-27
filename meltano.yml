@@ -209,7 +209,7 @@ plugins:
 #      - all_index_quotes.*
       - historical_index_light_chart.*
       - historical_index_full_chart.*
-#      - index_1min.*
+      - index_1min.*
       - index_5min.*
       - index_1h.*
       - sp500_constituent.*
@@ -790,6 +790,16 @@ plugins:
         query_params:
           from: "2025-02-01"
           to: "2025-05-01"
+
+      ### Index Streams ###
+
+      # `historical-chart/1min` silently caps at ~3-day window regardless of `from`.
+      index_1min:
+        query_params:
+          from: "2025-04-01"
+          to: "2025-04-15"
+        other_params:
+          time_slice_days: 3
 
       ### Commodity Streams ###
 

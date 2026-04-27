@@ -18,6 +18,7 @@ If either invariant breaks, time-slice streams will silently lose data.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -32,6 +33,7 @@ class _StubTimeSliceStream(TimeSliceStream):
 
     name = "test_stream"
     schema = {"properties": {"date": {"type": "string"}}}
+    replication_method = "FULL_TABLE"  # avoids needing a state backend in tests
 
     def __init__(self):
         self.query_params = {}
@@ -41,10 +43,15 @@ class _StubTimeSliceStream(TimeSliceStream):
         self._replication_key_ending_name = "to"
         self.logger = logging.getLogger("tap-fmp.test_stream")
         self._fake_stream_config = {"other_params": {"max_records_per_request": 10}}
+        self._fake_config: dict = {}
 
     @property
     def stream_config(self):
         return self._fake_stream_config
+
+    @property
+    def config(self):
+        return self._fake_config
 
 
 class _PaginatedStubTimeSliceStream(_StubTimeSliceStream):
@@ -60,6 +67,39 @@ def _make_stream():
 
 def _make_paginated_stream():
     return _PaginatedStubTimeSliceStream()
+
+
+@pytest.mark.parametrize(
+    "configured_days,expected_window_days",
+    [
+        (3, 3),
+        (7, 7),
+        (90, 90),
+        (None, 90),  # default when not set
+    ],
+)
+def test_time_slice_days_read_from_other_params(configured_days, expected_window_days):
+    """`time_slice_days` lives under `other_params` in meltano.yml.
+    Reading it from the top of `stream_config` silently uses the 90-day
+    default — which combined with FMP's silent intraday cap drops data."""
+    stream = _make_stream()
+    other_params: dict = {"max_records_per_request": 10}
+    if configured_days is not None:
+        other_params["time_slice_days"] = configured_days
+    stream._fake_stream_config = {"other_params": other_params}
+    # Mirror what parse_config_params does on real streams: keep the
+    # `self.other_params` instance attribute in sync with the config dict.
+    stream.other_params = other_params
+    stream._fake_config = {"start_date": "2024-01-01"}
+
+    chunks = stream.create_time_slice_chunks(context=None)
+
+    assert chunks, "expected at least one slice"
+    first_from, first_to = chunks[0]
+    actual_window = (
+        datetime.fromisoformat(first_to) - datetime.fromisoformat(first_from)
+    ).days
+    assert actual_window == expected_window_days
 
 
 def test_window_failure_propagates_and_no_later_records_emit():
@@ -190,7 +230,7 @@ def _run_fetch_window(stream, records, from_date, to_date, caplog, *, symbol="AA
 @pytest.mark.parametrize(
     "records,from_date,to_date,fires",
     [
-        # 88-day gap: the index_1min failure mode (records cluster at end of window).
+        # 88-day gap: records cluster at end of window (FMP silent cap).
         (
             [
                 {"date": "2024-03-29 09:30:00"},

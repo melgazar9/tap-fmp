@@ -111,7 +111,7 @@ class FmpRestStream(RESTStream, ABC):
         is set, since FMP exposes no way to enumerate valid name values for
         these streams."""
         query_name = self.query_params.get("name")
-        other_names = self.stream_config.get("other_params", {}).get("names")
+        other_names = self.other_params.get("names")
         if query_name and other_names:
             raise ConfigValidationError(
                 f"Stream {self.name}: specify either query_params.name OR "
@@ -449,9 +449,7 @@ class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):
 
     @property
     def partitions(self):
-        periods = self.stream_config.get("query_params", {}).get(
-            "period"
-        ) or self.stream_config.get("other_params", {}).get("periods")
+        periods = self.query_params.get("period") or self.other_params.get("periods")
 
         periods = self._get_periods(periods)
         symbols = self._tap.get_cached_company_symbols()
@@ -508,7 +506,7 @@ class TimeSliceStream(FmpRestStream):
         else:
             start_dt = datetime(1970, 1, 1).date()
 
-        window_days = int(self.stream_config.get("time_slice_days", 90))
+        window_days = int(self.other_params.get("time_slice_days", 90))
 
         query_params = self.stream_config.get("query_params", {})
         start_date_cfg = query_params.get(
@@ -743,9 +741,7 @@ class TimeSliceStream(FmpRestStream):
         url = self.get_url(context)
 
         time_slices = self.create_time_slice_chunks(context)
-        max_records = self.stream_config.get("other_params", {}).get(
-            "max_records_per_request", 4000
-        )
+        max_records = self.other_params.get("max_records_per_request", 4000)
 
         # No try/except around fetch_window: a transient API failure must
         # propagate so Singer leaves state at the last fully-completed window.
@@ -777,9 +773,7 @@ class BaseSymbolPartitionTimeSliceStream(BaseSymbolPartitionMixin, TimeSliceStre
 
         url = self.get_url(context)
         time_slices = self.create_time_slice_chunks(context)
-        max_records = self.stream_config.get("other_params", {}).get(
-            "max_records_per_request", 4000
-        )
+        max_records = self.other_params.get("max_records_per_request", 4000)
 
         # See note above: no try/except here. Failures must propagate so Singer
         # bookmark stays at last fully-completed window.
@@ -820,8 +814,8 @@ class IncrementalDateStream(FmpSurrogateKeyStream):
         if "date" in self.query_params:
             return [{"date": self.query_params.get("date")}]
 
-        query_params = self.stream_config.get("query_params", {})
-        other_params = self.stream_config.get("other_params", {})
+        query_params = self.query_params
+        other_params = self.other_params
         date_range = other_params.get("date_range")
 
         if "date" in query_params and "date_range" in other_params:
@@ -902,7 +896,7 @@ class IncrementalYearStream(FmpSurrogateKeyStream):
         if "year" in self.query_params:
             return [{"year": self.query_params.get("year")}]
 
-        other_params = self.stream_config.get("other_params", {})
+        other_params = self.other_params
 
         current_year = datetime.today().year
         default_start_year = 1970
@@ -971,8 +965,8 @@ class BaseSymbolYearPartitionStream(CompanySymbolPartitionStream):
     @property
     def partitions(self):
         """Get symbol + year + quarter/period partition combinations."""
-        query_params = self.stream_config.get("query_params", {})
-        other_params = self.stream_config.get("other_params", {})
+        query_params = self.query_params
+        other_params = self.other_params
 
         symbols = self._partition_symbols()
 
