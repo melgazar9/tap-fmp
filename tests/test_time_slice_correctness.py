@@ -102,6 +102,128 @@ def test_time_slice_days_read_from_other_params(configured_days, expected_window
     assert actual_window == expected_window_days
 
 
+def test_subclass_default_time_slice_days_overrides_base():
+    """Subclasses set `_default_time_slice_days` to encode known FMP caps
+    (e.g. 1min=3 days). The default applies when `other_params` is empty
+    and is itself overridable from meltano.yml."""
+
+    class _ThreeDayStub(_StubTimeSliceStream):
+        _default_time_slice_days = 3
+
+    stream = _ThreeDayStub()
+    stream._fake_stream_config = {"other_params": {"max_records_per_request": 10}}
+    stream.other_params = {"max_records_per_request": 10}
+    stream._fake_config = {"start_date": "2024-01-01"}
+    chunks = stream.create_time_slice_chunks(context=None)
+    assert chunks
+    first_from, first_to = chunks[0]
+    assert (
+        datetime.fromisoformat(first_to) - datetime.fromisoformat(first_from)
+    ).days == 3
+
+    # meltano.yml override still wins over the class default.
+    stream.other_params = {"max_records_per_request": 10, "time_slice_days": 14}
+    stream._fake_stream_config = {"other_params": stream.other_params}
+    chunks = stream.create_time_slice_chunks(context=None)
+    first_from, first_to = chunks[0]
+    assert (
+        datetime.fromisoformat(first_to) - datetime.fromisoformat(first_from)
+    ).days == 14
+
+
+from tap_fmp.streams.chart_streams import (
+    Company1minStream,
+    Company5minStream,
+    Company15minStream,
+    Company30minStream,
+    Company1HrStream,
+    Company4HrStream,
+)
+from tap_fmp.streams.commodity_streams import (
+    Commodities1minStream,
+    Commodities5minStream,
+    Commodities1HrStream,
+)
+from tap_fmp.streams.crypto_streams import (
+    Crypto1minStream,
+    Crypto5minStream,
+    Crypto1HrStream,
+)
+from tap_fmp.streams.forex_streams import (
+    Forex1minStream,
+    Forex5minStream,
+    Forex1HrStream,
+)
+from tap_fmp.streams.index_streams import (
+    Index1MinuteIntervalStream,
+    Index5MinuteIntervalStream,
+    Index1HourIntervalStream,
+)
+from tap_fmp.streams.news_streams import (
+    GeneralNewsStream,
+    StockNewsLatestStream,
+    CryptoNewsLatestStream,
+    ForexNewsLatestStream,
+    StockNewsStream,
+    CryptoNewsStream,
+    ForexNewsStream,
+    PressReleasesStream,
+    PressReleasesLatestStream,
+)
+from tap_fmp.streams.sec_filings_streams import (
+    Latest8KFilingsStream,
+    LatestSecFilingsStream,
+    SecFilingsByFormTypeStream,
+    SecFilingsBySymbolStream,
+    SecFilingsByCikStream,
+)
+from tap_fmp.streams.company_streams import HistoricalMarketCapStream
+
+
+@pytest.mark.parametrize(
+    "stream_cls,expected_days",
+    [
+        (Company1minStream, 3),
+        (Commodities1minStream, 3),
+        (Crypto1minStream, 3),
+        (Forex1minStream, 3),
+        (Index1MinuteIntervalStream, 3),
+        (Company5minStream, 5),
+        (Commodities5minStream, 5),
+        (Crypto5minStream, 5),
+        (Forex5minStream, 5),
+        (Index5MinuteIntervalStream, 5),
+        (Company15minStream, 15),
+        (Company30minStream, 90),
+        (Company1HrStream, 90),
+        (Company4HrStream, 90),
+        (Commodities1HrStream, 90),
+        (Crypto1HrStream, 90),
+        (Forex1HrStream, 90),
+        (Index1HourIntervalStream, 90),
+        (GeneralNewsStream, 10),
+        (StockNewsLatestStream, 7),
+        (CryptoNewsLatestStream, 7),
+        (ForexNewsLatestStream, 7),
+        (StockNewsStream, 30),
+        (CryptoNewsStream, 30),
+        (ForexNewsStream, 30),
+        (PressReleasesStream, 30),
+        (PressReleasesLatestStream, 30),
+        (Latest8KFilingsStream, 30),
+        (LatestSecFilingsStream, 30),
+        (SecFilingsByFormTypeStream, 30),
+        (SecFilingsBySymbolStream, 90),
+        (SecFilingsByCikStream, 90),
+        (HistoricalMarketCapStream, 90),
+    ],
+)
+def test_default_time_slice_days_resolves_via_mro(stream_cls, expected_days):
+    """Catch MRO surprises where a stream's `_default_time_slice_days`
+    is shadowed by an earlier base. Pure attribute lookup, no instantiation."""
+    assert stream_cls._default_time_slice_days == expected_days
+
+
 def test_window_failure_propagates_and_no_later_records_emit():
     """If fetch_window raises mid-iteration, no records from later windows
     must reach the consumer. State stays at the last good window."""

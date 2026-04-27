@@ -20,6 +20,8 @@ class BaseNewsTimeSliceStream(TimeSliceStream, FmpSurrogateKeyStream):
     is_timestamp_replication_key = True
     _paginate = True
     _max_pages = 100
+    # 100 pages * 250-record limit = 25k cap per slice.
+    _default_time_slice_days: int = 30
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -72,6 +74,8 @@ class GeneralNewsStream(BaseNewsTimeSliceStream):
     """Stream for General News API."""
 
     name = "general_news"
+    # ~2.5k/day → 10 days before page-cap truncation.
+    _default_time_slice_days: int = 10
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/news/general-latest"
@@ -97,10 +101,13 @@ class PressReleasesStream(
         return f"{self.url_base}/stable/news/press-releases"
 
 
+# `news/*-latest` feeds are NOT symbol-partitioned — every record across all
+# symbols hits the 25k page cap.
 class StockNewsLatestStream(BaseNewsTimeSliceStream):
     """Stream for Stock News Latest API."""
 
     name = "stock_news_latest"
+    _default_time_slice_days: int = 7
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/news/stock-latest"
@@ -110,6 +117,7 @@ class CryptoNewsLatestStream(BaseNewsTimeSliceStream):
     """Stream for Crypto News Latest API."""
 
     name = "crypto_news_latest"
+    _default_time_slice_days: int = 7
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/news/crypto-latest"
@@ -119,6 +127,7 @@ class ForexNewsLatestStream(BaseNewsTimeSliceStream):
     """Stream for Forex News Latest API."""
 
     name = "forex_news_latest"
+    _default_time_slice_days: int = 7
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/news/forex-latest"

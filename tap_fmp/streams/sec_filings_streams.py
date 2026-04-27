@@ -22,6 +22,9 @@ class BaseSecFilingTimeSliceStream(TimeSliceStream):
     _symbol_in_query_params = False
     _paginate = True
     _max_pages = 100
+    # Firehose endpoints (latest_8k, latest_sec_filings, sec_filings_by_form_type)
+    # span all issuers; 25k page cap forces a narrow window.
+    _default_time_slice_days: int = 30
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

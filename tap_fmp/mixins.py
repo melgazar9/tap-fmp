@@ -423,16 +423,25 @@ class ChartFullMixin(BasePriceSchemaMixin):
 
 
 class Prices1minMixin(BaseIntervalPriceSchemaMixin):
+    # FMP cap ~1170 rows (~3 trading days for a liquid symbol).
+    _default_time_slice_days: int = 3
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/historical-chart/1min"
 
 
 class Prices5minMixin(BaseIntervalPriceSchemaMixin):
+    # FMP cap ~624 rows (~8 trading days).
+    _default_time_slice_days: int = 5
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/historical-chart/5min"
 
 
 class Prices15minMixin(BaseIntervalPriceSchemaMixin):
+    # FMP cap ~835 rows (~22 trading days).
+    _default_time_slice_days: int = 15
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/historical-chart/15min"
 

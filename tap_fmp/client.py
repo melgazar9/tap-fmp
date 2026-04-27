@@ -481,6 +481,12 @@ class TimeSliceStream(FmpRestStream):
     replication_key = "date"
     replication_method = "INCREMENTAL"
 
+    # Sole defense against silent truncation on paginated and silently-capped
+    # paths: `fetch_window`'s recursive halving only engages on
+    # `max_records_per_request` hits, not on FMP's silent chart caps or
+    # `_max_pages` ceilings.
+    _default_time_slice_days: int = 90
+
     _LOG_FIXED_KEYS = frozenset(
         {
             "stream",
@@ -506,7 +512,9 @@ class TimeSliceStream(FmpRestStream):
         else:
             start_dt = datetime(1970, 1, 1).date()
 
-        window_days = int(self.other_params.get("time_slice_days", 90))
+        window_days = int(
+            self.other_params.get("time_slice_days", self._default_time_slice_days)
+        )
 
         query_params = self.stream_config.get("query_params", {})
         start_date_cfg = query_params.get(
