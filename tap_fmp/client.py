@@ -44,6 +44,9 @@ class FmpRestStream(RESTStream, ABC):
     _paginate = False
     _add_surrogate_key = False
     _max_pages = 10000  # maximum page index, inclusive — tap-side fallback for uncapped endpoints
+    _max_consecutive_empty_pages = (
+        2  # FMP occasionally returns a single empty page mid-data
+    )
     _paginate_key = "page"
     _replication_key_starting_name = "from"
     _replication_key_ending_name = "to"
@@ -303,6 +306,9 @@ class FmpRestStream(RESTStream, ABC):
             )
 
     def _set_configured_page(self):
+        if getattr(self, "_configured_page_resolved", False):
+            return self
+
         self.configured_page = None
         if self._paginate_key in self.query_params:
             self.configured_page = self.query_params[self._paginate_key]
@@ -313,6 +319,7 @@ class FmpRestStream(RESTStream, ABC):
             logging.info(
                 f"Using configured page {self.configured_page} for stream {self.name}"
             )
+        self._configured_page_resolved = True
         return self
 
     def _handle_pagination(
@@ -321,7 +328,6 @@ class FmpRestStream(RESTStream, ABC):
         self._set_configured_page()
         page = self.configured_page if self.configured_page is not None else 0
         consecutive_empty_pages = 0
-        max_consecutive_empty = 2
 
         max_page = (
             self.configured_page
@@ -340,7 +346,7 @@ class FmpRestStream(RESTStream, ABC):
 
             if not records:
                 consecutive_empty_pages += 1
-                if consecutive_empty_pages >= max_consecutive_empty:
+                if consecutive_empty_pages >= self._max_consecutive_empty_pages:
                     self.logger.info(
                         f"Stopping pagination after {consecutive_empty_pages} consecutive empty pages"
                     )
@@ -464,9 +470,30 @@ class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):
         return super().get_records(context)
 
 
+class TruncationReason:
+    """Reason codes for `*** DATA_TRUNCATED ***` log lines. The Dagster
+    sensor matches on these substrings — keep stable across releases."""
+
+    SILENT_CAP = "fmp_silent_cap_below_max_records"
+    PAGE_CEILING = "hit_page_ceiling_with_data"
+    SPLIT_FLOOR = "window_at_min_granularity_still_at_cap"
+
+
 class TimeSliceStream(FmpRestStream):
     replication_key = "date"
     replication_method = "INCREMENTAL"
+
+    _LOG_FIXED_KEYS = frozenset(
+        {
+            "stream",
+            "window",
+            "symbol",
+            "records_returned",
+            "max_records_per_request",
+            "reason",
+            "action",
+        }
+    )
 
     def create_time_slice_chunks(self, context: Context) -> list[tuple[str, str]]:
         """Generate (from, to) date ranges for the API, as list of (start, end) ISO strings."""
@@ -518,6 +545,119 @@ class TimeSliceStream(FmpRestStream):
             current = slice_end
         return slices
 
+    def _log_data_truncated(
+        self,
+        *,
+        from_date: str,
+        to_date: str,
+        symbol: str | None,
+        records_returned: int,
+        max_records: int,
+        reason: str,
+        action: str,
+        **extra: object,
+    ) -> None:
+        collisions = self._LOG_FIXED_KEYS & extra.keys()
+        assert not collisions, f"extra keys collide with fixed log fields: {collisions}"
+        parts = [
+            DATA_TRUNCATED_TOKEN,
+            f"stream={self.name}",
+            f"window={from_date}..{to_date}",
+            f"symbol={symbol}",
+            f"records_returned={records_returned}",
+            f"max_records_per_request={max_records}",
+            f"reason={reason}",
+            f"action={action}",
+        ]
+        for k, v in extra.items():
+            parts.append(f"{k}={v}")
+        self.logger.error(" ".join(parts))
+
+    def _fetch_paginated_window(
+        self, url: str, query_params: dict
+    ) -> tuple[list[dict], bool]:
+        """Aggregate raw records across all pages within a (from, to) window.
+        Returns `(records, hit_page_ceiling)`. The ceiling flag is True only
+        when the loop exited because we exhausted `_max_pages` with data
+        still flowing — caller treats that as truncation. A configured
+        single-page fetch never reports ceiling-hit."""
+        self._set_configured_page()
+        page = self.configured_page if self.configured_page is not None else 0
+        max_page = (
+            self.configured_page
+            if self.configured_page is not None
+            else self._max_pages
+        )
+        consecutive_empty = 0
+        records: list[dict] = []
+
+        while page <= max_page:
+            page_records = self._fetch_with_retry(url, query_params, page)
+            if not isinstance(page_records, list):
+                self.logger.warning(
+                    f"Expected list response on page {page}, got "
+                    f"{type(page_records).__name__}; stopping pagination."
+                )
+                return records, False
+            if not page_records:
+                consecutive_empty += 1
+                if consecutive_empty >= self._max_consecutive_empty_pages:
+                    return records, False
+            else:
+                consecutive_empty = 0
+                records.extend(page_records)
+            page += 1
+
+        return records, self.configured_page is None
+
+    def _check_silent_truncation(
+        self,
+        records: list[dict],
+        from_date: str,
+        to_date: str,
+        max_records: int,
+        symbol: str | None,
+    ) -> None:
+        if not records or not isinstance(records[0], dict):
+            return
+        try:
+            # FMP returns chart records DESC, but be order-agnostic.
+            candidates = [
+                datetime.fromisoformat(d).date()
+                for d in (records[0].get("date"), records[-1].get("date"))
+                if d
+            ]
+            if not candidates:
+                return
+            earliest = min(candidates)
+            from_dt = datetime.fromisoformat(from_date).date()
+            # 7-day tolerance covers 9/11-class closures, Christmas–NY
+            # half-days + weekend, 3-day weekends + symbol halt.
+            if (earliest - from_dt).days > 7:
+                self._log_data_truncated(
+                    from_date=from_date,
+                    to_date=to_date,
+                    symbol=symbol,
+                    records_returned=len(records),
+                    max_records=max_records,
+                    reason=TruncationReason.SILENT_CAP,
+                    action="set_smaller_time_slice_days_for_this_stream",
+                    earliest_returned=earliest.isoformat(),
+                )
+        except (ValueError, TypeError) as e:
+            self.logger.debug(
+                f"silent-truncation check skipped for stream={self.name} "
+                f"window={from_date}..{to_date}: {type(e).__name__}: {e}"
+            )
+
+    def _yield_processed(
+        self, records: list[dict], context: Context | None
+    ) -> t.Iterable[dict]:
+        for record in records:
+            record = self.post_process(record, context)
+            self._check_missing_fields(record)
+            yield record
+
     def fetch_window(
         self,
         url,
@@ -527,50 +667,75 @@ class TimeSliceStream(FmpRestStream):
         max_records,
         context: Context | None = None,
     ):
-        """
-        Recursively fetch all records for a window, splitting if we hit the max_records limit.
+        """Fetch all records for a window. Three modes:
+
+        1. `_paginate=True`: iterate all pages within the window. If the
+           page ceiling is hit, log DATA_TRUNCATED (splitting wouldn't
+           help — each half would also hit the ceiling).
+        2. Non-paginated, `len(records) >= max_records`: split window in
+           half and recurse. If already at 1-day granularity, log
+           DATA_TRUNCATED.
+        3. Non-paginated, `len(records) < max_records`: yield. Also runs
+           the silent-truncation safety net for FMP's hidden per-request
+           caps that sit below max_records.
         """
         query_params = query_params.copy()
         query_params[self._replication_key_starting_name] = from_date
         query_params[self._replication_key_ending_name] = to_date
+        symbol = query_params.get("symbol")
+
+        if self._paginate:
+            records, hit_page_ceiling = self._fetch_paginated_window(url, query_params)
+            if hit_page_ceiling:
+                self._log_data_truncated(
+                    from_date=from_date,
+                    to_date=to_date,
+                    symbol=symbol,
+                    records_returned=len(records),
+                    max_records=max_records,
+                    reason=TruncationReason.PAGE_CEILING,
+                    action="set_smaller_time_slice_days_for_this_stream",
+                    max_pages=self._max_pages,
+                )
+            else:
+                self._check_silent_truncation(
+                    records, from_date, to_date, max_records, symbol
+                )
+            yield from self._yield_processed(records, context)
+            return
 
         records = self._fetch_with_retry(url, query_params)
+
         if len(records) < max_records:
-            for record in records:
-                record = self.post_process(record, context)
-                self._check_missing_fields(record)
-                yield record
-        else:
-            from_dt = datetime.fromisoformat(from_date)
-            to_dt = datetime.fromisoformat(to_date)
-            if (to_dt - from_dt).days <= 1:
-                # Window can't be split further but FMP returned at the limit,
-                # implying truncation. Yield what we have so the partial window
-                # isn't lost, but escalate so a Dagster sensor can catch it and
-                # the user can refetch with a smaller window or higher limit.
-                self.logger.error(
-                    f"{DATA_TRUNCATED_TOKEN} stream={self.name} "
-                    f"window={from_date}..{to_date} "
-                    f"symbol={query_params.get('symbol')} "
-                    f"records_returned={len(records)} "
-                    f"max_records_per_request={max_records} "
-                    f"action=refetch_with_smaller_window_or_higher_limit"
-                )
-                for record in records:
-                    record = self.post_process(record, context)
-                    self._check_missing_fields(record)
-                    yield record
-                return
-            mid_dt = from_dt + (to_dt - from_dt) // 2
-            mid_date = mid_dt.strftime("%Y-%m-%d")
-            # Fetch left half
-            yield from self.fetch_window(
-                url, query_params, from_date, mid_date, max_records, context
+            self._check_silent_truncation(
+                records, from_date, to_date, max_records, symbol
             )
-            # Fetch right half
-            yield from self.fetch_window(
-                url, query_params, mid_date, to_date, max_records, context
+            yield from self._yield_processed(records, context)
+            return
+
+        from_dt = datetime.fromisoformat(from_date)
+        to_dt = datetime.fromisoformat(to_date)
+        if (to_dt - from_dt).days <= 1:
+            self._log_data_truncated(
+                from_date=from_date,
+                to_date=to_date,
+                symbol=symbol,
+                records_returned=len(records),
+                max_records=max_records,
+                reason=TruncationReason.SPLIT_FLOOR,
+                action="refetch_with_smaller_window_or_higher_limit",
             )
+            yield from self._yield_processed(records, context)
+            return
+
+        mid_dt = from_dt + (to_dt - from_dt) // 2
+        mid_date = mid_dt.strftime("%Y-%m-%d")
+        yield from self.fetch_window(
+            url, query_params, from_date, mid_date, max_records, context
+        )
+        yield from self.fetch_window(
+            url, query_params, mid_date, to_date, max_records, context
+        )
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         query_params = self.query_params.copy()
