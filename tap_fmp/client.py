@@ -481,10 +481,8 @@ class TimeSliceStream(FmpRestStream):
     replication_key = "date"
     replication_method = "INCREMENTAL"
 
-    # Sole defense against silent truncation on paginated and silently-capped
-    # paths: `fetch_window`'s recursive halving only engages on
-    # `max_records_per_request` hits, not on FMP's silent chart caps or
-    # `_max_pages` ceilings.
+    # Last-line defense against silent truncation: `fetch_window`'s halving
+    # only fires on `max_records_per_request` hits, not on silent caps or page ceilings.
     _default_time_slice_days: int = 90
 
     _LOG_FIXED_KEYS = frozenset(

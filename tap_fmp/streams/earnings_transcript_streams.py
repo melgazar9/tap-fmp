@@ -37,6 +37,12 @@ class EarningsTranscriptStream(
 
     name = "earnings_transcripts"
 
+    # Bookmark per symbol; symbol×year×quarter fan-out would exceed
+    # elt.buffer_size. Date still advances within a symbol's iteration;
+    # SDK-forced treat_as_sorted=False is safe since the target upserts on
+    # surrogate_key.
+    state_partitioning_keys = ["symbol"]
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),

@@ -12,6 +12,9 @@ from tap_fmp.helpers import safe_int
 
 
 class Form13fCikPartitionStream(FmpRestStream):
+    # Bookmark per CIK; cik×year×quarter fan-out would exceed elt.buffer_size.
+    state_partitioning_keys = ["cik"]
+
     @property
     def partitions(self):
         query_params = self.stream_config.get("query_params", {})
@@ -49,6 +52,9 @@ class Form13fCikPartitionStream(FmpRestStream):
 
 
 class Form13fSymbolPartitionStream(FmpRestStream):
+    # Bookmark per symbol; symbol×year×quarter fan-out would exceed elt.buffer_size.
+    state_partitioning_keys = ["symbol"]
+
     @property
     def partitions(self):
         query_params = self.stream_config.get("query_params", {})

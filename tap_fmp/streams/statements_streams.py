@@ -1062,6 +1062,11 @@ class FinancialReportsForm10kJsonStream(StatementStream):
 
     name = "financial_reports_form_10k_json"
 
+    # Bookmark per symbol; symbol×period×year fan-out would exceed
+    # elt.buffer_size. Declared per-leaf since sibling StatementStreams
+    # partition by (symbol, period).
+    state_partitioning_keys = ["symbol"]
+
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
