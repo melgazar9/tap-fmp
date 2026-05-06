@@ -62,6 +62,44 @@ The tap allows you to specify lists of symbols for various streams. This is usef
 
 **Note on Filtering Logic:** When you specify multiple filters (e.g., `symbols`, `countries`, `currencies`), the tap will extract data that matches **any** of the specified filters. For example, if you specify a list of symbols and a list of countries, the tap will extract data for those symbols, as well as all data for the specified countries. The filtering logic is an "OR" condition, not an "AND" condition.
 
+### Country / Currency Filtering — Required Prerequisite
+
+`filter_countries` and `filter_currencies` (e.g. `["US"]` / `["USD"]`) restrict the per-symbol universe every downstream stream iterates over. The filter looks up each symbol's country/currency from the `exchange_variants` data set, sourced according to `exchange_variants_source`:
+
+- `use_database: true` (default) — read from the `exchange_variants` Postgres table populated by the `exchange_variants` stream
+- `use_csv: true` — read from `distinct_exchange_variants.csv` shipped with the repo
+
+**You MUST populate the source before any other stream runs when filters are set.**
+
+When the source is unavailable (DB table empty / CSV not enabled), the tap currently logs a warning and **falls back to the full unfiltered ~89k-symbol universe** — burning API credits on records you do not want and contaminating downstream tables (especially under `load_method: append-only`, where re-running will not overwrite the bad rows).
+
+#### Recommended workflow (`use_database: true`)
+
+Run the `exchange_variants` stream by itself first and let it complete fully (~3–4 hours for the full FMP universe) **before** triggering any other stream:
+
+```bash
+meltano --environment <env> el tap-fmp target-postgres \
+  --state-id tap_fmp_target_postgres_<env>__exchange_variants \
+  --select exchange_variants
+```
+
+Once the table is populated, trigger the full job. Subsequent runs do not need this step — `ExchangeVariantsManager` reads from the existing table on startup (cached for `exchange_variants_source.cache_ttl_hours`, default 72h). Repeat the one-off only after a schema reset or whenever you want to refresh against a new FMP universe.
+
+> Do **not** select `exchange_variants` in the same parallel job as dependent streams on a cold table. Each stream runs as its own subprocess and initialises its symbol universe at startup; the dependents will read the still-empty table, fall back to unfiltered, and silently load global data.
+
+#### Alternative (`use_csv: true`)
+
+To skip the cold-start Postgres dependency, set in `meltano.yml`:
+
+```yaml
+config:
+  exchange_variants_source:
+    use_csv: true
+    use_database: false
+```
+
+The repo ships `distinct_exchange_variants.csv` as a static snapshot. It is stale relative to a fresh API sync (does not pick up newly listed symbols until you re-export it from a populated DB) but is sufficient for most filtering use cases and removes the ordering requirement entirely.
+
 ### Stream-Specific Configuration
 
 You can also configure specific parameters for each stream. This allows you to customize the data extraction for each stream.
