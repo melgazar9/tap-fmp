@@ -746,7 +746,13 @@ class TapFMP(Tap):
         return self._transcript_symbols_stream_instance
 
     def get_cached_indices(self) -> t.List[dict]:
-        """Thread-safe index caching for parallel execution."""
+        """Thread-safe index caching for parallel execution.
+
+        Indices (^GSPC, ^DJI, ^N225, ...) are not listed on exchanges in the
+        same way stocks/ETFs are, so they have no rows in `exchange_variants`
+        and the country/currency filter would drop 100% of them. Universe is
+        restricted via `select_index_symbols` in meltano config instead.
+        """
         return self._get_cached_data(
             {
                 "cache_attr": "_cached_indices",
@@ -754,8 +760,6 @@ class TapFMP(Tap):
                 "stream_getter": self.get_index_stream,
                 "data_type": "indices",
                 "sort_key": "symbol",
-                "apply_filtering": True,
-                "filter_config_key": "index_symbols",
             }
         )
 
