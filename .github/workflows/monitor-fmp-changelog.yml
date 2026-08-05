@@ -5,111 +5,236 @@ on:
     # Run every Monday at 9 AM UTC
     - cron: '0 9 * * 1'
   workflow_dispatch: # Allow manual triggering
+    inputs:
+      lookback_days:
+        description: 'How many days back to look for changelog entries'
+        required: false
+        default: '21'
 
 permissions:
-  issues: write
+  contents: write
+  pull-requests: write
+  id-token: write
 
 jobs:
-  check-changelog:
+  check-and-update:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
-      - name: Fetch and check FMP changelog
+      - name: Fetch and parse FMP changelog
         id: check
+        env:
+          LOOKBACK_DAYS: ${{ github.event.inputs.lookback_days || '21' }}
         run: |
-          # Fetch the changelog page HTML
-          curl -s "https://site.financialmodelingprep.com/developer/docs/changelog" > changelog-page.html
+          set -euo pipefail
 
-          # Extract the embedded JSON data from the Next.js page
-          # The changelog is in __NEXT_DATA__ script tag as props.pageProps.logs
-          grep -o '__NEXT_DATA__[^<]*' changelog-page.html | \
-            sed 's/__NEXT_DATA__" type="application\/json">//' | \
-            jq '.props.pageProps.logs' > changelog-response.json
+          # FMP's site returns 403 to requests without a browser User-Agent.
+          # --fail makes a non-2xx response a hard error instead of silently
+          # writing an error page into the output file.
+          curl -sS --fail --compressed -L \
+            -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            "https://site.financialmodelingprep.com/developer/docs/changelog" \
+            -o changelog-page.html
 
-          if ! jq empty changelog-response.json 2>/dev/null; then
-            echo "::error::Failed to extract changelog JSON from page"
-            exit 1
-          fi
+          echo "Fetched $(wc -c < changelog-page.html) bytes"
 
-          # Look at changes from the last 21 days
-          SINCE=$(date -d '21 days ago' +%Y-%m-%d 2>/dev/null || date -v-21d +%Y-%m-%d)
-          echo "since=$SINCE" >> "$GITHUB_OUTPUT"
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          import os
+          import re
+          import sys
+          from datetime import date, timedelta
 
-          NEW_COUNT=$(jq --arg date "$SINCE" '[.[] | select(.date > $date)] | length' changelog-response.json)
-          echo "new_count=$NEW_COUNT" >> "$GITHUB_OUTPUT"
+          html = open("changelog-page.html", encoding="utf-8").read()
 
-          if [ "$NEW_COUNT" -gt 0 ]; then
-            echo "has_new=true" >> "$GITHUB_OUTPUT"
+          # The changelog is a Next.js page; entries are embedded in the
+          # __NEXT_DATA__ script tag at props.pageProps.logs.
+          match = re.search(
+              r'<script id="__NEXT_DATA__" type="application/json"[^>]*>(.*?)</script>',
+              html,
+              re.S,
+          )
+          if not match:
+              print("::error::Could not find __NEXT_DATA__ in the changelog page. "
+                    "The page structure likely changed, or the request was blocked.")
+              sys.exit(1)
 
-            # Format entries for the issue body
-            jq -r --arg date "$SINCE" '
-              [.[] | select(.date > $date)] |
-              sort_by(.date) | reverse |
-              map(
-                "### " + .date + " — " + .text + "\n" +
-                "**Type:** " + (.type // "Unknown") + "\n" +
-                (.detail // "No details provided.") + "\n" +
-                if .url then "[Documentation](" + .url + ")\n" else "" end +
-                "---"
-              ) | join("\n\n")
-            ' changelog-response.json > new-entries.md
-          else
-            echo "has_new=false" >> "$GITHUB_OUTPUT"
-          fi
+          logs = json.loads(match.group(1)).get("props", {}).get("pageProps", {}).get("logs")
+          if not logs:
+              print("::error::__NEXT_DATA__ parsed but props.pageProps.logs was empty or missing.")
+              sys.exit(1)
 
-      - name: Check for existing open issue
+          print(f"Parsed {len(logs)} total changelog entries")
+
+          since = (date.today() - timedelta(days=int(os.environ["LOOKBACK_DAYS"]))).isoformat()
+          # Dates are ISO (YYYY-MM-DD), so lexical comparison is chronological.
+          new_entries = sorted(
+              (e for e in logs if e.get("date", "") > since),
+              key=lambda e: e["date"],
+              reverse=True,
+          )
+          print(f"{len(new_entries)} entries newer than {since}")
+
+          md = []
+          for entry in new_entries:
+              md.append(f"### {entry['date']} — {entry.get('text', '')}")
+              md.append(f"**Type:** {entry.get('type') or 'Unknown'}")
+              md.append("")
+              md.append(entry.get("detail") or "No details provided.")
+              if entry.get("url"):
+                  md.append("")
+                  md.append(f"[Documentation]({entry['url']})")
+              md.append("")
+              md.append("---")
+              md.append("")
+          open("formatted-entries.md", "w", encoding="utf-8").write("\n".join(md))
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"new_count={len(new_entries)}\n")
+              f.write(f"has_new={'true' if new_entries else 'false'}\n")
+              f.write(f"since={since}\n")
+          PYTHON_SCRIPT
+
+      - name: Checkout repository
         if: steps.check.outputs.has_new == 'true'
-        id: existing
-        uses: actions/github-script@v7
+        uses: actions/checkout@v4
+
+      - name: Configure git and date stamp
+        if: steps.check.outputs.has_new == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "DATE_STAMP=$(date +%Y-%m-%d)" >> "$GITHUB_ENV"
+
+      - name: Set up uv
+        if: steps.check.outputs.has_new == 'true'
+        uses: astral-sh/setup-uv@v8.1.0
         with:
-          script: |
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              labels: 'fmp-api-update',
-              state: 'open',
-              per_page: 1
-            });
-            // Don't create duplicate issues if one is already open
-            core.setOutput('exists', issues.length > 0 ? 'true' : 'false');
+          enable-cache: true
 
-      - name: Create GitHub issue
-        if: steps.check.outputs.has_new == 'true' && steps.existing.outputs.exists == 'false'
-        uses: actions/github-script@v7
+      - name: Install Python dependencies
+        if: steps.check.outputs.has_new == 'true'
+        run: uv sync
+
+      - name: Run Claude Code to update streams and open PR
+        if: steps.check.outputs.has_new == 'true'
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          script: |
-            const fs = require('fs');
-            const entries = fs.readFileSync('new-entries.md', 'utf8');
-            const count = '${{ steps.check.outputs.new_count }}';
+          claude_code_oauth_token: ${{ secrets.CLAUDE_TAP_FMP_API_KEY }}
+          prompt: |
+            You are updating the tap-fmp Singer tap based on new Financial Modeling Prep (FMP) API changelog entries.
 
-            const body = [
-              `## FMP API Changelog Updates`,
-              ``,
-              `**${count} new change(s)** detected:`,
-              ``,
-              entries,
-              ``,
-              `## Next Steps`,
-              ``,
-              `1. Review the changes above`,
-              `2. Comment \`/analyze-changes\` to have Claude analyze the impact and open a PR with fixes`,
-              `3. Or manually update streams in \`tap_fmp/streams/\``,
-              ``,
-              `**Changelog**: https://site.financialmodelingprep.com/developer/docs/changelog`,
-            ].join('\n');
+            ## Inputs available in the working directory
+            - `formatted-entries.md` — the new changelog entries (READ THIS)
+            - `CLAUDE.md` — project conventions (READ THIS FIRST, fully)
+            - `PRIMARY_KEY_AUDIT.md` — authoritative per-stream primary-key remediation plan
+            - `tap_fmp/client.py`, `tap_fmp/mixins.py` — base classes and mixins
+            - `tap_fmp/streams/*.py` — concrete stream classes, grouped by family
+            - `tap_fmp/tap.py` — stream imports and `discover_streams()`
+            - `meltano.yml` — stream `select:` list and per-stream `config:` blocks
+            - `./lint.sh` — runs black and flake8 (already installed via `uv sync`)
 
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `[FMP API] ${count} changelog update(s) — ${new Date().toISOString().split('T')[0]}`,
-              body: body,
-              labels: ['fmp-api-update']
-            });
+            ## Task
+            1. Read `CLAUDE.md` fully. Internalize:
+               - The class hierarchy (`FmpRestStream` → partition/time-slice/incremental base classes → concrete streams)
+               - The mixin composition pattern (config mixins, partition mixins, price-schema mixins)
+               - The `/stable/` endpoint prefix rule — `/v3/` and `/v4/` are dead legacy endpoints
+               - Code conventions (snake_case fields, explicit `th.PropertiesList` schemas, all imports at top of file)
+               - **Primary Key & Correctness Rules** — this is critical. Correctness over speed. The
+                 whole-row `surrogate_key` is a known defect; do NOT add it to new streams. Prefer a
+                 natural composite PK, and consult `PRIMARY_KEY_AUDIT.md` for the relevant family
+                 before changing any existing stream's key.
+            2. Read `formatted-entries.md`.
+            3. For each changelog entry, classify it:
+               - **New field(s) on an existing endpoint** → ADD the fields to the existing stream schema(s).
+                 Note that FMP often ships a field to both the base and the TTM variant with a `TTM`
+                 suffix — check whether both streams need it.
+               - **New endpoint announced** → ADD a new stream class following existing patterns in the
+                 most relevant family file, then register it in `tap_fmp/tap.py` (import +
+                 `discover_streams()`) and in `meltano.yml` (`select:` list, plus a `config:` block if
+                 it takes parameters).
+               - **New query parameter** (e.g. pagination, an opt-in flag) → wire it through the stream's
+                 config handling only if it changes what data we get. If it gates extra response fields,
+                 add those fields to the schema too.
+               - **Bug fix or data correction with no schema change** → SKIP (do nothing).
+               - **Deprecation announcement** → SKIP (do not remove until explicitly told to).
+               - **Website / dashboard / docs / marketing change** → SKIP. Many FMP changelog entries are
+                 about the website, localization, or the customer dashboard and have no API impact at all.
+            4. Make the code changes:
+               - Follow existing patterns — read neighboring stream classes before writing new ones
+               - Reuse base classes and mixins where possible; do not duplicate logic
+               - Field names snake_case; use `th.StringType`, `th.IntegerType`, `th.NumberType`,
+                 `th.BooleanType`, `th.DateType`, `th.DateTimeType`, `th.ArrayType`, `th.ObjectType`
+               - Never auto-discover schemas — always declare them explicitly
+               - All imports at the top of the file
+               - **Read the linked FMP docs page** (each changelog entry has a URL) to get exact field
+                 names, types, sample responses, and query parameters. Do not invent field names or guess
+                 types. The FMP docs site 403s requests without a browser User-Agent — pass
+                 `-A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`
+                 to curl, or use WebFetch. If a field's correctness is unclear from the docs alone, say so
+                 in the PR description rather than guessing.
+               - **Primary key**: follow `CLAUDE.md` § "Primary Key & Correctness Rules". For new streams,
+                 inspect a multi-record sample for collisions across the obvious natural keys. Do not
+                 default to a whole-row surrogate key.
+            5. Run `./lint.sh`. Fix every issue **in files you touched**. Note that
+               `tests/test_time_slice_correctness.py` has pre-existing E402 errors on `main` that are
+               unrelated to your change — do not fix or reformat that file, and do not treat its
+               failures as yours. If `./lint.sh` reports issues only in files you did not touch, say so
+               in the PR body and move on.
+            6. Run `uv run pytest` and make sure it passes. If a test was already failing on `main`
+               before your change, report that in the PR body rather than modifying the test.
+            7. **Self-review the diff** (`git diff`):
+               - DRY: any duplicated logic that should use a base class or mixin?
+               - SOLID: are responsibilities cleanly separated?
+               - Are field names snake_case throughout?
+               - Did you remove anything that should not have been removed?
+               - Are there unused imports or dead code?
+               - If you added a stream, is it registered in BOTH `tap.py` and `meltano.yml`?
+               - Simplify anything over-engineered.
+            8. If changes were made:
+               - Create branch: `fmp-api-update-${{ env.DATE_STAMP }}`
+               - Commit with a clear message
+               - Push the branch
+               - Open a PR titled `[FMP API] Schema updates — ${{ env.DATE_STAMP }}` to `main` using
+                 `gh pr create` with a body that includes:
+                 - A summary of what changed and why (reference the specific changelog entry)
+                 - The list of files changed
+                 - The full changelog excerpt from `formatted-entries.md`
+                 - Any entries you deliberately skipped, and why
+                 - A testing checklist (`./lint.sh`, `uv run pytest`,
+                   `meltano el tap-fmp target-jsonl --force --select <stream>.*`)
+
+            ## Critical rules
+            - Use `uv` for everything; never run `python`/`pip`/`poetry` directly
+            - No silent failures: if `lint.sh` or `pytest` keeps failing, report what's wrong rather than hiding it
+            - Never push to `main` directly
+            - Never amend commits; create new ones if you need to fix something
+            - If no code changes are warranted (e.g. every entry is a website or dashboard change),
+              exit without creating a branch or PR
+
+          claude_args: |
+            --max-turns 100
+            --model claude-opus-5
+            --allowedTools "Read,Write,Edit,WebFetch,Bash(git:*),Bash(gh:*),Bash(./lint.sh),Bash(uv:*),Bash(meltano:*),Bash(python3:*),Bash(curl:*),Bash(ls:*),Bash(cat:*),Bash(grep:*),Bash(find:*),Bash(rg:*),Bash(wc:*),Bash(head:*),Bash(date:*)"
 
       - name: Workflow summary
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ steps.check.outputs.has_new }}" = "true" ]; then
-            echo "### FMP Changelog: ${{ steps.check.outputs.new_count }} new change(s)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.check.outputs.has_new }}" != "true" ]; then
+            echo "### FMP Changelog: No new changes since ${{ steps.check.outputs.since }}" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "### FMP Changelog: ${{ steps.check.outputs.new_count }} change(s) since ${{ steps.check.outputs.since }}" >> "$GITHUB_STEP_SUMMARY"
+          PR_URL=$(gh pr list --head "fmp-api-update-${DATE_STAMP}" --json url --jq '.[0].url' 2>/dev/null || true)
+          if [ -n "$PR_URL" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**PR opened**: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "### FMP Changelog: No new changes in the last 21 days" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No PR was opened — Claude Code determined no code changes were needed, or the run failed before reaching the PR step. Check the Actions log." >> "$GITHUB_STEP_SUMMARY"
           fi
