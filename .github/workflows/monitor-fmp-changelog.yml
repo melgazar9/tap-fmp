@@ -9,7 +9,7 @@ on:
       lookback_days:
         description: 'How many days back to look for changelog entries'
         required: false
-        default: '21'
+        default: '10'
 
 permissions:
   contents: write
@@ -25,7 +25,9 @@ jobs:
       - name: Fetch and parse FMP changelog
         id: check
         env:
-          LOOKBACK_DAYS: ${{ github.event.inputs.lookback_days || '21' }}
+          # Weekly cron + 3 days slack, so each entry is seen once (twice if a run
+          # is missed) instead of lingering in scope for three consecutive runs.
+          LOOKBACK_DAYS: ${{ github.event.inputs.lookback_days || '10' }}
         run: |
           set -euo pipefail
 
