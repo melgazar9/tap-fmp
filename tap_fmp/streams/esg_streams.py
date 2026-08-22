@@ -62,6 +62,7 @@ class EsgBenchmarkStream(FmpRestStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("fiscal_year", th.IntegerType, required=True),
+        th.Property("period", th.StringType),
         th.Property("sector", th.StringType),
         th.Property("environmental_score", th.NumberType),
         th.Property("social_score", th.NumberType),
