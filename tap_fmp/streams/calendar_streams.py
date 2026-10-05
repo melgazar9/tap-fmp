@@ -116,6 +116,7 @@ class IPOsCalendarStream(TimeSliceCalendarStream):
         th.Property("actions", th.StringType),
         th.Property("shares", th.NumberType),
         th.Property("price_range", th.StringType),
+        th.Property("deal_size", th.NumberType),
         th.Property("market_cap", th.NumberType),
     ).to_dict()
 
