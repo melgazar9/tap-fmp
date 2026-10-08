@@ -25,7 +25,7 @@ jobs:
       # Must run before anything writes to the workspace: checkout empties the
       # directory before cloning, which would delete formatted-entries.md.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Fetch and parse FMP changelog
         id: check
