@@ -34,6 +34,7 @@ class CompanyScreenerStream(FmpRestStream):
         th.Property("price", th.NumberType),
         th.Property("last_annual_dividend", th.NumberType),
         th.Property("volume", th.NumberType),
+        th.Property("avg_volume", th.NumberType),
         th.Property("exchange", th.StringType),
         th.Property("exchange_short_name", th.StringType),
         th.Property("country", th.StringType),
