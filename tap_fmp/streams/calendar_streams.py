@@ -96,6 +96,14 @@ class EarningsCalendarStream(TimeSliceCalendarStream):
         th.Property("eps_estimated", th.NumberType),
         th.Property("revenue_actual", th.NumberType),
         th.Property("revenue_estimated", th.NumberType),
+        # Only returned when query_params.includeReportTimes is true (set in
+        # meltano.yml). FMP's changelog calls this "three additional fields",
+        # but the endpoint actually returns five.
+        th.Property("time", th.StringType),
+        th.Property("period_ending", th.DateType),
+        th.Property("fiscal_period", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
+        th.Property("confirmed", th.BooleanType),
         th.Property("last_updated", th.DateType),
     ).to_dict()
 

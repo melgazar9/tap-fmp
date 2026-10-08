@@ -564,6 +564,9 @@ plugins:
         query_params:
           from: 2025-07-01
           to: 2025-08-30
+          # Opt-in flag: without it the endpoint omits time, period_ending,
+          # fiscal_period, fiscal_year and confirmed from the response.
+          includeReportTimes: true
 
       ipos_calendar:
         query_params:

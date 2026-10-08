@@ -16,6 +16,14 @@ from tap_fmp.client import FmpRestStream, CompanySymbolPartitionStream
 class CompanyScreenerStream(FmpRestStream):
     name = "company_screener"
 
+    # FMP added a `page` parameter to this endpoint on 2026-06-05. Bounded to
+    # FMP's usual page ceiling rather than the 10000 default: pagination stops
+    # only on empty pages, so if `page` were ignored the stream would emit the
+    # same records once per page. Hitting the ceiling logs a warning, so a real
+    # cap above 100 surfaces rather than silently truncating.
+    _paginate = True
+    _max_pages = 100
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("company_name", th.StringType),

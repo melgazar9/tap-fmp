@@ -18,6 +18,7 @@ class BaseSenateStream(FmpRestStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
+        th.Property("senate_id", th.StringType),
         th.Property("disclosure_date", th.DateType),
         th.Property("transaction_date", th.DateType),
         th.Property("first_name", th.StringType),
@@ -75,6 +76,7 @@ class SenateTradingActivityStream(CompanySymbolPartitionStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
+        th.Property("senate_id", th.StringType),
         th.Property("disclosure_date", th.DateType),
         th.Property("transaction_date", th.DateType),
         th.Property("first_name", th.StringType),
@@ -105,6 +107,7 @@ class SenateTradesByNameStream(SenateNamePartitionMixin):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
+        th.Property("senate_id", th.StringType),
         th.Property("disclosure_date", th.DateType),
         th.Property("transaction_date", th.DateType),
         th.Property("first_name", th.StringType),
@@ -135,6 +138,7 @@ class HouseTradesStream(CompanySymbolPartitionStream):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
+        th.Property("senate_id", th.StringType),
         th.Property("disclosure_date", th.DateType),
         th.Property("transaction_date", th.DateType),
         th.Property("first_name", th.StringType),
@@ -165,6 +169,7 @@ class HouseTradesByNameStream(SenateNamePartitionMixin):
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
+        th.Property("senate_id", th.StringType),
         th.Property("disclosure_date", th.DateType),
         th.Property("transaction_date", th.DateType),
         th.Property("first_name", th.StringType),

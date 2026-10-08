@@ -299,11 +299,13 @@ class FmpRestStream(RESTStream, ABC):
                 else self.redact_api_key(str(e))
             )
             error_message = self.redact_api_key(error_message)
+            # `from None`: the original exception's message holds the raw
+            # URL, and chaining would print it (and the API key) in tracebacks.
             raise requests.exceptions.HTTPError(
                 error_message,
                 response=e.response,
                 request=e.request,
-            )
+            ) from None
 
     def _set_configured_page(self):
         if getattr(self, "_configured_page_resolved", False):

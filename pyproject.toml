@@ -42,7 +42,13 @@ tap-fmp = 'tap_fmp.tap:TapFMP.cli'
 
 [dependency-groups]
 dev = [
+    { include-group = "lint" },
     { include-group = "test" },
+]
+# Pinned: a newer black reformats files that 24.3.0 leaves unchanged.
+lint = [
+    "black==24.3.0",
+    "flake8==7.0.0",
 ]
 test = [
     "pytest>=8",

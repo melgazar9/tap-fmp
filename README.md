@@ -144,6 +144,7 @@ The tap's `_max_pages` attribute represents the **inclusive** maximum page index
 | `sec_filings_by_cik` | `/stable/sec-filings-search/cik` | 1000 | 100 | docs + empirical |
 | `sec_filings_by_form_type` | `/stable/sec-filings-search/form-type` | 1000 | 100 | docs + empirical |
 | `sec_filings_by_symbol` | `/stable/sec-filings-search/symbol` | 1000 | 100 | docs + empirical |
+| `company_screener` | `/stable/company-screener` | 10000 | 100 | docs (`page` added 2026-06-05); page cap assumed, not probed |
 | `latest_senate_disclosures` | `/stable/senate-latest` | 250 | 100 | docs + empirical |
 | `latest_house_disclosures` | `/stable/house-latest` | 250 | 100 | docs + empirical |
 | `crypto_news` | `/stable/news/crypto` | 250 | 100 | docs + empirical |
@@ -164,7 +165,6 @@ Pagination proceeds until the API returns empty or the tap's default `_max_pages
 
 | Stream | Endpoint | Max limit | Source |
 |---|---|---:|---|
-| `company_screener` | `/stable/company-screener` | 10000 | empirical (docs URL example showed 1000; API accepts up to 10000) |
 | `cik_list` | `/stable/cik-list` | 10000 | docs + empirical |
 | `analyst_estimates` | `/stable/analyst-estimates` | 1000 | docs |
 | `fmp_articles` | `/stable/fmp-articles` | 200 | empirical (docs URL example showed 20; API caps silently at 200) |

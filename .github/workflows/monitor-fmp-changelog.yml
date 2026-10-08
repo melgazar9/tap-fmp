@@ -22,6 +22,11 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # Must run before anything writes to the workspace: checkout empties the
+      # directory before cloning, which would delete formatted-entries.md.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Fetch and parse FMP changelog
         id: check
         env:
@@ -40,6 +45,9 @@ jobs:
             -o changelog-page.html
 
           echo "Fetched $(wc -c < changelog-page.html) bytes"
+
+          # Inputs for Claude, not repo content: keep them out of any commit.
+          printf '%s\n' changelog-page.html formatted-entries.md >> .git/info/exclude
 
           python3 << 'PYTHON_SCRIPT'
           import json
@@ -98,10 +106,6 @@ jobs:
               f.write(f"since={since}\n")
           PYTHON_SCRIPT
 
-      - name: Checkout repository
-        if: steps.check.outputs.has_new == 'true'
-        uses: actions/checkout@v4
-
       - name: Configure git and date stamp
         if: steps.check.outputs.has_new == 'true'
         run: |
@@ -124,6 +128,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_TAP_FMP_API_KEY }}
           prompt: |
@@ -132,7 +137,7 @@ jobs:
             ## Inputs available in the working directory
             - `formatted-entries.md` — the new changelog entries (READ THIS)
             - `CLAUDE.md` — project conventions (READ THIS FIRST, fully)
-            - `PRIMARY_KEY_AUDIT.md` — authoritative per-stream primary-key remediation plan
+            - `docs/PRIMARY_KEY_AUDIT.md` — authoritative per-stream primary-key remediation plan
             - `tap_fmp/client.py`, `tap_fmp/mixins.py` — base classes and mixins
             - `tap_fmp/streams/*.py` — concrete stream classes, grouped by family
             - `tap_fmp/tap.py` — stream imports and `discover_streams()`
@@ -147,7 +152,7 @@ jobs:
                - Code conventions (snake_case fields, explicit `th.PropertiesList` schemas, all imports at top of file)
                - **Primary Key & Correctness Rules** — this is critical. Correctness over speed. The
                  whole-row `surrogate_key` is a known defect; do NOT add it to new streams. Prefer a
-                 natural composite PK, and consult `PRIMARY_KEY_AUDIT.md` for the relevant family
+                 natural composite PK, and consult `docs/PRIMARY_KEY_AUDIT.md` for the relevant family
                  before changing any existing stream's key.
             2. Read `formatted-entries.md`.
             3. For each changelog entry, classify it:
@@ -178,14 +183,16 @@ jobs:
                  `-A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`
                  to curl, or use WebFetch. If a field's correctness is unclear from the docs alone, say so
                  in the PR description rather than guessing.
+               - **Confirm against a live response.** FMP's docs samples often lag the changelog.
+                 `FMP_API_KEY` is set in the environment: fetch a real sample with
+                 `curl -s "https://financialmodelingprep.com/stable/<endpoint>?<params>&apikey=$FMP_API_KEY"`
+                 and take field names and types from it. Never print, echo, log, or commit the key, and
+                 never use `curl -v`. If the call fails (e.g. 402 plan limit), say so in the PR body.
                - **Primary key**: follow `CLAUDE.md` § "Primary Key & Correctness Rules". For new streams,
                  inspect a multi-record sample for collisions across the obvious natural keys. Do not
                  default to a whole-row surrogate key.
-            5. Run `./lint.sh`. Fix every issue **in files you touched**. Note that
-               `tests/test_time_slice_correctness.py` has pre-existing E402 errors on `main` that are
-               unrelated to your change — do not fix or reformat that file, and do not treat its
-               failures as yours. If `./lint.sh` reports issues only in files you did not touch, say so
-               in the PR body and move on.
+            5. Run `./lint.sh`. Fix every issue **in files you touched**. If `./lint.sh` reports issues
+               only in files you did not touch, say so in the PR body and move on.
             6. Run `uv run pytest` and make sure it passes. If a test was already failing on `main`
                before your change, report that in the PR body rather than modifying the test.
             7. **Self-review the diff** (`git diff`):
@@ -219,7 +226,7 @@ jobs:
 
           claude_args: |
             --max-turns 100
-            --model claude-opus-5
+            --model claude-opus-5-5
             --allowedTools "Read,Write,Edit,WebFetch,Bash(git:*),Bash(gh:*),Bash(./lint.sh),Bash(uv:*),Bash(meltano:*),Bash(python3:*),Bash(curl:*),Bash(ls:*),Bash(cat:*),Bash(grep:*),Bash(find:*),Bash(rg:*),Bash(wc:*),Bash(head:*),Bash(date:*)"
 
       - name: Workflow summary

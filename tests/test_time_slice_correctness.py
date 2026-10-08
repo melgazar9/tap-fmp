@@ -24,6 +24,53 @@ from unittest.mock import patch
 import pytest
 
 from tap_fmp.client import DATA_TRUNCATED_TOKEN, TimeSliceStream
+from tap_fmp.streams.chart_streams import (
+    Company1minStream,
+    Company5minStream,
+    Company15minStream,
+    Company30minStream,
+    Company1HrStream,
+    Company4HrStream,
+)
+from tap_fmp.streams.commodity_streams import (
+    Commodities1minStream,
+    Commodities5minStream,
+    Commodities1HrStream,
+)
+from tap_fmp.streams.crypto_streams import (
+    Crypto1minStream,
+    Crypto5minStream,
+    Crypto1HrStream,
+)
+from tap_fmp.streams.forex_streams import (
+    Forex1minStream,
+    Forex5minStream,
+    Forex1HrStream,
+)
+from tap_fmp.streams.index_streams import (
+    Index1MinuteIntervalStream,
+    Index5MinuteIntervalStream,
+    Index1HourIntervalStream,
+)
+from tap_fmp.streams.news_streams import (
+    GeneralNewsStream,
+    StockNewsLatestStream,
+    CryptoNewsLatestStream,
+    ForexNewsLatestStream,
+    StockNewsStream,
+    CryptoNewsStream,
+    ForexNewsStream,
+    PressReleasesStream,
+    PressReleasesLatestStream,
+)
+from tap_fmp.streams.sec_filings_streams import (
+    Latest8KFilingsStream,
+    LatestSecFilingsStream,
+    SecFilingsByFormTypeStream,
+    SecFilingsBySymbolStream,
+    SecFilingsByCikStream,
+)
+from tap_fmp.streams.company_streams import HistoricalMarketCapStream
 
 
 class _StubTimeSliceStream(TimeSliceStream):
@@ -129,55 +176,6 @@ def test_subclass_default_time_slice_days_overrides_base():
     assert (
         datetime.fromisoformat(first_to) - datetime.fromisoformat(first_from)
     ).days == 14
-
-
-from tap_fmp.streams.chart_streams import (
-    Company1minStream,
-    Company5minStream,
-    Company15minStream,
-    Company30minStream,
-    Company1HrStream,
-    Company4HrStream,
-)
-from tap_fmp.streams.commodity_streams import (
-    Commodities1minStream,
-    Commodities5minStream,
-    Commodities1HrStream,
-)
-from tap_fmp.streams.crypto_streams import (
-    Crypto1minStream,
-    Crypto5minStream,
-    Crypto1HrStream,
-)
-from tap_fmp.streams.forex_streams import (
-    Forex1minStream,
-    Forex5minStream,
-    Forex1HrStream,
-)
-from tap_fmp.streams.index_streams import (
-    Index1MinuteIntervalStream,
-    Index5MinuteIntervalStream,
-    Index1HourIntervalStream,
-)
-from tap_fmp.streams.news_streams import (
-    GeneralNewsStream,
-    StockNewsLatestStream,
-    CryptoNewsLatestStream,
-    ForexNewsLatestStream,
-    StockNewsStream,
-    CryptoNewsStream,
-    ForexNewsStream,
-    PressReleasesStream,
-    PressReleasesLatestStream,
-)
-from tap_fmp.streams.sec_filings_streams import (
-    Latest8KFilingsStream,
-    LatestSecFilingsStream,
-    SecFilingsByFormTypeStream,
-    SecFilingsBySymbolStream,
-    SecFilingsByCikStream,
-)
-from tap_fmp.streams.company_streams import HistoricalMarketCapStream
 
 
 @pytest.mark.parametrize(

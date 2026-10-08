@@ -3,6 +3,6 @@
 set -e
 
 echo "Running black..."
-black .
+uv run black .
 echo "Running flake8..."
-flake8
+uv run flake8

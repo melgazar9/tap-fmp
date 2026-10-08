@@ -118,7 +118,7 @@ Three places, all required:
 
 `generate_surrogate_key(record)` (`helpers.py:141`) hashes **every field in the record**. `FmpRestStream.post_process` (`client.py:386`) writes that hash to `record["surrogate_key"]` when `_add_surrogate_key = True`, and most streams key on it. Because the loader upserts on `primary_keys`, **any** volatile field (price, volume, market_cap, ratios, scores) changing between syncs produces a new PK and inserts a duplicate row instead of updating it. This affects a large share of existing streams.
 
-`PRIMARY_KEY_AUDIT.md` is the authoritative per-stream remediation plan — read the relevant family table before touching a stream's PK.
+`docs/PRIMARY_KEY_AUDIT.md` is the authoritative per-stream remediation plan — read the relevant family table before touching a stream's PK.
 
 ### Choosing a primary key for new or edited streams
 
