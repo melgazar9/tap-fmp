@@ -219,6 +219,8 @@ class HistoricalSP500ConstituentStream(FmpSurrogateKeyStream):
         th.Property("symbol", th.StringType),
         th.Property("date", th.DateType),
         th.Property("date_added", th.StringType),
+        th.Property("change_type", th.StringType),
+        th.Property("added_ticker", th.StringType),
         th.Property("added_security", th.StringType),
         th.Property("removed_ticker", th.StringType),
         th.Property("removed_security", th.StringType),
