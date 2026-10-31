@@ -8,7 +8,7 @@ periods, and eod_bulk never skips a date it failed to read.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import patch
 
 import pytest
@@ -186,11 +186,11 @@ def test_eod_bulk_stops_on_a_failed_date_instead_of_skipping_it():
 def test_eod_bulk_refuses_a_row_from_another_date():
     stream = _eod_bulk(["2024-01-02", "2024-01-02"])
 
-    def fetch(self, context):
+    def fetch(self, context):  # rows as post_process yields them, dates typed
         return iter(
             [
-                {"symbol": "AAPL", "date": "2024-01-02"},
-                {"symbol": "MSFT", "date": "2024-01-05"},
+                {"symbol": "AAPL", "date": date(2024, 1, 2)},
+                {"symbol": "MSFT", "date": date(2024, 1, 5)},
             ]
         )
 

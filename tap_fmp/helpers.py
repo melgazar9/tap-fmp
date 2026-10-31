@@ -2,7 +2,8 @@ import re
 import uuid
 from functools import lru_cache
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import date, datetime
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 import logging
 import threading
 import typing as t
@@ -163,6 +164,27 @@ def safe_int(value) -> int | None:
         return None
 
 
+def whole_count(value) -> int | None:
+    """A headcount FMP sends as text: blank is unknown, a size range ("1-10")
+    is no count, and a decimal (an averaged headcount) rounds half up."""
+    if value is None or isinstance(value, int):
+        return value
+    text = str(value).strip()
+    low, dash, high = text.partition("-")
+    if not text or (dash and low.isdigit() and high.isdigit()):
+        return None
+    try:
+        return int(Decimal(text).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    except InvalidOperation:
+        raise ValueError(f"not a headcount: {value!r}") from None
+
+
+def iso_date(value) -> date | None:
+    """A date FMP sends as ISO text, with or without a time; blank is unknown."""
+    text = "" if value is None else str(value).strip()
+    return datetime.fromisoformat(text).date() if text else None
+
+
 class CompanyProfilesManager:
     """Each listing's country and currency for the country/currency filter, from
     the company profiles: exchange variants answer only for companies listed on
@@ -173,7 +195,6 @@ class CompanyProfilesManager:
         self.logger = logger or logging.getLogger(__name__)
         self.tap_instance = tap_instance
         self._cache: t.List[t.Dict[str, t.Any]] = []
-        self._cache_timestamp: t.Optional[datetime] = None
         self._cache_lock = threading.Lock()
         self._profiles_by_symbol: t.Optional[t.Dict[str, t.Dict[str, t.Any]]] = None
 
@@ -185,15 +206,13 @@ class CompanyProfilesManager:
             "csv_path", "distinct_exchange_variants.csv"
         )
         self.use_database = self.exchange_config.get("use_database", False)
-        self.cache_ttl_hours = self.exchange_config.get("cache_ttl_hours", 72)
 
     def get_company_profiles(self) -> t.List[t.Dict[str, t.Any]]:
-        """Resolve company profiles: DB → CSV → raise. The
-        `company_profile_by_symbol` sync is the canonical populator; callers
-        that reach this code on a cold table should run that stream first."""
+        """Resolve company profiles once per tap process: DB → CSV → raise.
+        The `company_profile_by_symbol` sync is the canonical populator;
+        callers that reach this code on a cold table should run that stream first."""
         with self._cache_lock:
-            if self._is_cache_valid():
-                self.logger.info("Using cached company profiles")
+            if self._cache:
                 return self._cache
 
             if self.use_database and self._has_database_config():
@@ -218,18 +237,8 @@ class CompanyProfilesManager:
                 "company_profile_by_symbol` to populate the table."
             )
 
-    def _is_cache_valid(self) -> bool:
-        """Check if current cache is still valid."""
-        if not self._cache or not self._cache_timestamp:
-            return False
-
-        expiry_time = self._cache_timestamp + timedelta(hours=self.cache_ttl_hours)
-        return datetime.now() < expiry_time
-
     def _update_cache(self, data: t.List[t.Dict[str, t.Any]]) -> None:
-        """Update internal cache with new data."""
         self._cache = data
-        self._cache_timestamp = datetime.now()
         self._profiles_by_symbol = None  # invalidate derived index
         self.logger.info(f"Cache updated with {len(data)} company profiles")
 
@@ -330,39 +339,3 @@ class CompanyProfilesManager:
         except Exception as e:
             self.logger.error(f"CSV loading failed: {e}")
             return None
-
-    def clear_cache(self) -> None:
-        """Clear the internal cache."""
-        with self._cache_lock:
-            self._cache = []
-            self._cache_timestamp = None
-            self._profiles_by_symbol = None
-            self.logger.info("Company profiles cache cleared")
-
-    def get_cache_info(self) -> t.Dict[str, t.Any]:
-        """Get information about current cache state."""
-        with self._cache_lock:
-            return {
-                "cache_size": len(self._cache),
-                "cache_timestamp": (
-                    self._cache_timestamp.isoformat() if self._cache_timestamp else None
-                ),
-                "is_valid": self._is_cache_valid(),
-                "expires_at": (
-                    (
-                        self._cache_timestamp + timedelta(hours=self.cache_ttl_hours)
-                    ).isoformat()
-                    if self._cache_timestamp
-                    else None
-                ),
-                "source_priority": self._get_source_priority(),
-            }
-
-    def _get_source_priority(self) -> t.List[str]:
-        """Get the current source priority list."""
-        priority = []
-        if self.use_database and self._has_database_config():
-            priority.append("database")
-        if self.use_csv and self._has_csv_file():
-            priority.append("csv")
-        return priority

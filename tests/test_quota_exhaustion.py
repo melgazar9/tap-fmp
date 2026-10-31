@@ -36,6 +36,7 @@ class _ScriptedSession:
             200: "OK",
             402: "Payment Required",
             429: "Too Many Requests",
+            502: "Bad Gateway",
         }[status]
         response._content = body
         return response

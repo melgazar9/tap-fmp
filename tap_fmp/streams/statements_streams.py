@@ -24,19 +24,6 @@ _STATEMENT_DATE_FIELDS = ("filing_date", "accepted_date")
 class StatementStream(
     FinancialStatementSymbolPartitionMixin, SymbolPeriodPartitionStream
 ):
-    _add_surrogate_key = True
-    primary_keys = ["surrogate_key"]
-
-    @property
-    def partitions(self):
-        """Each statement symbol once per period kind; the mixin supplies the symbols."""
-        periods = self.configured_periods
-        return [
-            {**partition, "period": period}
-            for partition in super().partitions
-            for period in periods
-        ]
-
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         if context:
             if "symbol" in context:

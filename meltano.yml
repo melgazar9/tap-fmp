@@ -44,7 +44,6 @@ plugins:
         csv_path: "distinct_exchange_variants.csv"
         use_database: false
         database_connection: null
-        cache_ttl_hours: 72
 
     - name: database_config
       kind: object
@@ -416,7 +415,6 @@ plugins:
         csv_path: "distinct_exchange_variants.csv"
         use_database: false
         database_connection: null
-        cache_ttl_hours: 72
 
       database_config:
         host: ${POSTGRES_HOST}

@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
+from tap_fmp.helpers import iso_date, whole_count
+
 
 class SelectableStreamMixin(ABC):
     """Mixin for streams that support configurable selection of items.
@@ -535,3 +537,20 @@ class ExchangeConfigMixin(BaseConfigMixin):
     def create_record_from_item(self, item: str) -> dict:
         """Create an exchange record dict from a single exchange string."""
         return {"exchange": item, "name": None}
+
+
+class ListingFieldTypesMixin:
+    """Types the listing fields FMP's JSON sends as text: the headcount as an
+    integer, the listing dates as dates (bulk CSVs convert by schema instead)."""
+
+    _count_fields: t.ClassVar[tuple[str, ...]] = ("full_time_employees",)
+    _iso_date_fields: t.ClassVar[tuple[str, ...]] = ("ipo_date", "delisted_date")
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        for field in self._count_fields:
+            if field in row:
+                row[field] = whole_count(row[field])
+        for field in self._iso_date_fields:
+            if field in row:
+                row[field] = iso_date(row[field])
+        return super().post_process(row, context)

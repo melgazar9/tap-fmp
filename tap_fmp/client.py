@@ -37,8 +37,9 @@ _SCHEMA_DRIFT_LOCK = threading.Lock()
 
 
 class FmpQuotaExhaustedError(RuntimeError):
-    """FMP kept refusing one request past its per-minute window: the plan's
-    30-day bandwidth cap or daily quota is spent, and retrying only waits."""
+    """FMP kept refusing one request longer than the stream waits out a 429:
+    the plan's 30-day bandwidth cap, its daily quota or a bulk endpoint's call
+    limit is spent, and retrying only waits."""
 
 
 class FmpErrorReplyError(RuntimeError):
@@ -86,6 +87,8 @@ class FmpRestStream(RESTStream, ABC):
     _quota_status_code = 429
     # seconds one request may keep drawing 429s: the per-minute limit clears inside it, the 30-day bandwidth cap never does
     _quota_exhausted_after_seconds = 300
+    # seconds one request may keep retrying any other failure (timeouts, 5xx)
+    _transient_retry_seconds = 1800
     _error_body_max_chars = 500
     _error_reply_key = "Error Message"
     # FMP's reply when the endpoint holds nothing for the request; every other error reply is a fault
@@ -252,6 +255,34 @@ class FmpRestStream(RESTStream, ABC):
             # Stamped after the sleep: the pre-sleep time let the next call go early and the stream burst past the limit.
             self._last_call_ts = time.time()
 
+    def _is_quota_refusal(self, e: BaseException | None) -> bool:
+        response = getattr(e, "response", None)
+        return (
+            isinstance(e, requests.exceptions.HTTPError)
+            and response is not None
+            and response.status_code == self._quota_status_code
+        )
+
+    @staticmethod
+    def _exponential_waits() -> t.Iterator[float]:
+        """Exponential seconds with full jitter, for a failure that clears on its own."""
+        waits = backoff.expo(base=5, max_value=300)
+        next(waits)  # backoff's generators yield once before their first value
+        return (backoff.full_jitter(wait) for wait in waits)
+
+    def _quota_retry_waits(self) -> t.Iterator[float]:
+        """Seconds before each retry of a 429."""
+        return self._exponential_waits()
+
+    def _retry_waits(self) -> t.Generator[float | None, BaseException | None, None]:
+        """backoff sends each failure in: a 429 waits the stream's quota pace, any other failure backs off exponentially."""
+        quota, transient = self._quota_retry_waits(), self._exponential_waits()
+        failure = yield
+        while True:
+            failure = yield next(
+                quota if self._is_quota_refusal(failure) else transient
+            )
+
     def _fetch_with_retry(
         self, url: str, query_params: dict, page: int | None = None
     ) -> list[dict]:
@@ -262,24 +293,26 @@ class FmpRestStream(RESTStream, ABC):
         first_quota_refusal: list[float] = []
 
         def give_up(e: Exception) -> bool:
+            if self._is_quota_refusal(e):
+                if not first_quota_refusal:
+                    first_quota_refusal.append(time.monotonic())
+                refused_for = time.monotonic() - first_quota_refusal[0]
+                return refused_for >= self._quota_exhausted_after_seconds
             response = getattr(e, "response", None)
-            if not isinstance(e, requests.exceptions.HTTPError) or response is None:
-                return False
-            if response.status_code != self._quota_status_code:
-                return response.status_code not in self._retryable_status_codes
-            if not first_quota_refusal:
-                first_quota_refusal.append(time.monotonic())
-            refused_for = time.monotonic() - first_quota_refusal[0]
-            return refused_for >= self._quota_exhausted_after_seconds
+            return (
+                isinstance(e, requests.exceptions.HTTPError)
+                and response is not None
+                and response.status_code not in self._retryable_status_codes
+            )
 
         @backoff.on_exception(
-            backoff.expo,
+            self._retry_waits,
             (requests.exceptions.RequestException,),
-            base=5,
-            max_value=300,
-            jitter=backoff.full_jitter,
+            jitter=None,  # each wait generator applies its own
             max_tries=max_retries,
-            max_time=1800,
+            max_time=max(
+                self._transient_retry_seconds, self._quota_exhausted_after_seconds
+            ),
             giveup=give_up,
             on_backoff=lambda details: logging.warning(
                 f"API request failed, retrying in {details['wait']:.1f}s "
@@ -292,13 +325,13 @@ class FmpRestStream(RESTStream, ABC):
         try:
             return fetch_with_backoff()
         except requests.exceptions.HTTPError as e:
-            if e.response is None or e.response.status_code != self._quota_status_code:
+            if not self._is_quota_refusal(e):
                 raise
             refused_for = time.monotonic() - first_quota_refusal[0]
             raise FmpQuotaExhaustedError(
-                f"Stream {self.name}: FMP answered 429 for {refused_for:.0f}s, past "
-                f"its per-minute limit, so the plan's bandwidth cap or daily quota is "
-                f"spent; stopping instead of retrying into it. {e}"
+                f"Stream {self.name}: FMP answered 429 for {refused_for:.0f}s, as long as "
+                f"this stream waits out ({self._quota_exhausted_after_seconds}s), so a limit "
+                f"past the per-minute one is spent; stopping instead of retrying into it. {e}"
             ) from None
 
     def _make_http_request(
@@ -351,8 +384,10 @@ class FmpRestStream(RESTStream, ABC):
                 records = [records]
 
             records = clean_json_keys(records)
+            # the size is what the plan's 30-day bandwidth cap counts
             logging.info(
                 f"Stream {self.name}: Records returned: {len(records) if isinstance(records, list) else 'not a list'}"
+                f" ({len(response.content) / 1e6:.2f} MB)"
             )
             return records
         except requests.exceptions.RequestException as e:
@@ -432,11 +467,7 @@ class FmpRestStream(RESTStream, ABC):
             else:
                 consecutive_empty_pages = 0
 
-            for record in records:
-                record = self.post_process(record, context)
-                self._check_missing_fields(record)
-                yield record
-
+            yield from self._yield_processed(records, context)
             page += 1
 
         if self.configured_page is None and page > self._max_pages:
@@ -448,6 +479,14 @@ class FmpRestStream(RESTStream, ABC):
     def _format_replication_key(replication_key_value):
         return replication_key_value
 
+    def _yield_processed(
+        self, records: list[dict], context: Context | None
+    ) -> t.Iterable[dict]:
+        for record in records:
+            record = self.post_process(record, context)
+            self._check_missing_fields(record)
+            yield record
+
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         url = self.get_url(context)
 
@@ -455,10 +494,7 @@ class FmpRestStream(RESTStream, ABC):
             yield from self._handle_pagination(url, self.query_params, context)
         else:
             records = self._fetch_with_retry(url, self.query_params)
-            for record in records:
-                record = self.post_process(record, context)
-                self._check_missing_fields(record)
-                yield record
+            yield from self._yield_processed(records, context)
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         if self._add_surrogate_key:
@@ -498,10 +534,7 @@ class BaseSymbolPartitionStream(BaseSymbolPartitionMixin, FmpRestStream):
             yield from self._handle_pagination(url, query_params, context)
         else:
             records = self._fetch_with_retry(url, query_params)
-            for record in records:
-                record = self.post_process(record, context)
-                self._check_missing_fields(record)
-                yield record
+            yield from self._yield_processed(records, context)
 
 
 class CompanySymbolPartitionStream(
@@ -511,21 +544,31 @@ class CompanySymbolPartitionStream(
     `CompanySymbolPartitionMixin` for the `_raw_partition` opt-in."""
 
 
-class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):
+class SymbolPeriodPartitionStream(CompanySymbolPartitionStream, FmpSurrogateKeyStream):
+    """Per-symbol stream asked once per period kind; a symbol mixin listed
+    first chooses the symbols, the company universe otherwise."""
+
     # FMP answers one period kind per request and defaults to annual; annual holds the FY rows, quarter Q1-Q4
     DEFAULT_PERIODS: t.ClassVar[tuple[str, ...]] = ("annual", "quarter")
+    # the period values the endpoint accepts; None accepts any
+    ALLOWED_PERIODS: t.ClassVar[tuple[str, ...] | None] = None
 
     @classmethod
-    def _get_periods(cls, periods):
+    def _get_periods(cls, periods) -> list[str]:
         if periods is None or periods == "*":
             periods = list(cls.DEFAULT_PERIODS)
         if isinstance(periods, str):
             periods = [periods]
-        if isinstance(periods, (list, tuple, set)):
-            return list(periods)
-        raise ConfigValidationError(
-            "period(s) must be a string, list/tuple/set, or '*'"
-        )
+        if not isinstance(periods, (list, tuple, set)) or not periods:
+            raise ConfigValidationError(
+                f"Stream {cls.name}: period(s) must be a non-empty string, list/tuple/set, or '*'"
+            )
+        invalid = set(periods) - set(cls.ALLOWED_PERIODS or periods)
+        if invalid:
+            raise ConfigValidationError(
+                f"Stream {cls.name}: invalid period(s) {sorted(invalid)}; allowed {sorted(cls.ALLOWED_PERIODS)}"
+            )
+        return list(periods)
 
     @property
     def configured_periods(self) -> list[str]:
@@ -537,14 +580,9 @@ class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):
     @property
     def partitions(self):
         periods = self.configured_periods
-        symbols = self._tap.get_cached_company_symbols()
-
-        if not periods:
-            return [{"symbol": s["symbol"]} for s in symbols]
-
         return [
-            {"symbol": s["symbol"], "period": period}
-            for s in symbols
+            {**partition, "period": period}
+            for partition in super().partitions
             for period in periods
         ]
 
@@ -747,14 +785,6 @@ class TimeSliceStream(FmpRestStream):
                 f"silent-truncation check skipped for stream={self.name} "
                 f"window={from_date}..{to_date}: {type(e).__name__}: {e}"
             )
-
-    def _yield_processed(
-        self, records: list[dict], context: Context | None
-    ) -> t.Iterable[dict]:
-        for record in records:
-            record = self.post_process(record, context)
-            self._check_missing_fields(record)
-            yield record
 
     def fetch_window(
         self,

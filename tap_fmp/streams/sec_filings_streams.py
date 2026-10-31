@@ -11,6 +11,7 @@ from tap_fmp.client import (
     CompanySymbolPartitionStream,
     CompanySymbolPartitionTimeSliceStream,
 )
+from tap_fmp.mixins import ListingFieldTypesMixin
 
 
 class BaseSecFilingTimeSliceStream(TimeSliceStream):
@@ -257,12 +258,13 @@ class SecFilingsCompanySearchByCikStream(FmpRestStream):
         return super().get_records(context)
 
 
-class SecCompanyFullProfileStream(CompanySymbolPartitionStream):
+class SecCompanyFullProfileStream(ListingFieldTypesMixin, CompanySymbolPartitionStream):
     """Stream for SEC Company Full Profile API."""
 
     name = "sec_company_full_profile"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
+    _count_fields = ("employees",)
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType),
@@ -287,7 +289,7 @@ class SecCompanyFullProfileStream(CompanySymbolPartitionStream):
         th.Property("state_location", th.StringType),
         th.Property("state_of_incorporation", th.StringType),
         th.Property("fiscal_year_end", th.StringType),
-        th.Property("ipo_date", th.StringType),
+        th.Property("ipo_date", th.DateType),
         th.Property("employees", th.IntegerType),
         th.Property("sec_filings_url", th.StringType),
         th.Property("tax_identification_number", th.StringType),
@@ -305,14 +307,6 @@ class SecCompanyFullProfileStream(CompanySymbolPartitionStream):
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/sec-profile"
-
-    def post_process(self, row: dict, context: Context | None = None) -> dict:
-        if "employees" in row:
-            if row["employees"] in ("", None):
-                row["employees"] = None
-            else:
-                row["employees"] = int(row["employees"])
-        return super().post_process(row, context)
 
 
 class IndustryClassificationListStream(FmpRestStream):

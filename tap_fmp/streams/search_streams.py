@@ -4,6 +4,7 @@ from __future__ import annotations
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 from tap_fmp.client import FmpRestStream, CompanySymbolPartitionStream
+from tap_fmp.mixins import ListingFieldTypesMixin
 
 ### Skipping the below endpoints
 # Stock Symbol Search
@@ -47,7 +48,7 @@ class CompanyScreenerStream(FmpRestStream):
         return f"{self.url_base}/stable/company-screener"
 
 
-class ExchangeVariantsStream(CompanySymbolPartitionStream):
+class ExchangeVariantsStream(ListingFieldTypesMixin, CompanySymbolPartitionStream):
     name = "exchange_variants"
     _raw_partition = True
 
@@ -73,7 +74,7 @@ class ExchangeVariantsStream(CompanySymbolPartitionStream):
         th.Property("ceo", th.StringType),
         th.Property("sector", th.StringType),
         th.Property("country", th.StringType),
-        th.Property("full_time_employees", th.StringType),
+        th.Property("full_time_employees", th.IntegerType),
         th.Property("phone", th.StringType),
         th.Property("address", th.StringType),
         th.Property("city", th.StringType),
@@ -82,7 +83,7 @@ class ExchangeVariantsStream(CompanySymbolPartitionStream):
         th.Property("dcf_diff", th.NumberType),
         th.Property("dcf", th.NumberType),
         th.Property("image", th.StringType),
-        th.Property("ipo_date", th.CustomType({"type": ["string", "null"]})),
+        th.Property("ipo_date", th.DateType),
         th.Property("default_image", th.BooleanType),
         th.Property("is_etf", th.BooleanType),
         th.Property("is_actively_trading", th.BooleanType),

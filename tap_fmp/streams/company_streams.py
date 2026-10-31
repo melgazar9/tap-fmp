@@ -10,7 +10,11 @@ from tap_fmp.client import (
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
-from tap_fmp.mixins import BatchSymbolPartitionMixin, CompanyBatchStreamMixin
+from tap_fmp.mixins import (
+    BatchSymbolPartitionMixin,
+    CompanyBatchStreamMixin,
+    ListingFieldTypesMixin,
+)
 
 
 class CompanySymbolSurrogateKeyStream(CompanySymbolPartitionStream):
@@ -23,7 +27,9 @@ class CompanySymbolSurrogateKeyStream(CompanySymbolPartitionStream):
     _add_surrogate_key = True
 
 
-class CompanyProfileBySymbolStream(CompanySymbolSurrogateKeyStream):
+class CompanyProfileBySymbolStream(
+    ListingFieldTypesMixin, CompanySymbolSurrogateKeyStream
+):
     name = "company_profile_by_symbol"
     _raw_partition = True
 
@@ -52,14 +58,14 @@ class CompanyProfileBySymbolStream(CompanySymbolSurrogateKeyStream):
         th.Property("ceo", th.StringType),
         th.Property("sector", th.StringType),
         th.Property("country", th.StringType),
-        th.Property("full_time_employees", th.StringType),
+        th.Property("full_time_employees", th.IntegerType),
         th.Property("phone", th.StringType),
         th.Property("address", th.StringType),
         th.Property("city", th.StringType),
         th.Property("state", th.StringType),
         th.Property("zip", th.StringType),
         th.Property("image", th.StringType),
-        th.Property("ipo_date", th.StringType),
+        th.Property("ipo_date", th.DateType),
         th.Property("default_image", th.BooleanType),
         th.Property("is_etf", th.BooleanType),
         th.Property("is_actively_trading", th.BooleanType),
@@ -71,7 +77,7 @@ class CompanyProfileBySymbolStream(CompanySymbolSurrogateKeyStream):
         return f"{self.url_base}/stable/profile"
 
 
-class CikProfileStream(FmpRestStream):
+class CikProfileStream(ListingFieldTypesMixin, FmpRestStream):
     name = "company_profile_by_cik"
     primary_keys = ["surrogate_key"]
 
@@ -100,14 +106,14 @@ class CikProfileStream(FmpRestStream):
         th.Property("ceo", th.StringType),
         th.Property("sector", th.StringType),
         th.Property("country", th.StringType),
-        th.Property("full_time_employees", th.StringType),
+        th.Property("full_time_employees", th.IntegerType),
         th.Property("phone", th.StringType),
         th.Property("address", th.StringType),
         th.Property("city", th.StringType),
         th.Property("state", th.StringType),
         th.Property("zip", th.StringType),
         th.Property("image", th.StringType),
-        th.Property("ipo_date", th.StringType),
+        th.Property("ipo_date", th.DateType),
         th.Property("default_image", th.BooleanType),
         th.Property("is_etf", th.BooleanType),
         th.Property("is_actively_trading", th.BooleanType),
@@ -169,7 +175,7 @@ class StockPeerComparisonStream(CompanySymbolSurrogateKeyStream):
         return super().post_process(row, context)
 
 
-class DelistedCompaniesStream(FmpRestStream):
+class DelistedCompaniesStream(ListingFieldTypesMixin, FmpRestStream):
     name = "delisted_companies"
     _paginate = True
 
@@ -178,8 +184,8 @@ class DelistedCompaniesStream(FmpRestStream):
         th.Property("symbol", th.StringType, required=True),
         th.Property("company_name", th.StringType),
         th.Property("exchange", th.StringType),
-        th.Property("ipo_date", th.StringType),
-        th.Property("delisted_date", th.StringType),
+        th.Property("ipo_date", th.DateType),
+        th.Property("delisted_date", th.DateType),
     ).to_dict()
 
     _add_surrogate_key = True

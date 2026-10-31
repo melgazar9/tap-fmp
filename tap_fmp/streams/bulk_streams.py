@@ -2,42 +2,75 @@
 
 from __future__ import annotations
 
+import itertools
 import typing as t
+from functools import cached_property
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 from tap_fmp.client import FmpSurrogateKeyStream, IncrementalDateStream
-from datetime import datetime
+from tap_fmp.helpers import iso_date, whole_count
+from datetime import date, datetime
 from singer_sdk.exceptions import ConfigValidationError
 from decimal import Decimal
 
 
 class BaseBulkStream(FmpSurrogateKeyStream):
-    _expect_csv = True
+    """A bulk endpoint's CSV carries every value as text; each column is
+    converted by its schema type, and a value that doesn't fit stops the stream."""
 
-    _decimal_fields = None
-    _float_fields = None
-    _integer_fields = None
-    _date_fields = None
-    _datetime_fields = None
+    _expect_csv = True
+    # FMP may restrict a key that keeps calling a bulk file, so its 429s are retried at a slow even pace
+    _quota_retry_interval_seconds: t.ClassVar[float] = 300
+    _quota_exhausted_after_seconds = 1800
+    _csv_booleans: t.ClassVar[dict[str, bool]] = {"true": True, "false": False}
+    # columns whose text follows a rule of its own rather than their schema type's
+    _column_converters: t.ClassVar[dict[str, t.Callable[[str], t.Any]]] = {}
+
+    def _quota_retry_waits(self) -> t.Iterator[float]:
+        return itertools.repeat(self._quota_retry_interval_seconds)
+
+    @cached_property
+    def _text_converters(self) -> dict[str, t.Callable[[str], t.Any]]:
+        converters = {}
+        for column, prop in self.schema["properties"].items():
+            types = prop.get("type", [])
+            types = types if isinstance(types, list) else [types]
+            if column in self._column_converters:
+                converters[column] = self._column_converters[column]
+            elif "boolean" in types:
+                converters[column] = self._boolean_from_text
+            elif "integer" in types:
+                converters[column] = self._integer_from_text
+            elif "number" in types:
+                converters[column] = Decimal
+            elif prop.get("format") == "date":
+                converters[column] = iso_date
+            elif prop.get("format") == "date-time":
+                converters[column] = datetime.fromisoformat
+        return converters
+
+    def _boolean_from_text(self, text: str) -> bool:
+        return self._csv_booleans[text.lower()]
+
+    @staticmethod
+    def _integer_from_text(text: str) -> int:
+        number = Decimal(text)
+        if number != number.to_integral_value():
+            raise ValueError("not a whole number")
+        return int(number)
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
-        field_converters = [
-            (self._decimal_fields, lambda v: Decimal(str(v))),
-            (self._float_fields, float),
-            (self._integer_fields, int),
-            (self._date_fields, lambda x: datetime.fromisoformat(x).date()),
-            (self._datetime_fields, lambda x: datetime.fromisoformat(x)),
-        ]
-
-        for fields, converter in field_converters:
-            if fields:
-                assert isinstance(fields, (tuple, list))
-                for col in fields:
-                    value = record.get(col)
-                    if value in (None, ""):
-                        record[col] = None
-                    else:
-                        record[col] = converter(value)
+        for column, convert in self._text_converters.items():
+            value = record.get(column)
+            if not isinstance(value, str):
+                continue
+            text = value.strip()
+            try:
+                record[column] = convert(text) if text else None
+            except (ValueError, ArithmeticError, KeyError) as e:
+                raise ValueError(
+                    f"Stream {self.name}: column {column} can't hold FMP's value {value!r} ({e!r})"
+                ) from None
         return super().post_process(record, context)
 
     def _requested_years(self) -> list[int]:
@@ -60,54 +93,35 @@ class BaseBulkStream(FmpSurrogateKeyStream):
 
 
 class PaginatedBulkStream(BaseBulkStream):
-    """Base class for bulk streams that need partitioning by part parameter."""
+    """Bulk file split into numbered parts. Each run reads every part (or the
+    configured ones): the file is a fresh snapshot, so a bookmark on the part
+    would skip the parts before it."""
 
-    replication_key = "_part"
-    replication_method = "INCREMENTAL"
     _paginate = True
     _paginate_key = "part"
 
-    def _get_parts(self):
-        if "part" in self.query_params:
-            return [self.query_params.get("part")]
-
-        other_params = self.stream_config.get("other_params", {})
-        parts = other_params.get("parts")
-
-        if "part" in self.query_params and "parts" in other_params:
+    def _configured_parts(self) -> list[int] | None:
+        """`other_params.parts`; none or "*" means every part, and `query_params.part` reads that part alone."""
+        parts = self.stream_config.get("other_params", {}).get("parts")
+        if "part" in self.query_params and parts is not None:
             raise ConfigValidationError(
                 "Cannot specify both 'part' in query_params and 'parts' in other_params."
             )
-
-        if not parts or parts == "*" or parts == ["*"]:
+        if parts in (None, "*", ["*"]):
             return None
-
         if isinstance(parts, (str, int)):
             parts = [parts]
-
-        parts = [int(part) for part in parts]
-
-        if self.replication_method == "INCREMENTAL":
-            state = self.get_context_state(context=None)
-            if state.get("replication_key_value"):
-                min_part = int(state["replication_key_value"])
-                parts = [part for part in parts if part >= min_part]
-
-        return parts
+        return [int(part) for part in parts]
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        parts = self._get_parts()
-        if parts:
-            for part in parts:
-                self.query_params.update({"part": part})
-                yield from super().get_records(context)
-        else:
-            if self.replication_method == "INCREMENTAL":
-                state = self.get_context_state(context)
-                if state.get("replication_key_value"):
-                    starting_part = int(state["replication_key_value"])
-                    self.query_params["part"] = starting_part
+        parts = self._configured_parts()
+        if parts is None:
             yield from super().get_records(context)
+            return
+        url = self.get_url(context)
+        for part in parts:
+            records = self._fetch_with_retry(url, self.query_params, part)
+            yield from self._yield_processed(records, context)
 
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         row["_part"] = self.query_params["part"]
@@ -163,23 +177,7 @@ class CompanyProfileBulkStream(PaginatedBulkStream):
     """Stream for Company Profile Bulk API."""
 
     name = "company_profile_bulk"
-
-    _decimal_fields = [
-        "price",
-        "market_cap",
-        "last_dividend",
-        "change",
-    ]
-
-    _float_fields = [
-        "beta",
-        "change_percentage",
-        "volume",
-        "average_volume",
-    ]
-
-    _integer_fields = ["full_time_employees"]
-    _date_fields = ["filing_date", "ipo_date"]
+    _column_converters = {"full_time_employees": whole_count}
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -232,15 +230,6 @@ class StockRatingBulkStream(BaseBulkStream):
 
     name = "stock_rating_bulk"
 
-    _integer_fields = [
-        "discounted_cash_flow_score",
-        "return_on_equity_score",
-        "return_on_assets_score",
-        "debt_to_equity_score",
-        "price_to_earnings_score",
-        "price_to_book_score",
-    ]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -263,8 +252,6 @@ class DcfValuationsBulkStream(BaseBulkStream):
 
     name = "dcf_valuations_bulk"
 
-    _decimal_fields = ["dcf", "stock_price"]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -281,20 +268,6 @@ class FinancialScoresBulkStream(BaseBulkStream):
     """Stream for Financial Scores Bulk API."""
 
     name = "financial_scores_bulk"
-
-    _decimal_fields = [
-        "working_capital",
-        "total_assets",
-        "retained_earnings",
-        "ebit",
-        "market_cap",
-        "total_liabilities",
-        "revenue",
-    ]
-
-    _float_fields = ["altman_z_score"]
-
-    _integer_fields = ["piotroski_score"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -320,19 +293,6 @@ class PriceTargetSummaryBulkStream(BaseBulkStream):
 
     name = "price_target_summary_bulk"
 
-    _decimal_fields = [
-        "last_month_avg_price_target",
-        "last_quarter_avg_price_target",
-        "last_year_avg_price_target",
-        "all_time_avg_price_target",
-    ]
-    _integer_fields = [
-        "last_month_count",
-        "last_quarter_count",
-        "last_year_count",
-        "all_time_count",
-    ]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -355,9 +315,6 @@ class EtfHolderBulkStream(PaginatedBulkStream):
     """Stream for ETF Holder Bulk API."""
 
     name = "etf_holder_bulk"
-
-    _decimal_fields = ["market_value"]
-    _float_fields = ["weight_percentage", "shares_number"]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -382,14 +339,6 @@ class UpgradesDowngradesConsensusBulkStream(BaseBulkStream):
 
     name = "upgrades_downgrades_consensus_bulk"
 
-    _integer_fields = [
-        "strong_buy",
-        "buy",
-        "hold",
-        "sell",
-        "strong_sell",
-    ]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -409,54 +358,6 @@ class KeyMetricsTtmBulkStream(TtmBulkStream):
     """Stream for Key Metrics TTM Bulk API."""
 
     name = "key_metrics_ttm_bulk"
-
-    _decimal_fields = [
-        "market_cap",
-        "enterprise_value_ttm",
-        "graham_number_ttm",
-        "graham_net_net_ttm",
-        "working_capital_ttm",
-        "invested_capital_ttm",
-        "average_receivables_ttm",
-        "average_payables_ttm",
-        "average_inventory_ttm",
-        "free_cash_flow_to_equity_ttm",
-        "free_cash_flow_to_firm_ttm",
-        "tangible_asset_value_ttm",
-        "net_current_asset_value_ttm",
-    ]
-
-    _float_fields = [
-        "ev_to_sales_ttm",
-        "ev_to_operating_cash_flow_ttm",
-        "ev_to_free_cash_flow_ttm",
-        "ev_to_ebitda_ttm",
-        "net_debt_to_ebitda_ttm",
-        "current_ratio_ttm",
-        "income_quality_ttm",
-        "tax_burden_ttm",
-        "interest_burden_ttm",
-        "return_on_assets_ttm",
-        "operating_return_on_assets_ttm",
-        "return_on_tangible_assets_ttm",
-        "return_on_equity_ttm",
-        "return_on_invested_capital_ttm",
-        "return_on_capital_employed_ttm",
-        "earnings_yield_ttm",
-        "free_cash_flow_yield_ttm",
-        "capex_to_operating_cash_flow_ttm",
-        "capex_to_depreciation_ttm",
-        "capex_to_revenue_ttm",
-        "sales_general_and_administrative_to_revenue_ttm",
-        "research_and_development_to_revenue_ttm",
-        "stock_based_compensation_to_revenue_ttm",
-        "intangibles_to_total_assets_ttm",
-        "days_of_sales_outstanding_ttm",
-        "days_of_payables_outstanding_ttm",
-        "days_of_inventory_outstanding_ttm",
-        "operating_cycle_ttm",
-        "cash_conversion_cycle_ttm",
-    ]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -513,70 +414,6 @@ class RatiosTtmBulkStream(TtmBulkStream):
     """Stream for Ratios TTM Bulk API."""
 
     name = "ratios_ttm_bulk"
-
-    _float_fields = [
-        "gross_profit_margin_ttm",
-        "ebit_margin_ttm",
-        "ebitda_margin_ttm",
-        "operating_profit_margin_ttm",
-        "pretax_profit_margin_ttm",
-        "continuous_operations_profit_margin_ttm",
-        "net_profit_margin_ttm",
-        "bottom_line_profit_margin_ttm",
-        "receivables_turnover_ttm",
-        "payables_turnover_ttm",
-        "inventory_turnover_ttm",
-        "fixed_asset_turnover_ttm",
-        "asset_turnover_ttm",
-        "current_ratio_ttm",
-        "quick_ratio_ttm",
-        "solvency_ratio_ttm",
-        "cash_ratio_ttm",
-        "price_to_earnings_ratio_ttm",
-        "price_to_earnings_growth_ratio_ttm",
-        "price_to_earnings_diluted_ratio_ttm",
-        "price_to_earnings_diluted_growth_ratio_ttm",
-        "forward_price_to_earnings_growth_ratio_ttm",
-        "price_to_book_ratio_ttm",
-        "price_to_sales_ratio_ttm",
-        "price_to_free_cash_flow_ratio_ttm",
-        "price_to_operating_cash_flow_ratio_ttm",
-        "debt_to_assets_ratio_ttm",
-        "debt_to_equity_ratio_ttm",
-        "debt_to_capital_ratio_ttm",
-        "long_term_debt_to_capital_ratio_ttm",
-        "financial_leverage_ratio_ttm",
-        "working_capital_turnover_ratio_ttm",
-        "operating_cash_flow_ratio_ttm",
-        "operating_cash_flow_sales_ratio_ttm",
-        "free_cash_flow_operating_cash_flow_ratio_ttm",
-        "debt_service_coverage_ratio_ttm",
-        "interest_coverage_ratio_ttm",
-        "short_term_operating_cash_flow_coverage_ratio_ttm",
-        "operating_cash_flow_coverage_ratio_ttm",
-        "capital_expenditure_coverage_ratio_ttm",
-        "dividend_paid_and_capex_coverage_ratio_ttm",
-        "dividend_payout_ratio_ttm",
-        "dividend_yield_ttm",
-        "enterprise_value_ttm",
-        "revenue_per_share_ttm",
-        "net_income_per_share_ttm",
-        "interest_debt_per_share_ttm",
-        "cash_per_share_ttm",
-        "book_value_per_share_ttm",
-        "tangible_book_value_per_share_ttm",
-        "shareholders_equity_per_share_ttm",
-        "operating_cash_flow_per_share_ttm",
-        "capex_per_share_ttm",
-        "free_cash_flow_per_share_ttm",
-        "net_income_per_ebt_ttm",
-        "ebt_per_ebit_ttm",
-        "price_to_fair_value_ttm",
-        "debt_to_market_cap_ttm",
-        "effective_tax_rate_ttm",
-        "enterprise_value_multiple_ttm",
-        "dividend_per_share_ttm",
-    ]
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -668,8 +505,6 @@ class EarningsSurprisesBulkStream(BaseBulkStream):
 
     name = "earnings_surprises_bulk"
 
-    _decimal_fields = ["eps_actual", "eps_estimated"]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
@@ -693,43 +528,6 @@ class IncomeStatementBulkStream(IncrementalYearPeriodStream):
 
     name = "income_statement_bulk"
 
-    _float_fields = [
-        "revenue",
-        "cost_of_revenue",
-        "gross_profit",
-        "research_and_development_expenses",
-        "general_and_administrative_expenses",
-        "selling_and_marketing_expenses",
-        "selling_general_and_administrative_expenses",
-        "other_expenses",
-        "operating_expenses",
-        "cost_and_expenses",
-        "net_interest_income",
-        "interest_income",
-        "interest_expense",
-        "depreciation_and_amortization",
-        "ebitda",
-        "ebit",
-        "non_operating_income_excluding_interest",
-        "operating_income",
-        "total_other_income_expenses_net",
-        "income_before_tax",
-        "income_tax_expense",
-        "net_income_from_continuing_operations",
-        "net_income_from_discontinued_operations",
-        "other_adjustments_to_net_income",
-        "net_income",
-        "net_income_deductions",
-        "bottom_line_net_income",
-        "eps",
-        "eps_diluted",
-        "weighted_average_shs_out",
-        "weighted_average_shs_out_dil",
-    ]
-
-    _date_fields = ["filing_date"]
-    _datetime_fields = ["accepted_date"]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -738,7 +536,7 @@ class IncomeStatementBulkStream(IncrementalYearPeriodStream):
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.DateType),
         th.Property("accepted_date", th.DateTimeType),
-        th.Property("fiscal_year", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("revenue", th.NumberType),
         th.Property("cost_of_revenue", th.NumberType),
@@ -782,43 +580,11 @@ class IncomeStatementGrowthBulkStream(IncrementalYearPeriodStream):
 
     name = "income_statement_growth_bulk"
 
-    _float_fields = [
-        "growth_revenue",
-        "growth_cost_of_revenue",
-        "growth_gross_profit",
-        "growth_gross_profit_ratio",
-        "growth_research_and_development_expenses",
-        "growth_general_and_administrative_expenses",
-        "growth_selling_and_marketing_expenses",
-        "growth_other_expenses",
-        "growth_operating_expenses",
-        "growth_cost_and_expenses",
-        "growth_interest_income",
-        "growth_interest_expense",
-        "growth_depreciation_and_amortization",
-        "growth_ebitda",
-        "growth_operating_income",
-        "growth_income_before_tax",
-        "growth_income_tax_expense",
-        "growth_net_income",
-        "growth_eps",
-        "growth_eps_diluted",
-        "growth_weighted_average_shs_out",
-        "growth_weighted_average_shs_out_dil",
-        "growth_ebit",
-        "growth_non_operating_income_excluding_interest",
-        "growth_net_interest_income",
-        "growth_total_other_income_expenses_net",
-        "growth_net_income_from_continuing_operations",
-        "growth_other_adjustments_to_net_income",
-        "growth_net_income_deductions",
-    ]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("date", th.DateType),
-        th.Property("fiscal_year", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("reported_currency", th.StringType),
         th.Property("growth_revenue", th.NumberType),
@@ -861,62 +627,6 @@ class BalanceSheetStatementBulkStream(IncrementalYearPeriodStream):
 
     name = "balance_sheet_statement_bulk"
 
-    _float_fields = [
-        "cash_and_cash_equivalents",
-        "short_term_investments",
-        "cash_and_short_term_investments",
-        "net_receivables",
-        "accounts_receivables",
-        "other_receivables",
-        "inventory",
-        "prepaids",
-        "other_current_assets",
-        "total_current_assets",
-        "property_plant_equipment_net",
-        "goodwill",
-        "intangible_assets",
-        "goodwill_and_intangible_assets",
-        "long_term_investments",
-        "tax_assets",
-        "other_non_current_assets",
-        "total_non_current_assets",
-        "other_assets",
-        "total_assets",
-        "total_payables",
-        "account_payables",
-        "other_payables",
-        "accrued_expenses",
-        "short_term_debt",
-        "capital_lease_obligations_current",
-        "tax_payables",
-        "deferred_revenue",
-        "other_current_liabilities",
-        "total_current_liabilities",
-        "long_term_debt",
-        "capital_lease_obligations_non_current",
-        "deferred_revenue_non_current",
-        "deferred_tax_liabilities_non_current",
-        "other_non_current_liabilities",
-        "total_non_current_liabilities",
-        "other_liabilities",
-        "capital_lease_obligations",
-        "total_liabilities",
-        "treasury_stock",
-        "preferred_stock",
-        "common_stock",
-        "retained_earnings",
-        "additional_paid_in_capital",
-        "accumulated_other_comprehensive_income_loss",
-        "other_total_stockholders_equity",
-        "total_stockholders_equity",
-        "total_equity",
-        "minority_interest",
-        "total_liabilities_and_total_equity",
-        "total_investments",
-        "total_debt",
-        "net_debt",
-    ]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -925,7 +635,7 @@ class BalanceSheetStatementBulkStream(IncrementalYearPeriodStream):
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.DateType),
         th.Property("accepted_date", th.DateTimeType),
-        th.Property("fiscal_year", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("cash_and_cash_equivalents", th.NumberType),
         th.Property("short_term_investments", th.NumberType),
@@ -991,65 +701,11 @@ class BalanceSheetStatementGrowthBulkStream(IncrementalYearPeriodStream):
 
     name = "balance_sheet_statement_growth_bulk"
 
-    _float_fields = [
-        "growth_cash_and_cash_equivalents",
-        "growth_short_term_investments",
-        "growth_cash_and_short_term_investments",
-        "growth_net_receivables",
-        "growth_inventory",
-        "growth_other_current_assets",
-        "growth_total_current_assets",
-        "growth_property_plant_equipment_net",
-        "growth_goodwill",
-        "growth_intangible_assets",
-        "growth_goodwill_and_intangible_assets",
-        "growth_long_term_investments",
-        "growth_tax_assets",
-        "growth_other_non_current_assets",
-        "growth_total_non_current_assets",
-        "growth_other_assets",
-        "growth_total_assets",
-        "growth_account_payables",
-        "growth_short_term_debt",
-        "growth_tax_payables",
-        "growth_deferred_revenue",
-        "growth_other_current_liabilities",
-        "growth_total_current_liabilities",
-        "growth_long_term_debt",
-        "growth_deferred_revenue_non_current",
-        "growth_deferred_tax_liabilities_non_current",
-        "growth_other_non_current_liabilities",
-        "growth_total_non_current_liabilities",
-        "growth_other_liabilities",
-        "growth_total_liabilities",
-        "growth_preferred_stock",
-        "growth_common_stock",
-        "growth_retained_earnings",
-        "growth_accumulated_other_comprehensive_income_loss",
-        "growth_other_total_stockholders_equity",
-        "growth_total_stockholders_equity",
-        "growth_minority_interest",
-        "growth_total_equity",
-        "growth_total_liabilities_and_stockholders_equity",
-        "growth_total_investments",
-        "growth_total_debt",
-        "growth_net_debt",
-        "growth_accounts_receivables",
-        "growth_other_receivables",
-        "growth_prepaids",
-        "growth_total_payables",
-        "growth_other_payables",
-        "growth_accrued_expenses",
-        "growth_capital_lease_obligations_current",
-        "growth_additional_paid_in_capital",
-        "growth_treasury_stock",
-    ]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("date", th.DateType),
-        th.Property("fiscal_year", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("reported_currency", th.StringType),
         th.Property("growth_cash_and_cash_equivalents", th.NumberType),
@@ -1116,51 +772,6 @@ class CashFlowStatementBulkStream(IncrementalYearPeriodStream):
 
     name = "cash_flow_statement_bulk"
 
-    _float_fields = [
-        "net_income",
-        "depreciation_and_amortization",
-        "deferred_income_tax",
-        "stock_based_compensation",
-        "change_in_working_capital",
-        "accounts_receivables",
-        "inventory",
-        "accounts_payables",
-        "other_working_capital",
-        "other_non_cash_items",
-        "net_cash_provided_by_operating_activities",
-        "investments_in_property_plant_and_equipment",
-        "acquisitions_net",
-        "purchases_of_investments",
-        "sales_maturities_of_investments",
-        "other_investing_activities",
-        "net_cash_provided_by_investing_activities",
-        "net_debt_issuance",
-        "long_term_net_debt_issuance",
-        "short_term_net_debt_issuance",
-        "net_stock_issuance",
-        "net_common_stock_issuance",
-        "common_stock_issuance",
-        "common_stock_repurchased",
-        "net_preferred_stock_issuance",
-        "net_dividends_paid",
-        "common_dividends_paid",
-        "preferred_dividends_paid",
-        "other_financing_activities",
-        "net_cash_provided_by_financing_activities",
-        "effect_of_forex_changes_on_cash",
-        "net_change_in_cash",
-        "cash_at_end_of_period",
-        "cash_at_beginning_of_period",
-        "operating_cash_flow",
-        "capital_expenditure",
-        "free_cash_flow",
-        "income_taxes_paid",
-        "interest_paid",
-    ]
-
-    _date_fields = ["filing_date"]
-    _datetime_fields = ["accepted_date"]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -1169,7 +780,7 @@ class CashFlowStatementBulkStream(IncrementalYearPeriodStream):
         th.Property("cik", th.StringType),
         th.Property("filing_date", th.DateType),
         th.Property("accepted_date", th.DateTimeType),
-        th.Property("fiscal_year", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("net_income", th.NumberType),
         th.Property("depreciation_and_amortization", th.NumberType),
@@ -1221,51 +832,11 @@ class CashFlowStatementGrowthBulkStream(IncrementalYearPeriodStream):
 
     name = "cash_flow_statement_growth_bulk"
 
-    _float_fields = [
-        "growth_net_income",
-        "growth_depreciation_and_amortization",
-        "growth_deferred_income_tax",
-        "growth_stock_based_compensation",
-        "growth_change_in_working_capital",
-        "growth_accounts_receivables",
-        "growth_inventory",
-        "growth_accounts_payables",
-        "growth_other_working_capital",
-        "growth_other_non_cash_items",
-        "growth_net_cash_provided_by_operating_activities",
-        "growth_investments_in_property_plant_and_equipment",
-        "growth_acquisitions_net",
-        "growth_purchases_of_investments",
-        "growth_sales_maturities_of_investments",
-        "growth_other_investing_activities",
-        "growth_net_cash_used_for_investing_activities",
-        "growth_debt_repayment",
-        "growth_common_stock_issued",
-        "growth_common_stock_repurchased",
-        "growth_dividends_paid",
-        "growth_other_financing_activities",
-        "growth_net_cash_used_provided_by_financing_activities",
-        "growth_effect_of_forex_changes_on_cash",
-        "growth_net_change_in_cash",
-        "growth_cash_at_end_of_period",
-        "growth_cash_at_beginning_of_period",
-        "growth_operating_cash_flow",
-        "growth_capital_expenditure",
-        "growth_free_cash_flow",
-        "growth_net_debt_issuance",
-        "growth_long_term_net_debt_issuance",
-        "growth_short_term_net_debt_issuance",
-        "growth_net_stock_issuance",
-        "growth_preferred_dividends_paid",
-        "growth_income_taxes_paid",
-        "growth_interest_paid",
-    ]
-
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
         th.Property("symbol", th.StringType),
         th.Property("date", th.DateType),
-        th.Property("fiscal_year", th.StringType),
+        th.Property("fiscal_year", th.IntegerType),
         th.Property("period", th.StringType),
         th.Property("reported_currency", th.StringType),
         th.Property("growth_net_income", th.NumberType),
@@ -1315,12 +886,11 @@ class CashFlowStatementGrowthBulkStream(IncrementalYearPeriodStream):
         return f"{self.url_base}/stable/cash-flow-statement-growth-bulk"
 
 
-class EodBulkStream(IncrementalDateStream):
+class EodBulkStream(BaseBulkStream, IncrementalDateStream):
     """Stream for EOD Bulk API."""
 
     name = "eod_bulk"
     primary_keys = ["symbol", "date"]
-    _expect_csv = True
     # Dates are requested in order, so an interrupted backfill resumes at its last date instead of from the start.
     is_sorted = True
 
@@ -1362,25 +932,13 @@ class EodBulkStream(IncrementalDateStream):
             filtered_dates = [d for d in filtered_dates if d["date"] <= date_lte]
 
         for date_dict in filtered_dates:
-            requested_date = date_dict["date"]
+            requested_date = date.fromisoformat(date_dict["date"])
             self.query_params.update(date_dict)
             for record in super(IncrementalDateStream, self).get_records(context):
                 # The bookmark follows the row date, so a row from another date would move it past dates not yet read.
-                if str(record.get("date"))[:10] != requested_date:
+                if record.get("date") != requested_date:
                     raise ValueError(
                         f"eod_bulk: requested {requested_date} but FMP returned "
                         f"{record.get('symbol')} dated {record.get('date')}"
                     )
                 yield record
-
-    def post_process(self, record: dict, context: Context | None = None) -> dict:
-        for col in ["open", "high", "low", "close", "adj_close", "volume"]:
-            if col in record and not isinstance(record[col], (int, float, Decimal)):
-                if record[col] not in (None, ""):
-                    try:
-                        record[col] = Decimal(record[col])
-                    except Exception:
-                        record[col] = float(record[col])
-                else:
-                    record[col] = None
-        return super().post_process(record, context)
