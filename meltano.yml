@@ -38,7 +38,7 @@ plugins:
     - name: exchange_variants_source
       kind: object
       label: Exchange Variants Source Configuration
-      description: Configuration for how to source exchange variants data
+      description: Where the country/currency filter reads each listing's company profile from
       default:
         use_csv: true
         csv_path: "distinct_exchange_variants.csv"
@@ -49,7 +49,7 @@ plugins:
     - name: database_config
       kind: object
       label: Database Configuration
-      description: Database connection settings for exchange variants
+      description: Database holding the company profiles the country/currency filter reads
       default:
         host: null
         port: null
@@ -57,7 +57,7 @@ plugins:
         username: null
         password: null
         schema: "public"
-        table: "exchange_variants"
+        table: "company_profile_by_symbol"
 
 
     select:
@@ -425,7 +425,7 @@ plugins:
         username: ${POSTGRES_USER}
         password: ${POSTGRES_PASSWORD}
         schema: "tap_fmp_production"
-        table: "exchange_variants"
+        table: "company_profile_by_symbol"
 
       company_symbols:
         select_symbols: ["NVDA", "META", "AAPL"]

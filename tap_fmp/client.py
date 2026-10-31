@@ -36,6 +36,37 @@ _SCHEMA_DRIFT_SEEN: set[tuple[str, frozenset[str]]] = set()
 _SCHEMA_DRIFT_LOCK = threading.Lock()
 
 
+class FmpQuotaExhaustedError(RuntimeError):
+    """FMP kept refusing one request past its per-minute window: the plan's
+    30-day bandwidth cap or daily quota is spent, and retrying only waits."""
+
+
+class FmpErrorReplyError(RuntimeError):
+    """FMP answered with an error message in place of data, under a success status."""
+
+
+class YearWindow:
+    """Years a year-partitioned stream requests: a configured list is a
+    backfill; none configured means only the trailing window, since the
+    history before it is already loaded."""
+
+    # calendar years requested when none are configured; late filings and amendments land inside it
+    TRAILING_YEARS: t.ClassVar[int] = 2
+
+    @classmethod
+    def resolve(cls, configured: t.Any, start_date: str) -> list[int]:
+        """`start_date` is the floor: no year before its year is requested."""
+        first_year = datetime.fromisoformat(str(start_date)[:10]).year
+        if not configured or configured in ("*", ["*"]):
+            this_year = datetime.today().year
+            years = range(this_year - cls.TRAILING_YEARS + 1, this_year + 1)
+        else:
+            if isinstance(configured, (str, int)):
+                configured = [configured]
+            years = [int(year) for year in configured]
+        return [year for year in years if year >= first_year]
+
+
 class FmpRestStream(RESTStream, ABC):
     """FMP stream class with symbol partitioning support."""
 
@@ -51,6 +82,14 @@ class FmpRestStream(RESTStream, ABC):
     _replication_key_starting_name = "from"
     _replication_key_ending_name = "to"
     _expect_csv = False
+    _retryable_status_codes = frozenset({429, 500, 502, 503, 504})
+    _quota_status_code = 429
+    # seconds one request may keep drawing 429s: the per-minute limit clears inside it, the 30-day bandwidth cap never does
+    _quota_exhausted_after_seconds = 300
+    _error_body_max_chars = 500
+    _error_reply_key = "Error Message"
+    # FMP's reply when the endpoint holds nothing for the request; every other error reply is a fault
+    _no_data_reply_prefix = "No Data for this symbol"
 
     def __init__(self, tap: Tap) -> None:
         super().__init__(tap)
@@ -165,7 +204,9 @@ class FmpRestStream(RESTStream, ABC):
 
         Priority:
         1. If replication_key bookmark exists in state, use it
-        2. Otherwise, use stream-specific start date from query_params or global start_date
+        2. Otherwise the SDK's starting_replication_value, which is the global start_date: it is a
+           floor, so a stream's own start only applies when later (callers take the later of the two)
+        3. Without either, the stream-specific start date from query_params, then global start_date
 
         Works with different replication key types: timestamp, date, year, part, etc.
         """
@@ -208,14 +249,28 @@ class FmpRestStream(RESTStream, ABC):
             wait = self._last_call_ts + self._min_interval - now
             if wait > 0:
                 time.sleep(wait + random.uniform(0, 0.1))
-            self._last_call_ts = now
+            # Stamped after the sleep: the pre-sleep time let the next call go early and the stream burst past the limit.
+            self._last_call_ts = time.time()
 
     def _fetch_with_retry(
         self, url: str, query_params: dict, page: int | None = None
     ) -> list[dict]:
-        """Centralized API call with retry logic."""
+        """Centralized API call with retry logic. A 429 that outlasts
+        `_quota_exhausted_after_seconds` raises FmpQuotaExhaustedError."""
 
         max_retries = self.other_params.get("max_retries", 12)
+        first_quota_refusal: list[float] = []
+
+        def give_up(e: Exception) -> bool:
+            response = getattr(e, "response", None)
+            if not isinstance(e, requests.exceptions.HTTPError) or response is None:
+                return False
+            if response.status_code != self._quota_status_code:
+                return response.status_code not in self._retryable_status_codes
+            if not first_quota_refusal:
+                first_quota_refusal.append(time.monotonic())
+            refused_for = time.monotonic() - first_quota_refusal[0]
+            return refused_for >= self._quota_exhausted_after_seconds
 
         @backoff.on_exception(
             backoff.expo,
@@ -225,11 +280,7 @@ class FmpRestStream(RESTStream, ABC):
             jitter=backoff.full_jitter,
             max_tries=max_retries,
             max_time=1800,
-            giveup=lambda e: (
-                isinstance(e, requests.exceptions.HTTPError)
-                and e.response is not None
-                and e.response.status_code not in (429, 500, 502, 503, 504)
-            ),
+            giveup=give_up,
             on_backoff=lambda details: logging.warning(
                 f"API request failed, retrying in {details['wait']:.1f}s "
                 f"(attempt {details['tries']}): {details['exception']}"
@@ -238,7 +289,17 @@ class FmpRestStream(RESTStream, ABC):
         def fetch_with_backoff():
             return self._make_http_request(url, query_params, page)
 
-        return fetch_with_backoff()
+        try:
+            return fetch_with_backoff()
+        except requests.exceptions.HTTPError as e:
+            if e.response is None or e.response.status_code != self._quota_status_code:
+                raise
+            refused_for = time.monotonic() - first_quota_refusal[0]
+            raise FmpQuotaExhaustedError(
+                f"Stream {self.name}: FMP answered 429 for {refused_for:.0f}s, past "
+                f"its per-minute limit, so the plan's bandwidth cap or daily quota is "
+                f"spent; stopping instead of retrying into it. {e}"
+            ) from None
 
     def _make_http_request(
         self, url: str, query_params: dict, page: int | None = None
@@ -283,6 +344,9 @@ class FmpRestStream(RESTStream, ABC):
             else:
                 records = response.json()
 
+            if isinstance(records, dict) and self._error_reply_key in records:
+                return self._no_data_or_raise(records[self._error_reply_key], log_url)
+
             if isinstance(records, dict) and len(records):
                 records = [records]
 
@@ -292,12 +356,14 @@ class FmpRestStream(RESTStream, ABC):
             )
             return records
         except requests.exceptions.RequestException as e:
-            redacted_url = self.redact_api_key(e.request.url)
-            error_message = (
-                f"{e.response.status_code} Client Error: {e.response.reason} for url: {redacted_url}"
-                if e.response and e.request
-                else self.redact_api_key(str(e))
-            )
+            # `is not None`, not truthiness: a Response is falsy whenever its status is an error.
+            if e.response is not None and e.request is not None:
+                error_message = (
+                    f"{e.response.status_code} Client Error: {e.response.reason} for url: {e.request.url}"
+                    f" | response: {e.response.text[:self._error_body_max_chars]}"
+                )
+            else:
+                error_message = str(e)
             error_message = self.redact_api_key(error_message)
             # `from None`: the original exception's message holds the raw
             # URL, and chaining would print it (and the API key) in tracebacks.
@@ -306,6 +372,16 @@ class FmpRestStream(RESTStream, ABC):
                 response=e.response,
                 request=e.request,
             ) from None
+
+    def _no_data_or_raise(self, message: str, log_url: str) -> list[dict]:
+        """An error reply is never a record: FMP's no-data reply is an empty result, any other one stops the stream."""
+        if message.startswith(self._no_data_reply_prefix):
+            logging.info(f"Stream {self.name}: no data at {log_url}")
+            return []
+        raise FmpErrorReplyError(
+            f"Stream {self.name}: FMP answered {log_url} with an error in place of data: "
+            f"{self.redact_api_key(message)[:self._error_body_max_chars]}"
+        )
 
     def _set_configured_page(self):
         if getattr(self, "_configured_page_resolved", False):
@@ -487,6 +563,9 @@ class TimeSliceStream(FmpRestStream):
     # only fires on `max_records_per_request` hits, not on silent caps or page ceilings.
     _default_time_slice_days: int = 90
 
+    # True where the endpoint omits records dated on `from`; the request then starts a day early.
+    _exclusive_from: bool = False
+
     _LOG_FIXED_KEYS = frozenset(
         {
             "stream",
@@ -521,7 +600,13 @@ class TimeSliceStream(FmpRestStream):
             self._replication_key_starting_name
         ) or tap_cfg.get("start_date")
 
-        end_date = query_params.get("to") or datetime.now().strftime("%Y-%m-%d")
+        # the global end_date is a ceiling over the stream's own `to`, as start_date is a floor under its `from`
+        ceilings = [
+            str(ceiling)[:10]
+            for ceiling in (query_params.get("to"), tap_cfg.get("end_date"))
+            if ceiling
+        ]
+        end_date = min(ceilings) if ceilings else datetime.now().strftime("%Y-%m-%d")
 
         if start_date_cfg:
             config_start_dt = datetime.fromisoformat(start_date_cfg).date()
@@ -686,7 +771,13 @@ class TimeSliceStream(FmpRestStream):
            caps that sit below max_records.
         """
         query_params = query_params.copy()
-        query_params[self._replication_key_starting_name] = from_date
+        query_params[self._replication_key_starting_name] = (
+            (datetime.fromisoformat(from_date[:10]) - timedelta(days=1)).strftime(
+                "%Y-%m-%d"
+            )
+            if self._exclusive_from
+            else from_date
+        )
         query_params[self._replication_key_ending_name] = to_date
         symbol = query_params.get("symbol")
 
@@ -832,7 +923,10 @@ class IncrementalDateStream(FmpSurrogateKeyStream):
             )
 
         if not date_range:
-            date_range = ["1990-01-01", datetime.today().date().strftime("%Y-%m-%d")]
+            date_range = [
+                str(self.config["start_date"])[:10],
+                datetime.today().date().strftime("%Y-%m-%d"),
+            ]
 
         assert isinstance(date_range, list), "date_range must be a list"
 

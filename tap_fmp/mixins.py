@@ -159,12 +159,13 @@ class CompanySymbolPartitionMixin(BaseSymbolPartitionMixin):
     applied) — correct for per-symbol data streams (prices, fundamentals,
     analyst data, etc.).
 
-    Reference/universe streams whose output FEEDS the filter (e.g.
-    `ExchangeVariantsStream`) must override `_raw_partition = True` so they
-    partition over the unfiltered universe. Otherwise the filter is gated on
-    data the stream itself produces — a circular bootstrap dependency that
+    Reference/universe streams whose output FEEDS the filter
+    (`CompanyProfileBySymbolStream`) must override `_raw_partition = True` so
+    they partition over the unfiltered universe. Otherwise the filter is gated
+    on data the stream itself produces — a circular bootstrap dependency that
     causes the reference table to be populated with only the filtered
-    subset.
+    subset. Reference streams meant to hold every listing worldwide
+    (`ExchangeVariantsStream`) set it too.
     """
 
     _raw_partition: t.ClassVar[bool] = False
@@ -418,8 +419,17 @@ class ChartFullMixin(BasePriceSchemaMixin):
         th.Property("vwap", th.NumberType),
     ).to_dict()
 
+    # the largest postgres bigint, the volume column's type; FMP sends garbage volumes past it on some bars
+    BIGINT_MAX: t.ClassVar[int] = 2**63 - 1
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/historical-price-eod/full"
+
+    def post_process(self, record: dict, context: Context | None = None) -> dict:
+        # The bar's prices stay; only a volume the column can't hold is dropped.
+        if record.get("volume") is not None and record["volume"] > self.BIGINT_MAX:
+            record["volume"] = None
+        return super().post_process(record, context)
 
 
 class Prices1minMixin(BaseIntervalPriceSchemaMixin):

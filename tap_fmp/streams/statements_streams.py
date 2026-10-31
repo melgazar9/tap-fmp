@@ -6,12 +6,12 @@ import json
 
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
-from datetime import datetime
 
 from tap_fmp.client import (
     FmpRestStream,
     SymbolPeriodPartitionStream,
     BaseSymbolPartitionStream,
+    YearWindow,
 )
 
 from tap_fmp.helpers import blank_strings_to_none
@@ -1085,12 +1085,11 @@ class FinancialReportsForm10kJsonStream(StatementStream):
                 }
             ),
         ),
-        th.Property("error_message", th.StringType),
     ).to_dict()
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         """Process record and move all filing data to filing_data field."""
-        core_fields = {"surrogate_key", "symbol", "period", "year", "error_message"}
+        core_fields = {"surrogate_key", "symbol", "period", "year"}
         filing_data = {k: v for k, v in record.items() if k not in core_fields}
         processed_record = {k: v for k, v in record.items() if k in core_fields}
         if filing_data:
@@ -1107,14 +1106,14 @@ class FinancialReportsForm10kJsonStream(StatementStream):
 
     @property
     def partitions(self):
-        query_params = self.stream_config.get("query_params", {})
-        periods = query_params.get("period")
-        years = query_params.get("years")
-        if periods is None or periods == "*":
-            periods = ["Q1", "Q2", "Q3", "Q4", "FY", "annual", "quarter"]
-        if years is None or years == "*":
-            years = [y for y in range(2023, datetime.today().date().year + 1)]
-            years = [str(y) for y in years]
+        other_params = self.stream_config.get("other_params", {})
+        periods = self._get_periods(other_params.get("period"))
+        years = [
+            str(y)
+            for y in YearWindow.resolve(
+                other_params.get("years"), self.config["start_date"]
+            )
+        ]
         return [
             {"symbol": s["symbol"], "period": p, "year": y}
             for s in self._tap.get_cached_financial_statement_symbols()

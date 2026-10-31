@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import typing as t
+from abc import abstractmethod
 from datetime import datetime
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
-from tap_fmp.client import FmpRestStream, FmpSurrogateKeyStream
+from tap_fmp.client import FmpRestStream, FmpSurrogateKeyStream, YearWindow
 from tap_fmp.helpers import safe_int
 
 
-class Form13fCikPartitionStream(FmpRestStream):
-    # Bookmark per CIK; cik×year×quarter fan-out would exceed elt.buffer_size.
-    state_partitioning_keys = ["cik"]
+class Form13fPeriodPartitionStream(FmpRestStream):
+    """A 13F stream fanned out over entity × year × quarter. With no `years`
+    configured it requests only YearWindow's trailing window."""
+
+    @abstractmethod
+    def _partition_entities(self) -> list[dict]:
+        """The entity half of each partition, e.g. `{"cik": ...}`."""
 
     @property
     def partitions(self):
@@ -25,23 +30,21 @@ class Form13fCikPartitionStream(FmpRestStream):
             if "quarter" in query_params
             else other_params.get("quarters")
         )
-
-        years = (
-            [query_params["year"]]
-            if "year" in query_params
-            else other_params.get("years")
-        )
-
         if not quarters or quarters == ["*"]:
             quarters = [1, 2, 3, 4]
 
-        if not years or years == ["*"]:
-            current_year = datetime.today().year
-            years = [y for y in range(2020, current_year + 1)]
+        years = YearWindow.resolve(
+            (
+                query_params["year"]
+                if "year" in query_params
+                else other_params.get("years")
+            ),
+            self.config["start_date"],
+        )
 
         return [
-            {"cik": c["cik"], "year": y, "quarter": q}
-            for c in self._tap.get_cached_ciks()
+            {**entity, "year": y, "quarter": q}
+            for entity in self._partition_entities()
             for y in years
             for q in quarters
         ]
@@ -51,44 +54,20 @@ class Form13fCikPartitionStream(FmpRestStream):
         return super().get_records(context)
 
 
-class Form13fSymbolPartitionStream(FmpRestStream):
+class Form13fCikPartitionStream(Form13fPeriodPartitionStream):
+    # Bookmark per CIK; cik×year×quarter fan-out would exceed elt.buffer_size.
+    state_partitioning_keys = ["cik"]
+
+    def _partition_entities(self) -> list[dict]:
+        return [{"cik": c["cik"]} for c in self._tap.get_cached_ciks()]
+
+
+class Form13fSymbolPartitionStream(Form13fPeriodPartitionStream):
     # Bookmark per symbol; symbol×year×quarter fan-out would exceed elt.buffer_size.
     state_partitioning_keys = ["symbol"]
 
-    @property
-    def partitions(self):
-        query_params = self.stream_config.get("query_params", {})
-        other_params = self.stream_config.get("other_params", {})
-
-        quarters = (
-            [query_params.get("quarter")]
-            if "quarter" in query_params
-            else other_params.get("quarters")
-        )
-
-        years = (
-            [query_params.get("year")]
-            if "year" in query_params
-            else other_params.get("years")
-        )
-
-        if not quarters or quarters == ["*"]:
-            quarters = [1, 2, 3, 4]
-
-        if not years or years == ["*"]:
-            current_year = datetime.today().year
-            years = [y for y in range(2020, current_year + 1)]
-
-        return [
-            {"symbol": s["symbol"], "year": y, "quarter": q}
-            for s in self._tap.get_cached_company_symbols()
-            for y in years
-            for q in quarters
-        ]
-
-    def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        self.query_params.update(context)
-        return super().get_records(context)
+    def _partition_entities(self) -> list[dict]:
+        return [{"symbol": s["symbol"]} for s in self._tap.get_cached_company_symbols()]
 
 
 class InstitutionalOwnershipFilingsStream(FmpRestStream):

@@ -1,5 +1,11 @@
 # tap-fmp primary-key audit & remediation plan
 
+> **Decision 2026-10-31: point-in-time history wins.** A value FMP revises in place is a new version, and an
+> upsert on a natural key would overwrite what was served earlier, so the latest-only (**N**) recommendations
+> below are not applied. Keyless (Tier 0) streams stay keyless: each run appends what FMP served with its
+> `_sdc_extracted_at`, an exact observation log. `company_executives` / `stock_peer_comparison` carry the
+> company asked about (`symbol` / `requested_symbol`), which FMP's reply omits.
+
 Audit date: 2026-06-18. Covers all **258 concrete streams** (every class with a `name=`).
 Per-family tables are below; this header holds the root cause, the cross-cutting defects, the
 recommended fix mechanism, and the migration. Grounding: stream `schema` definitions in code are
@@ -60,8 +66,6 @@ surrogate bug. Fix = give each a real PK (and drop any dead `surrogate_key` colu
 - Pagination field `_part` (e.g. `company_profile_bulk`, `etf_holder_bulk`) is added at
   `PaginatedBulkStream.post_process` **before** the hash → it currently pollutes the surrogate and
   must be excluded from any PK and any redefined hash.
-- `eod_bulk` emits synthetic `__TIMEOUT_FAILURE__` skip-records (bulk_streams.py ~1400) that would
-  land as real PK rows — filter them.
 - Several recommended PK columns are nullable today (`date`, `url`, `link`, `cusip`) → must be
   enforced NOT NULL (and de-collapsed) before use as a Postgres PK.
 - Type inconsistencies to clean up (join hazards, not all PK-breaking): `financial_ratios.date` is
@@ -337,7 +341,7 @@ All streams below inherit `primary_keys=["surrogate_key"]` and `_add_surrogate_k
 ### Notes
 - **`surrogate_key` column fate = `drop` for every bulk stream.** Each has a clear composite natural key, so the column is redundant. If downstream joins need a single-column key, switch the chosen streams to `keep→hash(PK)` (redefine `generate_surrogate_key` to hash ONLY the recommended PK fields) instead of dropping — but never leave it as the whole-row hash. Note `surrogate_key` is declared `required=True` in every schema; dropping it requires removing that Property too.
 - **`_part` must be excluded from PK and from any hash.** `PaginatedBulkStream.post_process` sets `row["_part"]` (line 95) *before* `super().post_process` runs `generate_surrogate_key` over `sorted(data.keys())`, so today `_part` pollutes the surrogate hash for `company_profile_bulk` and `etf_holder_bulk`. Even after fixing the PK, if you keep a hash it must not include `_part`. `_part` should remain a non-key payload/batch column only (and arguably be dropped from the emitted record entirely).
-- **`eod_bulk` leftover `surrogate_key`.** PK override is correct, but the schema still declares `surrogate_key` (`required=True`) and `IncrementalDateStream`→`FmpSurrogateKeyStream` still sets `_add_surrogate_key=True`, so the unused whole-row hash is still computed and stored. Drop the column (or set `_add_surrogate_key=False`) for cleanliness. Also note the synthetic skip-record path (lines 1400-1410) emits `symbol="__TIMEOUT_FAILURE__"` rows that will land as real PK rows under `["symbol","date"]` — harmless but worth filtering downstream.
+- **`eod_bulk` leftover `surrogate_key`.** PK override is correct, but the schema still declares `surrogate_key` (`required=True`) and `IncrementalDateStream`→`FmpSurrogateKeyStream` still sets `_add_surrogate_key=True`, so the unused whole-row hash is still computed and stored. Drop the column (or set `_add_surrogate_key=False`) for cleanliness.
 - **`stock_rating_bulk` `date` and `earnings_surprises_bulk` `date`/`last_updated` are `DateType`** (good for keying). The statement streams' `accepted_date` is a `DateTimeType` (filing metadata, not a key candidate). None of the snapshot bulks (`financial_scores_bulk`, `price_target_summary_bulk`, `upgrades_downgrades_consensus_bulk`, `key_metrics_ttm_bulk`, `ratios_ttm_bulk`, `stock_peers_bulk`, `company_profile_bulk`) carry a native period/date column — confirming P2 (not T) would be the only history option for those.
 - **`income_statement_growth_bulk` lacks `reported_currency`?** It DOES declare it (line 847), as do all four growth/statement streams — so the recommended PK with `reported_currency` is formable without a schema change for every statement and growth stream.
 

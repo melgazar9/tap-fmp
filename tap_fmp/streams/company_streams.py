@@ -25,6 +25,7 @@ class CompanySymbolSurrogateKeyStream(CompanySymbolPartitionStream):
 
 class CompanyProfileBySymbolStream(CompanySymbolSurrogateKeyStream):
     name = "company_profile_by_symbol"
+    _raw_partition = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -152,6 +153,7 @@ class StockPeerComparisonStream(CompanySymbolSurrogateKeyStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("requested_symbol", th.StringType, required=True),
         th.Property("symbol", th.StringType, required=True),
         th.Property("company_name", th.StringType),
         th.Property("price", th.NumberType),
@@ -160,6 +162,11 @@ class StockPeerComparisonStream(CompanySymbolSurrogateKeyStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/stock-peers"
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        # The reply lists only the peers; `symbol` is the peer, so the company asked about is kept beside it.
+        row["requested_symbol"] = context["symbol"]
+        return super().post_process(row, context)
 
 
 class DelistedCompaniesStream(FmpRestStream):
@@ -336,6 +343,7 @@ class CompanyExecutiveStream(CompanySymbolSurrogateKeyStream):
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
+        th.Property("symbol", th.StringType, required=True),
         th.Property("title", th.StringType),
         th.Property("name", th.StringType),
         th.Property("pay", th.NumberType),
@@ -348,6 +356,11 @@ class CompanyExecutiveStream(CompanySymbolSurrogateKeyStream):
 
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/key-executives"
+
+    def post_process(self, row: dict, context: Context | None = None) -> dict:
+        # The reply carries no symbol, so the company asked about is written onto each executive.
+        row["symbol"] = context["symbol"]
+        return super().post_process(row, context)
 
 
 class ExecutiveCompensationStream(CompanySymbolSurrogateKeyStream):

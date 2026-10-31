@@ -93,12 +93,15 @@ class EconomicIndicatorsStream(EconomicsStream):
 
 class EconomicCalendarStream(EconomicsStream):
     name = "economic_calendar"
+    # One row per scheduled release. FMP fills in estimate/actual and revises previous in place, so the key
+    # must exclude every value field or each fill-in inserts a duplicate (docs/PRIMARY_KEY_AUDIT.md).
+    primary_keys = ["date", "country", "event"]
+    _add_surrogate_key = False
 
     schema = th.PropertiesList(
-        th.Property("surrogate_key", th.StringType, required=True),
         th.Property("date", th.DateTimeType, required=True),
-        th.Property("country", th.StringType),
-        th.Property("event", th.StringType),
+        th.Property("country", th.StringType, required=True),
+        th.Property("event", th.StringType, required=True),
         th.Property("currency", th.StringType),
         th.Property("previous", th.NumberType),
         th.Property("estimate", th.NumberType),

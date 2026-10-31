@@ -40,9 +40,16 @@ tap-fmp --about
 The following configuration options are available for the `tap-fmp` extractor:
 
 *   **`api_key`**: Your FMP API key. This is a required setting.
-*   **`start_date`**: The initial date to start extracting data from. This should be in `YYYY-MM-DDTHH:mm:ssZ` format.
-*   **`exchange_variants_source`**: Configuration for how to source exchange variants data. You can use a CSV file or a database.
-*   **`database_config`**: Database connection settings for exchange variants.
+*   **`start_date`**: The initial date to start extracting data from, and the floor for every stream: a stream's own `query_params.from` applies only when it is later. A bookmark wins over both. This should be in `YYYY-MM-DDTHH:mm:ssZ` format.
+*   **`end_date`**: The last day time-sliced streams request, and the ceiling over a stream's own `query_params.to`; unset means today. It exists for backfill windows, so any other selected stream refuses to run while it is set. A backfill runs on its own state id, so the stream's real bookmark is untouched:
+
+    ```bash
+    TAP_FMP_START_DATE=1900-01-01T00:00:00Z TAP_FMP_END_DATE=1989-12-31 \
+      meltano --environment <env> el tap-fmp target-postgres \
+      --state-id tap_fmp_target_postgres_<env>__dividends_calendar__backfill --select dividends_calendar
+    ```
+*   **`exchange_variants_source`**: Where the country/currency filter reads each listing's company profile from: a database or a CSV file.
+*   **`database_config`**: Database holding the company profiles the country/currency filter reads.
 
 ### Symbol and List Configuration
 
@@ -64,28 +71,30 @@ The tap allows you to specify lists of symbols for various streams. This is usef
 
 ### Country / Currency Filtering — Required Prerequisite
 
-`filter_countries` and `filter_currencies` (e.g. `["US"]` / `["USD"]`) restrict the per-symbol universe every downstream stream iterates over. The filter looks up each symbol's country/currency from the `exchange_variants` data set, sourced according to `exchange_variants_source`:
+`filter_countries` and `filter_currencies` (e.g. `["US"]` / `["USD"]`) restrict the per-symbol universe every downstream stream iterates over. The filter looks up each symbol's country/currency in the company profiles, sourced according to `exchange_variants_source`:
 
-- `use_database: true` (default) — read from the `exchange_variants` Postgres table populated by the `exchange_variants` stream
-- `use_csv: true` — read from `distinct_exchange_variants.csv` shipped with the repo
+- `use_database: true` (default) — read from the `company_profile_by_symbol` Postgres table populated by the `company_profile_by_symbol` stream
+- `use_csv: true` — read from a CSV with `symbol`, `country` and `currency` columns
+
+Exchange variants can't serve the filter: FMP answers them only for companies listed on more than one exchange, so a single-listing company (ABNB, CRWD, GEV) has none.
 
 **You MUST populate the source before any other stream runs when filters are set.**
 
-When the source is unavailable (DB table empty / CSV not enabled), the tap currently logs a warning and **falls back to the full unfiltered ~89k-symbol universe** — burning API credits on records you do not want and contaminating downstream tables (especially under `load_method: append-only`, where re-running will not overwrite the bad rows).
+When the source is unavailable (DB table empty / CSV not enabled), every filtered stream **fails at startup** rather than run on the unfiltered worldwide universe, which would spend the plan's bandwidth on listings you do not want. A source covering less than `TapFMP.MIN_PROFILE_COVERAGE` of the listed companies also fails at startup: it is a partial load, and filtering on it would silently drop every listing it lacks. The table keeps each version of a profile; the filter reads each symbol's latest.
 
 #### Recommended workflow (`use_database: true`)
 
-Run the `exchange_variants` stream by itself first and let it complete fully (~3–4 hours for the full FMP universe) **before** triggering any other stream:
+Run the `company_profile_by_symbol` stream by itself first and let it complete fully (one request per listed company) **before** triggering any other stream:
 
 ```bash
 meltano --environment <env> el tap-fmp target-postgres \
-  --state-id tap_fmp_target_postgres_<env>__exchange_variants \
-  --select exchange_variants
+  --state-id tap_fmp_target_postgres_<env>__company_profile_by_symbol \
+  --select company_profile_by_symbol
 ```
 
-Once the table is populated, trigger the full job. Subsequent runs do not need this step — `ExchangeVariantsManager` reads from the existing table on startup (cached for `exchange_variants_source.cache_ttl_hours`, default 72h). Repeat the one-off only after a schema reset or whenever you want to refresh against a new FMP universe.
+Once the table is populated, trigger the full job. Subsequent runs do not need this step — `CompanyProfilesManager` reads from the existing table on startup. Repeat the one-off only after a schema reset or whenever you want to refresh against a new FMP universe.
 
-> Do **not** select `exchange_variants` in the same parallel job as dependent streams on a cold table. Each stream runs as its own subprocess and initialises its symbol universe at startup; the dependents will read the still-empty table, fall back to unfiltered, and silently load global data.
+> Do **not** select `company_profile_by_symbol` in the same parallel job as dependent streams on a cold table. Each stream runs as its own subprocess and initialises its symbol universe at startup; the dependents will read the still-empty table and fail.
 
 #### Alternative (`use_csv: true`)
 
@@ -98,7 +107,7 @@ config:
     use_database: false
 ```
 
-The repo ships `distinct_exchange_variants.csv` as a static snapshot. It is stale relative to a fresh API sync (does not pick up newly listed symbols until you re-export it from a populated DB) but is sufficient for most filtering use cases and removes the ordering requirement entirely.
+The repo's `distinct_exchange_variants.csv` is an exchange-variants snapshot, so it lacks every single-listing company and fails the coverage check on a full universe; export the company profiles to a CSV instead.
 
 ### Stream-Specific Configuration
 

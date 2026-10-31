@@ -45,6 +45,7 @@ class HolidaysByExchangeStream(TimeSliceStream, FmpSurrogateKeyStream):
     name = "holidays_by_exchange"
 
     _symbol_in_query_params = False
+    _exclusive_from = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),

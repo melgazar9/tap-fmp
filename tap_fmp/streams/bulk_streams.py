@@ -40,6 +40,24 @@ class BaseBulkStream(FmpSurrogateKeyStream):
                         record[col] = converter(value)
         return super().post_process(record, context)
 
+    def _requested_years(self) -> list[int]:
+        """Years from `years` in other_params ("*" or none means all), never before start_date's year."""
+        other_params = self.stream_config.get("other_params", {})
+        if "year" in self.query_params and "years" in other_params:
+            raise ConfigValidationError(
+                f"Stream {self.name}: cannot specify both 'year' in query_params and 'years' in other_params."
+            )
+        if "year" in self.query_params:
+            return [int(self.query_params["year"])]
+
+        first_year = datetime.fromisoformat(str(self.config["start_date"])[:10]).year
+        years = other_params.get("years")
+        if years in (None, "*", ["*"]):
+            return list(range(first_year, datetime.today().year + 1))
+        if isinstance(years, (str, int)):
+            years = [years]
+        return sorted(int(year) for year in years if int(year) >= first_year)
+
 
 class PaginatedBulkStream(BaseBulkStream):
     """Base class for bulk streams that need partitioning by part parameter."""
@@ -100,27 +118,6 @@ class IncrementalYearPeriodStream(BaseBulkStream):
     replication_key = "date"
     replication_method = "INCREMENTAL"
 
-    def _get_year_range(self):
-        if "year" in self.query_params:
-            return [self.query_params.get("year")]
-
-        other_params = self.stream_config.get("other_params", {})
-        year_range = other_params.get("year_range")
-
-        if "year" in self.query_params and "year_range" in other_params:
-            raise ConfigValidationError(
-                "Cannot specify both 'year' and 'year_range' in query_params and other_params."
-            )
-
-        if not year_range:
-            return [y for y in range(1990, datetime.today().year + 1)]
-
-        assert isinstance(year_range, list), "date_range must be a list"
-
-        if len(year_range) == 1 or year_range[-1] == "current_year":
-            year_range = [y for y in range(year_range[0], datetime.today().year + 1)]
-        return year_range
-
     def _get_periods(self):
         other_params = self.stream_config.get("other_params", {})
 
@@ -142,14 +139,10 @@ class IncrementalYearPeriodStream(BaseBulkStream):
         return periods
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        year_range = self._get_year_range()
-        starting_date = self.get_starting_timestamp(context)
-
-        filtered_years = [
-            y
-            for y in year_range
-            if y >= max(datetime.fromisoformat(starting_date).year, 1990)
-        ]
+        starting_year = datetime.fromisoformat(
+            str(self.get_starting_timestamp(context))[:10]
+        ).year
+        filtered_years = [y for y in self._requested_years() if y >= starting_year]
 
         periods = self._get_periods()
 
@@ -686,30 +679,9 @@ class EarningsSurprisesBulkStream(BaseBulkStream):
         th.Property("last_updated", th.DateType),
     ).to_dict()
 
-    def _get_years_dict(self):
-        if "year" in self.query_params:
-            return [{"year": str(self.query_params.get("year"))}]
-
-        other_params = self.stream_config.get("other_params", {})
-        years = other_params.get("years")
-
-        if "year" in self.query_params and "years" in other_params:
-            raise ValueError(
-                f"Stream {self.name}: Cannot specify both 'year' in query_params and 'years' in other_params."
-            )
-
-        if not years:
-            years = [y for y in range(1990, datetime.today().year + 1)]
-
-        if isinstance(years, (str, int)):
-            years = [years]
-
-        return [{"year": str(year)} for year in years]
-
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        years_dict = self._get_years_dict()
-        for year_dict in years_dict:
-            self.query_params.update(year_dict)
+        for year in self._requested_years():
+            self.query_params.update({"year": str(year)})
             yield from super().get_records(context)
 
     def get_url(self, context: Context | None = None) -> str:
@@ -1349,6 +1321,8 @@ class EodBulkStream(IncrementalDateStream):
     name = "eod_bulk"
     primary_keys = ["symbol", "date"]
     _expect_csv = True
+    # Dates are requested in order, so an interrupted backfill resumes at its last date instead of from the start.
+    is_sorted = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -1376,7 +1350,7 @@ class EodBulkStream(IncrementalDateStream):
         return start_date
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        """Override to add date_lte filtering and skip dates that fail after 3 retries."""
+        """Override to add date_lte filtering. A date that fails ends the stream so its bookmark stays on that date."""
         dates_dict = self._get_dates_dict()
         starting_date = self.get_starting_timestamp(context)
         other_params = self.stream_config.get("other_params", {})
@@ -1388,31 +1362,16 @@ class EodBulkStream(IncrementalDateStream):
             filtered_dates = [d for d in filtered_dates if d["date"] <= date_lte]
 
         for date_dict in filtered_dates:
-            current_date = date_dict.get("date", "unknown")
-
-            try:
-                self.query_params.update(date_dict)
-                yield from super(IncrementalDateStream, self).get_records(context)
-
-            except Exception as e:
-                # Catch all exceptions that come from the 3-retry failure
-                self.logger.warning(
-                    f"EOD Bulk: Failed for date {current_date} after 3 retries, skipping to next date. "
-                    f"Error: {self.redact_api_key(e)}"
-                )
-                # Yield minimal record to advance bookmark past failed date
-                yield {
-                    "surrogate_key": f"eod_bulk_skip_{current_date}",
-                    "symbol": "__TIMEOUT_FAILURE__",
-                    "date": current_date,
-                    "open": None,
-                    "low": None,
-                    "high": None,
-                    "close": None,
-                    "adj_close": None,
-                    "volume": None,
-                }
-                continue
+            requested_date = date_dict["date"]
+            self.query_params.update(date_dict)
+            for record in super(IncrementalDateStream, self).get_records(context):
+                # The bookmark follows the row date, so a row from another date would move it past dates not yet read.
+                if str(record.get("date"))[:10] != requested_date:
+                    raise ValueError(
+                        f"eod_bulk: requested {requested_date} but FMP returned "
+                        f"{record.get('symbol')} dated {record.get('date')}"
+                    )
+                yield record
 
     def post_process(self, record: dict, context: Context | None = None) -> dict:
         for col in ["open", "high", "low", "close", "adj_close", "volume"]:

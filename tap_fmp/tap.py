@@ -8,9 +8,11 @@ import threading
 
 from singer_sdk import Tap
 from singer_sdk import typing as th
+from singer_sdk.exceptions import ConfigValidationError
 
+from tap_fmp.client import TimeSliceStream
 from tap_fmp.disk_cache import DiskCache, compute_fingerprint
-from tap_fmp.helpers import ExchangeVariantsManager
+from tap_fmp.helpers import CompanyProfilesManager
 
 from tap_fmp.streams.search_streams import (
     CompanyScreenerStream,
@@ -416,8 +418,11 @@ class TapFMP(Tap):
     _transcript_symbols_stream_instance: AvailableTranscriptSymbolsStream | None = None
     _transcript_symbols_lock = threading.Lock()
 
-    _exchange_variants_manager: ExchangeVariantsManager | None = None
-    _exchange_variants_lock = threading.Lock()
+    _company_profiles_manager: CompanyProfilesManager | None = None
+    _company_profiles_lock = threading.Lock()
+    _profile_coverage_verified: bool = False
+    # share of the raw company universe the profile source must hold; below it the source is a partial load
+    MIN_PROFILE_COVERAGE: t.ClassVar[float] = 0.95
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -431,6 +436,24 @@ class TapFMP(Tap):
             if shared_cache_dir
             else None
         )
+
+    def sync_all(self) -> None:
+        self._refuse_streams_end_date_cannot_bound()
+        super().sync_all()
+
+    def _refuse_streams_end_date_cannot_bound(self) -> None:
+        """Only time-sliced streams take a date window; any other selected stream would run to today."""
+        if not self.config.get("end_date"):
+            return
+        unbounded = sorted(
+            name
+            for name, stream in self.streams.items()
+            if stream.selected and not isinstance(stream, TimeSliceStream)
+        )
+        if unbounded:
+            raise ConfigValidationError(
+                f"end_date bounds only time-sliced streams; these selected streams cannot honour it: {unbounded}"
+            )
 
     def _build_cache_fingerprint(self, stream) -> str:
         """Build a fingerprint from the stream's effective parsed config."""
@@ -582,6 +605,11 @@ class TapFMP(Tap):
             description="Start date for data extraction",
         ),
         th.Property(
+            "end_date",
+            th.DateTimeType,
+            description="Last day time-sliced streams request, for a backfill window; unset means today",
+        ),
+        th.Property(
             "company_symbols",
             th.ObjectType(
                 th.Property(
@@ -597,7 +625,7 @@ class TapFMP(Tap):
     def get_cached_raw_company_symbols(self) -> t.List[dict]:
         """Unfiltered stock-list universe. Primary cache; the filtered view
         derives from this. Reference streams that feed the country/currency
-        filter (e.g. exchange_variants) partition over this directly."""
+        filter (company_profile_by_symbol) partition over this directly."""
         return self._get_cached_data(
             {
                 "cache_attr": "_cached_raw_company_symbols",
@@ -749,8 +777,8 @@ class TapFMP(Tap):
         """Thread-safe index caching for parallel execution.
 
         Indices (^GSPC, ^DJI, ^N225, ...) are not listed on exchanges in the
-        same way stocks/ETFs are, so they have no rows in `exchange_variants`
-        and the country/currency filter would drop 100% of them. Universe is
+        same way stocks/ETFs are, so they have no company profile and the
+        country/currency filter would drop 100% of them. Universe is
         restricted via `select_index_symbols` in meltano config instead.
         """
         return self._get_cached_data(
@@ -770,25 +798,21 @@ class TapFMP(Tap):
             self._index_stream_instance = IndexListStream(self)
         return self._index_stream_instance
 
-    def get_exchange_variants_manager(self) -> ExchangeVariantsManager:
-        """Get the exchange variants manager instance."""
-        if self._exchange_variants_manager is None:
-            with self._exchange_variants_lock:
-                if self._exchange_variants_manager is None:
-                    self.logger.info("Creating ExchangeVariantsManager instance...")
-                    self._exchange_variants_manager = ExchangeVariantsManager(
+    def get_company_profiles_manager(self) -> CompanyProfilesManager:
+        """Get the company profiles manager instance."""
+        if self._company_profiles_manager is None:
+            with self._company_profiles_lock:
+                if self._company_profiles_manager is None:
+                    self.logger.info("Creating CompanyProfilesManager instance...")
+                    self._company_profiles_manager = CompanyProfilesManager(
                         config=dict(self.config), logger=self.logger, tap_instance=self
                     )
-        return self._exchange_variants_manager
+        return self._company_profiles_manager
 
-    def get_cached_exchange_variants(self) -> t.List[dict]:
-        """Resolve exchange variants (DB → CSV → raise)."""
-        return self.get_exchange_variants_manager().get_exchange_variants()
-
-    def get_cached_exchange_variants_by_symbol(self) -> t.Dict[str, dict]:
-        """Symbol → variant dict, memoized across the 5 filtered-universe
+    def get_cached_company_profiles_by_symbol(self) -> t.Dict[str, dict]:
+        """Symbol → profile dict, memoized across the 5 filtered-universe
         caches so the 89k-entry dict is built once per tap run."""
-        return self.get_exchange_variants_manager().get_variants_by_symbol()
+        return self.get_company_profiles_manager().get_profiles_by_symbol()
 
     def _apply_country_currency_filtering(
         self, symbols: list[dict], config_key: str
@@ -808,37 +832,40 @@ class TapFMP(Tap):
             return symbols
 
         self.logger.info(
-            f"Loading exchange variants for filtering {config_key} symbols..."
+            f"Loading company profiles for filtering {config_key} symbols..."
         )
         try:
-            variants_by_symbol = self.get_cached_exchange_variants_by_symbol()
+            profiles_by_symbol = self.get_cached_company_profiles_by_symbol()
         except RuntimeError as e:
-            self.logger.error(
-                f"Exchange variants unavailable for filtering {config_key} ({e}). "
-                f"Returning unfiltered {len(symbols)} symbols — downstream data "
-                f"will include non-{filter_countries}/{filter_currencies} records. "
-                f"Expected only on first run; re-run after exchange_variants "
-                f"has landed to enable filtering."
+            raise RuntimeError(
+                f"Cannot filter {config_key} to countries={filter_countries}, "
+                f"currencies={filter_currencies}; refusing to run on the unfiltered "
+                f"{len(symbols)} symbols, which requests every listing worldwide. {e}"
+            ) from e
+        self.logger.info(f"Loaded {len(profiles_by_symbol)} company profiles")
+        self._require_complete_profiles(profiles_by_symbol)
+
+        missing = [
+            s["symbol"] for s in symbols if s["symbol"] not in profiles_by_symbol
+        ]
+        if missing:
+            self.logger.warning(
+                f"{len(missing)} of {len(symbols)} {config_key} have no company profile "
+                f"and are excluded, e.g. {missing[:10]}"
             )
-            return symbols
-        self.logger.info(f"Loaded {len(variants_by_symbol)} exchange variants")
 
         filtered_symbols = []
         for s in symbols:
-            variant = variants_by_symbol.get(s["symbol"])
-            if not variant:
-                # Symbol not found in exchange_variants - exclude it from results
-                self.logger.debug(
-                    f"Symbol {s['symbol']} not found in exchange_variants, excluding"
-                )
+            profile = profiles_by_symbol.get(s["symbol"])
+            if not profile:
                 continue
 
             # Check if symbol matches filter criteria
             country_match = (
-                not filter_countries or variant.get("country") in filter_countries
+                not filter_countries or profile.get("country") in filter_countries
             )
             currency_match = (
-                not filter_currencies or variant.get("currency") in filter_currencies
+                not filter_currencies or profile.get("currency") in filter_currencies
             )
 
             # Symbol must match ALL specified filters (AND logic)
@@ -846,8 +873,8 @@ class TapFMP(Tap):
             if country_match and currency_match:
                 filtered_symbols.append(s)
             else:
-                country_val = variant.get("country") if variant else "N/A"
-                currency_val = variant.get("currency") if variant else "N/A"
+                country_val = profile.get("country")
+                currency_val = profile.get("currency")
                 self.logger.debug(
                     f"Symbol {s['symbol']} filtered out: country={country_val} "
                     f"(filter: {filter_countries}), currency={currency_val} "
@@ -858,6 +885,20 @@ class TapFMP(Tap):
             f"Filtered {len(symbols)} to {len(filtered_symbols)} symbols for {config_key}"
         )
         return filtered_symbols
+
+    def _require_complete_profiles(self, profiles_by_symbol: dict) -> None:
+        """A partly loaded profile source would drop every listing it lacks, so it must cover the company universe."""
+        if self._profile_coverage_verified:
+            return
+        raw_symbols = {s["symbol"] for s in self.get_cached_raw_company_symbols()}
+        coverage = len(raw_symbols & profiles_by_symbol.keys()) / len(raw_symbols)
+        if coverage < self.MIN_PROFILE_COVERAGE:
+            raise RuntimeError(
+                f"company profiles hold {coverage:.1%} of the {len(raw_symbols)} listed companies, "
+                f"under {self.MIN_PROFILE_COVERAGE:.0%}: it is a partial load, and filtering on it would "
+                f"silently drop the rest. Run `--select company_profile_by_symbol` to completion first."
+            )
+        self._profile_coverage_verified = True
 
     def discover_streams(self) -> list:
         """Return a list of discovered streams."""

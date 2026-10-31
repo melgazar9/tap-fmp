@@ -8,6 +8,10 @@ import threading
 import typing as t
 import csv
 
+import psycopg2
+from psycopg2 import sql
+from psycopg2.extras import RealDictCursor
+
 
 # Financial acronyms FMP can smash together in field names (e.g. "EBITDATTM").
 # The standard camelCase rules can't find a boundary between two all-caps runs,
@@ -159,8 +163,10 @@ def safe_int(value) -> int | None:
         return None
 
 
-class ExchangeVariantsManager:
-    """Manages exchange variants data with priority-based sourcing."""
+class CompanyProfilesManager:
+    """Each listing's country and currency for the country/currency filter, from
+    the company profiles: exchange variants answer only for companies listed on
+    more than one exchange, so they can't place a single-listing company."""
 
     def __init__(self, config: dict, logger: logging.Logger = None, tap_instance=None):
         self.config = config
@@ -169,7 +175,7 @@ class ExchangeVariantsManager:
         self._cache: t.List[t.Dict[str, t.Any]] = []
         self._cache_timestamp: t.Optional[datetime] = None
         self._cache_lock = threading.Lock()
-        self._variants_by_symbol: t.Optional[t.Dict[str, t.Dict[str, t.Any]]] = None
+        self._profiles_by_symbol: t.Optional[t.Dict[str, t.Dict[str, t.Any]]] = None
 
         self.exchange_config = config.get("exchange_variants_source", {})
         self.db_config = config.get("database_config", {})
@@ -181,17 +187,17 @@ class ExchangeVariantsManager:
         self.use_database = self.exchange_config.get("use_database", False)
         self.cache_ttl_hours = self.exchange_config.get("cache_ttl_hours", 72)
 
-    def get_exchange_variants(self) -> t.List[t.Dict[str, t.Any]]:
-        """Resolve exchange variants: DB → CSV → raise. The stream sync is
-        the canonical populator; callers that reach this code on a cold
-        table should run `--select exchange_variants` first."""
+    def get_company_profiles(self) -> t.List[t.Dict[str, t.Any]]:
+        """Resolve company profiles: DB → CSV → raise. The
+        `company_profile_by_symbol` sync is the canonical populator; callers
+        that reach this code on a cold table should run that stream first."""
         with self._cache_lock:
             if self._is_cache_valid():
-                self.logger.info("Using cached exchange variants data")
+                self.logger.info("Using cached company profiles")
                 return self._cache
 
             if self.use_database and self._has_database_config():
-                self.logger.info("Loading exchange variants from database")
+                self.logger.info("Loading company profiles from database")
                 data = self._load_from_database()
                 if data:
                     self._update_cache(data)
@@ -199,7 +205,7 @@ class ExchangeVariantsManager:
                 self.logger.warning("Database loading failed, trying next source")
 
             if self.use_csv and self._has_csv_file():
-                self.logger.info("Loading exchange variants from CSV")
+                self.logger.info("Loading company profiles from CSV")
                 data = self._load_from_csv()
                 if data:
                     self._update_cache(data)
@@ -207,10 +213,9 @@ class ExchangeVariantsManager:
                 self.logger.warning("CSV loading failed, no further sources")
 
             raise RuntimeError(
-                "exchange_variants unavailable from any configured source "
+                "company profiles unavailable from any configured source "
                 "(DB/CSV). Run `meltano el tap-fmp target-postgres --select "
-                "exchange_variants` to populate the table, or supply "
-                "distinct_exchange_variants.csv."
+                "company_profile_by_symbol` to populate the table."
             )
 
     def _is_cache_valid(self) -> bool:
@@ -225,16 +230,16 @@ class ExchangeVariantsManager:
         """Update internal cache with new data."""
         self._cache = data
         self._cache_timestamp = datetime.now()
-        self._variants_by_symbol = None  # invalidate derived index
-        self.logger.info(f"Cache updated with {len(data)} exchange variants")
+        self._profiles_by_symbol = None  # invalidate derived index
+        self.logger.info(f"Cache updated with {len(data)} company profiles")
 
-    def get_variants_by_symbol(self) -> t.Dict[str, t.Dict[str, t.Any]]:
-        """Symbol → variant dict, built once per cache refresh. Used by all
+    def get_profiles_by_symbol(self) -> t.Dict[str, t.Dict[str, t.Any]]:
+        """Symbol → profile dict, built once per cache refresh. Used by all
         per-universe filters so they don't each rebuild an 89k-entry dict."""
-        if self._variants_by_symbol is None:
-            variants = self.get_exchange_variants()
-            self._variants_by_symbol = {d["symbol"]: d for d in variants}
-        return self._variants_by_symbol
+        if self._profiles_by_symbol is None:
+            profiles = self.get_company_profiles()
+            self._profiles_by_symbol = {d["symbol"]: d for d in profiles}
+        return self._profiles_by_symbol
 
     def _has_database_config(self) -> bool:
         required = ("host", "database", "username", "password")
@@ -259,17 +264,7 @@ class ExchangeVariantsManager:
         return csv_file_path.exists() and csv_file_path.is_file()
 
     def _load_from_database(self) -> t.Optional[t.List[t.Dict[str, t.Any]]]:
-        """Load exchange variants from PostgreSQL database."""
-        try:
-            import psycopg2
-            from psycopg2 import sql
-            from psycopg2.extras import RealDictCursor
-        except ImportError:
-            self.logger.error(
-                "psycopg2 not installed. Install with: uv add psycopg2-binary"
-            )
-            return None
-
+        """Load company profiles from PostgreSQL database."""
         try:
             connection_params = {
                 "host": self.db_config.get("host"),
@@ -280,16 +275,16 @@ class ExchangeVariantsManager:
             }
 
             schema = self.db_config.get("schema", "public")
-            table = self.db_config.get("table", "exchange_variants")
+            table = self.db_config.get("table", "company_profile_by_symbol")
 
             # Use psycopg2.sql.Identifier rather than f-string interpolation:
             # config-sourced identifiers are still untrusted at the SQL layer
             # (typo/escape errors, future config-from-env-var). Identifier()
             # quotes them safely.
+            # The table keeps every version of a profile; the filter reads each symbol's latest.
             query = sql.SQL(
-                "SELECT DISTINCT symbol, currency, cik, exchange, "
-                "exchange_short_name, industry, country, ipo_date, is_fund "
-                "FROM {schema}.{table} ORDER BY symbol"
+                "SELECT DISTINCT ON (symbol) symbol, country, currency "
+                "FROM {schema}.{table} ORDER BY symbol, _sdc_extracted_at DESC NULLS LAST"
             ).format(
                 schema=sql.Identifier(schema),
                 table=sql.Identifier(table),
@@ -307,7 +302,7 @@ class ExchangeVariantsManager:
             return None
 
     def _load_from_csv(self) -> t.Optional[t.List[t.Dict[str, t.Any]]]:
-        """Load exchange variants from CSV file."""
+        """Load symbol/country/currency rows from CSV file."""
         try:
             csv_file_path = Path(self.csv_path)
             if not csv_file_path.is_absolute():
@@ -329,7 +324,7 @@ class ExchangeVariantsManager:
                     if clean_row:
                         data.append(clean_row)
 
-            self.logger.info(f"Loaded {len(data)} exchange variants from CSV")
+            self.logger.info(f"Loaded {len(data)} company profiles from CSV")
             return data
 
         except Exception as e:
@@ -341,8 +336,8 @@ class ExchangeVariantsManager:
         with self._cache_lock:
             self._cache = []
             self._cache_timestamp = None
-            self._variants_by_symbol = None
-            self.logger.info("Exchange variants cache cleared")
+            self._profiles_by_symbol = None
+            self.logger.info("Company profiles cache cleared")
 
     def get_cache_info(self) -> t.Dict[str, t.Any]:
         """Get information about current cache state."""
