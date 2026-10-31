@@ -512,11 +512,13 @@ class CompanySymbolPartitionStream(
 
 
 class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):
+    # FMP answers one period kind per request and defaults to annual; annual holds the FY rows, quarter Q1-Q4
+    DEFAULT_PERIODS: t.ClassVar[tuple[str, ...]] = ("annual", "quarter")
 
-    @staticmethod
-    def _get_periods(periods):
+    @classmethod
+    def _get_periods(cls, periods):
         if periods is None or periods == "*":
-            periods = ["Q1", "Q2", "Q3", "Q4", "FY", "annual", "quarter"]
+            periods = list(cls.DEFAULT_PERIODS)
         if isinstance(periods, str):
             periods = [periods]
         if isinstance(periods, (list, tuple, set)):
@@ -526,10 +528,15 @@ class SymbolPeriodPartitionStream(FmpSurrogateKeyStream):
         )
 
     @property
-    def partitions(self):
-        periods = self.query_params.get("period") or self.other_params.get("periods")
+    def configured_periods(self) -> list[str]:
+        """Period kinds requested per symbol: the stream's `period`/`periods` config, else DEFAULT_PERIODS."""
+        return self._get_periods(
+            self.query_params.get("period") or self.other_params.get("periods")
+        )
 
-        periods = self._get_periods(periods)
+    @property
+    def partitions(self):
+        periods = self.configured_periods
         symbols = self._tap.get_cached_company_symbols()
 
         if not periods:

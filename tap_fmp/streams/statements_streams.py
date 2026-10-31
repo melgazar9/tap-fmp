@@ -27,11 +27,22 @@ class StatementStream(
     _add_surrogate_key = True
     primary_keys = ["surrogate_key"]
 
+    @property
+    def partitions(self):
+        """Each statement symbol once per period kind; the mixin supplies the symbols."""
+        periods = self.configured_periods
+        return [
+            {**partition, "period": period}
+            for partition in super().partitions
+            for period in periods
+        ]
+
     def post_process(self, row: dict, context: Context | None = None) -> dict:
         if context:
             if "symbol" in context:
                 row["symbol"] = context["symbol"]
-            if "period" in context:
+            # FMP's own period (FY, Q1..Q4) stays; the requested kind only fills a reply that has none
+            if "period" in context and not row.get("period"):
                 row["period"] = context["period"]
             if "year" in context:
                 row["year"] = context["year"]
@@ -1065,6 +1076,8 @@ class FinancialReportsForm10kJsonStream(StatementStream):
     """Financial reports Form 10-K JSON."""
 
     name = "financial_reports_form_10k_json"
+    # the 10-K is the annual report, so its endpoint takes FMP's fiscal-period labels, not the period kinds
+    DEFAULT_PERIODS = ("FY",)
 
     # Bookmark per symbol; symbol×period×year fan-out would exceed
     # elt.buffer_size. Declared per-leaf since sibling StatementStreams
