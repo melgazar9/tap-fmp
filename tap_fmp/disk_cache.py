@@ -59,6 +59,8 @@ class DiskCache:
         self._cache_dir = cache_dir
         self._namespace = _sanitize_path_component(namespace)
         self._ttl_hours = ttl_hours
+        # an unwritable cache dir is a deploy fault: failing here beats every process silently fetching alone
+        os.makedirs(os.path.join(cache_dir, self._namespace), exist_ok=True)
 
     def _manifest_path(self, key: str) -> str:
         """Build the absolute path for a cache manifest file.
@@ -144,7 +146,7 @@ class DiskCache:
         2. Slow path (locked): acquire exclusive flock → recheck manifest →
            call fetch_fn() on miss → write atomically → return.
 
-        Disk I/O errors are swallowed with a warning and fall through to fetch_fn().
+        A filesystem without flock falls back to fetch_fn() with a warning;
         fetch_fn() failures propagate to the caller.
         """
         manifest_path = self._manifest_path(key)
@@ -154,22 +156,22 @@ class DiskCache:
         if cached is not None:
             return cached
 
-        # Slow path: lock, recheck, fetch, write
         lock_path = self._lock_path(manifest_path)
         os.makedirs(os.path.dirname(lock_path), exist_ok=True)
-        try:
-            with open(lock_path, "w") as lock_fd:
+        with open(lock_path, "w") as lock_fd:
+            # only flock may fall back: requests' errors subclass OSError, so a fetch failure must not land here
+            try:
                 fcntl.flock(lock_fd, fcntl.LOCK_EX)
-                cached = self._read_manifest(manifest_path)
-                if cached is not None:
-                    return cached
-                data = fetch_fn()
-                self._write_manifest(manifest_path, data)
-                return data
-        except OSError as exc:
-            logger.warning(
-                "Disk cache: lock failed for %s: %s — falling back to direct fetch",
-                key,
-                exc,
-            )
-            return fetch_fn()
+            except OSError as exc:
+                logger.warning(
+                    "Disk cache: lock failed for %s: %s — falling back to direct fetch",
+                    key,
+                    exc,
+                )
+                return fetch_fn()
+            cached = self._read_manifest(manifest_path)
+            if cached is not None:
+                return cached
+            data = fetch_fn()
+            self._write_manifest(manifest_path, data)
+            return data

@@ -456,7 +456,8 @@ class TapFMP(Tap):
             )
 
     def _build_cache_fingerprint(self, stream) -> str:
-        """Build a fingerprint from the stream's effective parsed config."""
+        """Fingerprint of the API request a universe comes from: the disk cache
+        holds only API replies, so the request is the whole key."""
         qp = getattr(stream, "query_params", {})
         op = getattr(stream, "other_params", {})
         normalized_qp = {k: str(v) for k, v in sorted(qp.items()) if k != "apikey"}
@@ -469,8 +470,19 @@ class TapFMP(Tap):
             }
         )
 
+    @staticmethod
+    def _fetch_universe(stream, data_type: str) -> t.List[dict]:
+        records = list(stream.get_records(context=None))
+        if not records:
+            raise RuntimeError(
+                f"FMP returned no {data_type}: every stream partitioned over them would request nothing."
+            )
+        return records
+
     def _get_cached_data(self, config: dict) -> t.List[dict]:
-        """Generic thread-safe caching with configuration and optional L2 disk cache."""
+        """A symbol universe, loaded once per process. The disk cache shares the
+        raw API reply across a run's processes; a selection written in config is
+        built from config, and the country/currency filter runs after the cache."""
         cache_attr = config["cache_attr"]
         lock = config["lock"]
         stream_getter = config["stream_getter"]
@@ -486,23 +498,23 @@ class TapFMP(Tap):
                 if cached_data is None:
                     self.logger.info(f"Fetching and caching {data_type}...")
                     stream = stream_getter()
+                    selected = getattr(
+                        stream, "get_selected_items_list", lambda: None
+                    )()
 
-                    def _fetch():
-                        data = list(stream.get_records(context=None))
-                        if apply_filtering and filter_config_key:
-                            data = self._apply_country_currency_filtering(
-                                data, filter_config_key
-                            )
-                        return sorted(data, key=lambda x: x.get(sort_key, ""))
-
-                    if self._disk_cache is not None:
-                        fingerprint = self._build_cache_fingerprint(stream)
-                        cache_key = (
-                            f"symbols/{data_type.replace(' ', '_')}/{fingerprint}"
-                        )
-                        cached_data = self._disk_cache.get_or_fetch(cache_key, _fetch)
+                    if self._disk_cache is None or selected is not None:
+                        records = self._fetch_universe(stream, data_type)
                     else:
-                        cached_data = _fetch()
+                        fingerprint = self._build_cache_fingerprint(stream)
+                        records = self._disk_cache.get_or_fetch(
+                            f"symbols/{data_type.replace(' ', '_')}/{fingerprint}",
+                            lambda: self._fetch_universe(stream, data_type),
+                        )
+                    if apply_filtering and filter_config_key:
+                        records = self._apply_country_currency_filtering(
+                            records, filter_config_key
+                        )
+                    cached_data = sorted(records, key=lambda x: x.get(sort_key, ""))
 
                     setattr(self, cache_attr, cached_data)
                     self.logger.info(f"Cached {len(cached_data)} {data_type}.")
