@@ -54,17 +54,23 @@ class YearWindow:
     # calendar years requested when none are configured; late filings and amendments land inside it
     TRAILING_YEARS: t.ClassVar[int] = 2
 
+    @staticmethod
+    def configured(configured: t.Any) -> list[int] | None:
+        """The configured years, one or a list; None when unset or "*" asks for the stream's default."""
+        if not configured or configured in ("*", ["*"]):
+            return None
+        if isinstance(configured, (str, int)):
+            configured = [configured]
+        return [int(year) for year in configured]
+
     @classmethod
     def resolve(cls, configured: t.Any, start_date: str) -> list[int]:
         """`start_date` is the floor: no year before its year is requested."""
         first_year = datetime.fromisoformat(str(start_date)[:10]).year
-        if not configured or configured in ("*", ["*"]):
+        years = cls.configured(configured)
+        if years is None:
             this_year = datetime.today().year
             years = range(this_year - cls.TRAILING_YEARS + 1, this_year + 1)
-        else:
-            if isinstance(configured, (str, int)):
-                configured = [configured]
-            years = [int(year) for year in configured]
         return [year for year in years if year >= first_year]
 
 
@@ -516,11 +522,16 @@ class BaseSymbolPartitionStream(BaseSymbolPartitionMixin, FmpRestStream):
 
     _symbol_in_path_params = False
     _symbol_in_query_params = True
+    # partition fields sent as request params; copied per request so query_params keeps only the config
+    _context_query_params: t.ClassVar[tuple[str, ...]] = ()
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         assert self._symbol_in_path_params or self._symbol_in_query_params
 
         query_params = self.query_params.copy()
+        query_params.update(
+            {field: context[field] for field in self._context_query_params}
+        )
         path_params = self.path_params.copy()
 
         if self._symbol_in_query_params:
@@ -1091,91 +1102,41 @@ class IncrementalYearStream(FmpSurrogateKeyStream):
         return super().post_process(record, context)
 
 
-class BaseSymbolYearPartitionStream(CompanySymbolPartitionStream):
-    """Abstract base class for streams that partition by symbol and year with configurable quarter/period logic."""
+class SymbolYearQuarterPartitionStream(CompanySymbolPartitionStream):
+    """Stream asked per symbol, fiscal year and quarter, bookmarked per symbol."""
 
     replication_method = "INCREMENTAL"
     replication_key = "date"
+    # symbol x year x quarter state would outgrow elt.buffer_size; the target upserts on surrogate_key
+    state_partitioning_keys = ["symbol"]
+    _context_query_params = ("year", "quarter")
 
-    # Configurable class attributes - override in subclasses
-    _partition_field_name: str = None  # "quarter" or "period"
-    _partition_values: list = None  # [1,2,3,4] or ["Q1","Q2","Q3","Q4"]
+    # years a fiscal year can trail, and lead, the calendar year of its call
+    FISCAL_YEAR_LAG: t.ClassVar[int] = 2
+    FISCAL_YEAR_LEAD: t.ClassVar[int] = 1
+    QUARTERS: t.ClassVar[tuple[int, ...]] = (1, 2, 3, 4)
 
-    @property
-    def partitions(self):
-        """Get symbol + year + quarter/period partition combinations."""
-        query_params = self.query_params
-        other_params = self.other_params
+    def _fiscal_years(self, symbol: str, last_year: int) -> list[int]:
+        """The fiscal years a call on or after the symbol's bookmark, else start_date, can carry."""
+        start = self.get_starting_timestamp({"symbol": symbol})
+        if not start:
+            raise ConfigValidationError(f"Missing start_date for {self.name}")
+        return list(range(int(str(start)[:4]) - self.FISCAL_YEAR_LAG, last_year + 1))
 
-        symbols = self._partition_symbols()
-
-        # Get years (default: current year only)
-        if "year" in query_params:
-            years = [int(query_params["year"])]
-        elif "years" in other_params:
-            years = [int(y) for y in other_params["years"]]
+    @cached_property
+    def partitions(self) -> list[dict]:
+        """Configured years are a backfill for every symbol. Cached: the SDK reads it again to finalize state."""
+        backfill = YearWindow.configured(
+            self.query_params.get("year", self.other_params.get("years"))
+        )
+        if "quarter" in self.query_params:
+            quarters = [self.query_params["quarter"]]
         else:
-            years = [int(y) for y in range(1970, datetime.today().year + 1)]
-
-        # Get partition values (quarters/periods)
-        if self._partition_field_name in query_params:
-            partition_values = [query_params[self._partition_field_name]]
-        elif f"{self._partition_field_name}s" in other_params:
-            partition_values = other_params[f"{self._partition_field_name}s"]
-        else:
-            partition_values = self._partition_values
-
-        assert years is not None, f"Years cannot be None for stream {self.name}."
-        assert (
-            partition_values is not None
-        ), f"Must set partition values in meltano.yml or as a stream class attribute for stream {self.name}."
-
-        partitions = []
-        for symbol in symbols:
-            for year in years:
-                for partition_value in partition_values:
-                    partitions.append(
-                        {
-                            "symbol": symbol["symbol"],
-                            "year": year,
-                            self._partition_field_name: partition_value,
-                        }
-                    )
-        return partitions
-
-    def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        """Update query params with year and partition value from context."""
-        if context:
-            if "year" in context:
-                self.query_params["year"] = context["year"]
-            if self._partition_field_name in context:
-                self.query_params[self._partition_field_name] = context[
-                    self._partition_field_name
-                ]
-        yield from super().get_records(context)
-
-    def post_process(self, record: dict, context: Context | None = None) -> dict:
-        """Inject year and partition field into record if not present."""
-        if context:
-            if "year" in context and "year" not in record:
-                record["year"] = context["year"]
-            if (
-                self._partition_field_name in context
-                and self._partition_field_name not in record
-            ):
-                record[self._partition_field_name] = context[self._partition_field_name]
-        return super().post_process(record, context)
-
-
-class SymbolYearQuarterPartitionStream(BaseSymbolYearPartitionStream):
-    """Stream that partitions by symbol, year, and quarter (integer: 1, 2, 3, 4)."""
-
-    _partition_field_name = "quarter"
-    _partition_values = [1, 2, 3, 4]
-
-
-class SymbolYearPeriodPartitionStream(BaseSymbolYearPartitionStream):
-    """Stream that partitions by symbol, year, and period (string: Q1, Q2, Q3, Q4)."""
-
-    _partition_field_name = "period"
-    _partition_values = ["Q1", "Q2", "Q3", "Q4"]
+            quarters = self.other_params.get("quarters") or self.QUARTERS
+        last_year = datetime.today().year + self.FISCAL_YEAR_LEAD
+        return [
+            {"symbol": symbol["symbol"], "year": year, "quarter": quarter}
+            for symbol in self._partition_symbols()
+            for year in backfill or self._fiscal_years(symbol["symbol"], last_year)
+            for quarter in quarters
+        ]
