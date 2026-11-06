@@ -59,7 +59,7 @@ class Form13fCikPartitionStream(Form13fPeriodPartitionStream):
     state_partitioning_keys = ["cik"]
 
     def _partition_entities(self) -> list[dict]:
-        return [{"cik": c["cik"]} for c in self._tap.get_cached_ciks()]
+        return [{"cik": cik} for cik in self._tap.get_cached_13f_filer_ciks()]
 
 
 class Form13fSymbolPartitionStream(Form13fPeriodPartitionStream):
@@ -270,7 +270,7 @@ class HolderPerformanceSummaryStream(FmpRestStream):
 
     @property
     def partitions(self):
-        return [{"cik": c["cik"]} for c in self._tap.get_cached_ciks()]
+        return [{"cik": cik} for cik in self._tap.get_cached_13f_filer_ciks()]
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         self.query_params.update(context)

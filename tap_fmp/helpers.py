@@ -185,6 +185,138 @@ def iso_date(value) -> date | None:
     return datetime.fromisoformat(text).date() if text else None
 
 
+class WarehouseConnection:
+    """libpq parameters for the tap's `database_config`."""
+
+    REQUIRED_FIELDS: t.ClassVar[tuple[str, ...]] = (
+        "host",
+        "database",
+        "username",
+        "password",
+    )
+
+    @classmethod
+    def missing_fields(cls, db_config: dict) -> list[str]:
+        return [field for field in cls.REQUIRED_FIELDS if not db_config.get(field)]
+
+    @staticmethod
+    def params(db_config: dict) -> dict:
+        return {
+            "host": db_config.get("host"),
+            "port": db_config.get("port", 5432),
+            "database": db_config.get("database"),
+            "user": db_config.get("username"),
+            "password": db_config.get("password"),
+        }
+
+    @staticmethod
+    def schema(db_config: dict) -> str:
+        return db_config.get("schema", "public")
+
+
+class Form13fFilerRegistry:
+    """Every CIK known to file 13Fs, from the warehouse: FMP's CIK list is every SEC
+    entity, and no single source names every filer."""
+
+    FEED_TABLE: t.ClassVar[str] = "institutional_ownership_latest_filings"
+    TABLES: t.ClassVar[tuple[str, ...]] = (
+        FEED_TABLE,
+        "institutional_ownership_extract",
+        "holder_performance_summary",
+        "holder_industry_breakdown",
+        "form_13f_filing_dates",
+        "form_13f_filings_extracts_with_analytics",
+    )
+    # days since the feed's newest filing before the run refuses it; filers since then would go unseen
+    MAX_FEED_AGE_DAYS: t.ClassVar[int] = 7
+
+    def __init__(self, db_config: dict, logger: logging.Logger):
+        self._db_config = db_config
+        self._schema = WarehouseConnection.schema(db_config)
+        self._logger = logger
+
+    def load_ciks(self) -> list[str]:
+        missing = WarehouseConnection.missing_fields(self._db_config)
+        if missing:
+            raise RuntimeError(
+                f"The 13F filer list reads the warehouse, but database_config lacks {missing}."
+            )
+        params = WarehouseConnection.params(self._db_config)
+        with psycopg2.connect(**params) as conn, conn.cursor() as cursor:
+            tables = self._existing_tables(cursor)
+            self._require_fresh_feed(cursor, tables)
+            stored_ciks = self._union_of_ciks(cursor, tables)
+        if not stored_ciks:
+            raise RuntimeError(
+                f"{self._schema} holds no CIKs in {tables}: the 13F filer streams would request nothing."
+            )
+        ciks = self._normalized(stored_ciks)
+        self._logger.info(f"13F filer list: {len(ciks)} CIKs from {tables}.")
+        return ciks
+
+    def _normalized(self, stored_ciks: list[str]) -> list[str]:
+        """One sorted, zero-padded form, so a padding difference can't split a filer in two."""
+        invalid = [
+            cik
+            for cik in stored_ciks
+            if not (cik.isascii() and cik.isdigit() and len(cik) <= 10)
+        ]
+        if invalid:
+            raise RuntimeError(
+                f"{self._schema} holds {len(invalid)} values that are not CIKs, e.g. {sorted(invalid)[:5]}."
+            )
+        return sorted({cik.zfill(10) for cik in stored_ciks})
+
+    def _existing_tables(self, cursor) -> list[str]:
+        cursor.execute(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = %s AND table_name = ANY(%s)",
+            (self._schema, list(self.TABLES)),
+        )
+        tables = sorted(row[0] for row in cursor.fetchall())
+        not_loaded = sorted(set(self.TABLES).difference(tables))
+        if not_loaded:
+            # a fresh warehouse has none of them, and the streams that load them read this list
+            self._logger.warning(
+                f"13F filer list: {self._schema} has no {not_loaded}; their filers are not on the list."
+            )
+        return tables
+
+    def _require_fresh_feed(self, cursor, tables: list[str]) -> None:
+        problem = self._feed_problem(cursor, tables)
+        if problem:
+            raise RuntimeError(
+                f"{self._schema}.{self.FEED_TABLE} {problem}. Load that stream first."
+            )
+
+    def _feed_problem(self, cursor, tables: list[str]) -> str | None:
+        if self.FEED_TABLE not in tables:
+            return "does not exist"
+        cursor.execute(
+            sql.SQL("SELECT max(filing_date) FROM {}").format(
+                sql.Identifier(self._schema, self.FEED_TABLE)
+            )
+        )
+        newest_filing = cursor.fetchone()[0]
+        if newest_filing is None:
+            return "holds no filings"
+        age_days = (date.today() - newest_filing.date()).days
+        if age_days > self.MAX_FEED_AGE_DAYS:
+            return f"is stale: newest filing is {age_days} days old, so filers since then would be missed"
+        return None
+
+    def _union_of_ciks(self, cursor, tables: list[str]) -> list[str]:
+        # DISTINCT per table: rows far outnumber CIKs in the largest tables
+        selects = [
+            sql.SQL("SELECT DISTINCT cik FROM {} WHERE cik IS NOT NULL").format(
+                sql.Identifier(self._schema, table)
+            )
+            for table in tables
+        ]
+        cursor.execute(sql.SQL(" UNION ").join(selects))
+        return [row[0] for row in cursor.fetchall()]
+
+
 class CompanyProfilesManager:
     """Each listing's country, currency and exchange for the universe filter, from
     the company profiles: exchange variants answer only for companies listed on
@@ -251,8 +383,7 @@ class CompanyProfilesManager:
         return self._profiles_by_symbol
 
     def _has_database_config(self) -> bool:
-        required = ("host", "database", "username", "password")
-        missing = [f for f in required if not self.db_config.get(f)]
+        missing = WarehouseConnection.missing_fields(self.db_config)
         if missing and self.use_database:
             self.logger.warning(
                 "database_config incomplete — missing %s; DB source skipped. "
@@ -275,15 +406,7 @@ class CompanyProfilesManager:
     def _load_from_database(self) -> t.Optional[t.List[t.Dict[str, t.Any]]]:
         """Load company profiles from PostgreSQL database."""
         try:
-            connection_params = {
-                "host": self.db_config.get("host"),
-                "port": self.db_config.get("port", 5432),
-                "database": self.db_config.get("database"),
-                "user": self.db_config.get("username"),
-                "password": self.db_config.get("password"),
-            }
-
-            schema = self.db_config.get("schema", "public")
+            schema = WarehouseConnection.schema(self.db_config)
             table = self.db_config.get("table", "company_profile_by_symbol")
 
             # Use psycopg2.sql.Identifier rather than f-string interpolation:
@@ -299,7 +422,7 @@ class CompanyProfilesManager:
                 table=sql.Identifier(table),
             )
 
-            with psycopg2.connect(**connection_params) as conn:
+            with psycopg2.connect(**WarehouseConnection.params(self.db_config)) as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                     cursor.execute(query)
                     rows = cursor.fetchall()

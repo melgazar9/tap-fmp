@@ -12,7 +12,7 @@ from singer_sdk.exceptions import ConfigValidationError
 
 from tap_fmp.client import TimeSliceStream
 from tap_fmp.disk_cache import DiskCache, compute_fingerprint
-from tap_fmp.helpers import CompanyProfilesManager
+from tap_fmp.helpers import CompanyProfilesManager, Form13fFilerRegistry
 
 from tap_fmp.streams.search_streams import (
     CompanyScreenerStream,
@@ -378,6 +378,9 @@ class TapFMP(Tap):
     _cik_stream_instance: CikListStream | None = None
     _ciks_lock = threading.Lock()
 
+    _cached_13f_filer_ciks: t.List[str] | None = None
+    _13f_filer_ciks_lock = threading.Lock()
+
     _cached_exchanges: t.List[dict] | None = None
     _exchange_stream_instance: AvailableExchangesStream | None = None
     _exchanges_lock = threading.Lock()
@@ -706,6 +709,17 @@ class TapFMP(Tap):
             self.logger.info("Creating CikListStream instance...")
             self._cik_stream_instance = CikListStream(self)
         return self._cik_stream_instance
+
+    def get_cached_13f_filer_ciks(self) -> t.List[str]:
+        """The CIKs known to file 13Fs; a CIK selection written in config wins."""
+        if self.get_cik_stream().get_selected_items_list() is not None:
+            return [c["cik"] for c in self.get_cached_ciks()]
+        with self._13f_filer_ciks_lock:
+            if self._cached_13f_filer_ciks is None:
+                self._cached_13f_filer_ciks = Form13fFilerRegistry(
+                    self.config.get("database_config", {}), self.logger
+                ).load_ciks()
+        return self._cached_13f_filer_ciks
 
     def get_cached_exchanges(self) -> t.List[dict]:
         """Thread-safe exchange caching for parallel execution."""

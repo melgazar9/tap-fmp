@@ -28,8 +28,8 @@ GLOBAL_START = "1990-01-01T00:00:00Z"
 
 
 class _FakeTap:
-    def get_cached_ciks(self):
-        return [{"cik": "0001067983"}]
+    def get_cached_13f_filer_ciks(self):
+        return ["0001067983"]
 
     def get_cached_company_symbols(self):
         return [{"symbol": "AAPL"}]

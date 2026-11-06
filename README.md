@@ -49,7 +49,11 @@ The following configuration options are available for the `tap-fmp` extractor:
       --state-id tap_fmp_target_postgres_<env>__dividends_calendar__backfill --select dividends_calendar
     ```
 *   **`exchange_variants_source`**: Where the universe filter reads each listing's company profile from: a database or a CSV file.
-*   **`database_config`**: Database holding the company profiles the universe filter reads.
+*   **`database_config`**: Database holding the company profiles the universe filter reads, and the 13F tables the filer list reads.
+
+### 13F Filer List
+
+`institutional_ownership_extract`, `holder_performance_summary` and `holder_industry_breakdown` ask about known 13F filers rather than every SEC entity on FMP's CIK list. The list is every CIK in `institutional_ownership_latest_filings` plus every CIK in the tables the 13F streams have loaded, read from `database_config`. The run stops if `institutional_ownership_latest_filings` is missing, empty or stale, so load it before these streams; a first-time filer waits for its next load. A `ciks.select_ciks` list in config replaces the filer list.
 
 ### Symbol and List Configuration
 
