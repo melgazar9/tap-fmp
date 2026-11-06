@@ -16,7 +16,6 @@ class SelectableStreamMixin(ABC):
     Classes using this mixin must have:
     - self.config: dict
     - self.post_process(record: dict) -> dict method
-    - self._check_missing_fields(record: dict) method
     - self.schema: dict property
     """
 
@@ -86,10 +85,7 @@ class SelectableStreamMixin(ABC):
                 f"Processing selected {self.item_name_plural}: {selected_items}"
             )
             for item in selected_items:
-                record = self.create_record_from_item(item)
-                record = self.post_process(record, context)
-                self._check_missing_fields(record)
-                yield record
+                yield self.post_process(self.create_record_from_item(item), context)
 
 
 class BaseSymbolPartitionMixin(ABC):
@@ -157,7 +153,7 @@ class BaseSymbolPartitionMixin(ABC):
 class CompanySymbolPartitionMixin(BaseSymbolPartitionMixin):
     """Partitions over the company stock universe.
 
-    By default returns the FILTERED universe (country/currency filter
+    By default returns the FILTERED universe (universe filter
     applied) — correct for per-symbol data streams (prices, fundamentals,
     analyst data, etc.).
 

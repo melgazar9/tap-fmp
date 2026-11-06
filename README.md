@@ -48,8 +48,8 @@ The following configuration options are available for the `tap-fmp` extractor:
       meltano --environment <env> el tap-fmp target-postgres \
       --state-id tap_fmp_target_postgres_<env>__dividends_calendar__backfill --select dividends_calendar
     ```
-*   **`exchange_variants_source`**: Where the country/currency filter reads each listing's company profile from: a database or a CSV file.
-*   **`database_config`**: Database holding the company profiles the country/currency filter reads.
+*   **`exchange_variants_source`**: Where the universe filter reads each listing's company profile from: a database or a CSV file.
+*   **`database_config`**: Database holding the company profiles the universe filter reads.
 
 ### Symbol and List Configuration
 
@@ -69,9 +69,9 @@ The tap allows you to specify lists of symbols for various streams. This is usef
 
 **Note on Filtering Logic:** When you specify multiple filters (e.g., `symbols`, `countries`, `currencies`), the tap will extract data that matches **any** of the specified filters. For example, if you specify a list of symbols and a list of countries, the tap will extract data for those symbols, as well as all data for the specified countries. The filtering logic is an "OR" condition, not an "AND" condition.
 
-### Country / Currency Filtering — Required Prerequisite
+### Country / Currency / Exchange Filtering — Required Prerequisite
 
-`filter_countries` and `filter_currencies` (e.g. `["US"]` / `["USD"]`) restrict the per-symbol universe every downstream stream iterates over. The filter looks up each symbol's country/currency in the company profiles, sourced according to `exchange_variants_source`:
+`filter_countries`, `filter_currencies` and `filter_exchanges` (e.g. `["US"]` / `["USD"]` / `["NASDAQ", "NYSE"]`) restrict the per-symbol universe every downstream stream iterates over. A US company's listing abroad carries its US country and currency, so only `filter_exchanges` drops it. The filter looks up each symbol's country/currency/exchange in the company profiles, sourced according to `exchange_variants_source`:
 
 - `use_database: true` (default) — read from the `company_profile_by_symbol` Postgres table populated by the `company_profile_by_symbol` stream
 - `use_csv: true` — read from a CSV with `symbol`, `country` and `currency` columns

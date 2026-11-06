@@ -186,7 +186,7 @@ def iso_date(value) -> date | None:
 
 
 class CompanyProfilesManager:
-    """Each listing's country and currency for the country/currency filter, from
+    """Each listing's country, currency and exchange for the universe filter, from
     the company profiles: exchange variants answer only for companies listed on
     more than one exchange, so they can't place a single-listing company."""
 
@@ -292,7 +292,7 @@ class CompanyProfilesManager:
             # quotes them safely.
             # The table keeps every version of a profile; the filter reads each symbol's latest.
             query = sql.SQL(
-                "SELECT DISTINCT ON (symbol) symbol, country, currency "
+                "SELECT DISTINCT ON (symbol) symbol, country, currency, exchange "
                 "FROM {schema}.{table} ORDER BY symbol, _sdc_extracted_at DESC NULLS LAST"
             ).format(
                 schema=sql.Identifier(schema),
@@ -311,7 +311,7 @@ class CompanyProfilesManager:
             return None
 
     def _load_from_csv(self) -> t.Optional[t.List[t.Dict[str, t.Any]]]:
-        """Load symbol/country/currency rows from CSV file."""
+        """Load symbol/country/currency/exchange rows from CSV file."""
         try:
             csv_file_path = Path(self.csv_path)
             if not csv_file_path.is_absolute():
@@ -329,6 +329,10 @@ class CompanyProfilesManager:
                             elif value == "":
                                 value = None
                             clean_row[key] = value
+
+                    # the CSV's `exchange` is the long name; the filter matches the short one profiles carry
+                    if "exchange_short_name" in clean_row:
+                        clean_row["exchange"] = clean_row["exchange_short_name"]
 
                     if clean_row:
                         data.append(clean_row)

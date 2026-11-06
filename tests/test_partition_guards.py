@@ -94,7 +94,7 @@ def test_the_symbol_filter_refuses_to_fall_back_to_every_listing():
     with pytest.raises(
         RuntimeError, match="refusing to run on the unfiltered 2 symbols"
     ):
-        _UnfilterableTap()._apply_country_currency_filtering(symbols, "company_symbols")
+        _UnfilterableTap()._apply_profile_filtering(symbols, "company_symbols")
 
 
 @pytest.mark.parametrize("configured", [None, "*", ["*"], []])

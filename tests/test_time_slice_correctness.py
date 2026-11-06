@@ -10,7 +10,7 @@ Verifies invariants critical for Singer state resumption:
 2. When `fetch_window` detects truncation (max-records hit at 1-day floor,
    FMP's silent per-request cap, or pagination ceiling reached with data
    still flowing), it emits a `*** DATA_TRUNCATED ***` ERROR log so the
-   Dagster sensor can flag the partial window.
+   partial window can be found in the stream log.
 
 If either invariant breaks, time-slice streams will silently lose data.
 """
@@ -269,7 +269,7 @@ def test_window_failure_propagates_and_no_later_records_emit():
 
 def test_max_records_truncation_emits_alert(caplog):
     """When fetch_window hits the limit at 1-day granularity, an ERROR with
-    the *** DATA_TRUNCATED *** token must be logged so Dagster can alert."""
+    the *** DATA_TRUNCATED *** token must be logged."""
     stream = _make_stream()
 
     # 10 records (the cap) — triggers the "can't split further" branch
@@ -409,7 +409,7 @@ def test_silent_truncation_alert(records, from_date, to_date, fires, caplog):
 
 
 def test_silent_truncation_alert_message_structure(caplog):
-    """Pin the ERROR message fields the Dagster sensor matches on."""
+    """Pin the fields of the ERROR message."""
     fake_records = [
         {"date": "2024-03-29 09:30:00"},
         {"date": "2024-03-30 09:30:00"},

@@ -12,6 +12,7 @@ from tap_fmp.mixins import (
     BaseSymbolPartitionMixin,
     CompanySymbolPartitionMixin,
 )
+from tap_fmp.schema_drift import SchemaDriftMonitor
 import typing as t
 import logging
 import requests
@@ -23,17 +24,8 @@ import csv
 import io
 from functools import cached_property
 
-# Tokens matched by the Dagster sensor wired to ERROR-level log lines.
-# Tests import these constants instead of re-spelling the strings.
-SCHEMA_DRIFT_TOKEN = "*** SCHEMA_DRIFT ***"
+# Tests import this constant instead of re-spelling the string.
 DATA_TRUNCATED_TOKEN = "*** DATA_TRUNCATED ***"
-
-# Process-global dedup for schema-drift alerts. Keyed by (stream_name,
-# frozenset(missing_fields)) so each unique drift fires exactly one ERROR log
-# per process. Without this, a drifted field would log millions of duplicate
-# lines (one per record) and flood Dagster.
-_SCHEMA_DRIFT_SEEN: set[tuple[str, frozenset[str]]] = set()
-_SCHEMA_DRIFT_LOCK = threading.Lock()
 
 
 class FmpQuotaExhaustedError(RuntimeError):
@@ -149,8 +141,12 @@ class FmpRestStream(RESTStream, ABC):
         self.query_params["apikey"] = self.config.get("api_key")
 
     @cached_property
-    def _schema_field_set(self) -> frozenset[str]:
-        return frozenset(self.schema.get("properties", {}).keys())
+    def _schema_drift(self) -> SchemaDriftMonitor:
+        return SchemaDriftMonitor(self.name, self.schema, self.logger)
+
+    def sync(self, context: Context | None = None) -> None:
+        super().sync(context)
+        self._schema_drift.report()
 
     def _resolve_name_partitions(self, output_key: str = "name") -> list[dict]:
         """Build a `[{output_key: name}, ...]` partition list from
@@ -176,36 +172,6 @@ class FmpRestStream(RESTStream, ABC):
             f"other_params.names in meltano.yml. FMP doesn't expose a way to "
             f"enumerate valid name values for this stream."
         )
-
-    def _check_missing_fields(self, record: dict):
-        """Log SCHEMA_DRIFT once per unique (stream, missing-field-set) when
-        the record carries fields absent from the declared schema. Also emits
-        a DEBUG log for schema fields absent from the record (only if DEBUG is
-        enabled, since it runs on every record)."""
-        schema_fields = self._schema_field_set
-        record_keys = record.keys()
-        missing_in_schema = record_keys - schema_fields
-
-        if logging.getLogger().isEnabledFor(logging.DEBUG):
-            missing_in_record = schema_fields - record_keys
-            if missing_in_record:
-                logging.debug(
-                    f"Missing fields in record that are present in schema: "
-                    f"{missing_in_record} for stream {self.name}"
-                )
-
-        if missing_in_schema:
-            key = (self.name, frozenset(missing_in_schema))
-            with _SCHEMA_DRIFT_LOCK:
-                already_seen = key in _SCHEMA_DRIFT_SEEN
-                if not already_seen:
-                    _SCHEMA_DRIFT_SEEN.add(key)
-            if not already_seen:
-                self.logger.error(
-                    f"{SCHEMA_DRIFT_TOKEN} stream={self.name} "
-                    f"missing_fields={sorted(missing_in_schema)} "
-                    f"action=add_to_schema"
-                )
 
     def get_starting_timestamp(self, context: Context | None) -> str | None:
         """
@@ -490,7 +456,7 @@ class FmpRestStream(RESTStream, ABC):
     ) -> t.Iterable[dict]:
         for record in records:
             record = self.post_process(record, context)
-            self._check_missing_fields(record)
+            self._schema_drift.observe(record)
             yield record
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:

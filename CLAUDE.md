@@ -108,7 +108,7 @@ Three places, all required:
 - **All imports at the top of the module.** Never `import` inside a function or method body.
 - **Line length 128** (`.flake8`). `black` reformats; `flake8` ignores `F405, F403, W503, E203, E266`.
 - **Pagination**: set `_paginate = True`. FMP caps paginated endpoints at page index 100 inclusive — those streams set `_max_pages = 100`. See README § "Endpoint Limits & Pagination Reference" for the per-stream table.
-- **Schema drift is monitored, not fatal.** `_check_missing_fields` logs `*** SCHEMA_DRIFT ***` at ERROR once per unique (stream, missing-field-set); a Dagster sensor watches for that token. Adding a field the API already returns is how you clear a drift alert.
+- **Schema drift is monitored, not fatal.** `SchemaDriftMonitor` (`schema_drift.py`) logs `*** SCHEMA_DRIFT ***` at ERROR when a new field or changed type is first seen, then once at the end of each sync with every new, changed, absent and always-null field and the record count. Nothing alerts on that token: it lives only in the stream's log. Adding a field the API already returns clears its `new_fields` entry; an entry in `absent_fields` or `always_null_fields` on a stream with few records may only mean FMP had nothing to send.
 
 ## Primary Key & Correctness Rules
 

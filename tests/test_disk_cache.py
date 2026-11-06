@@ -124,7 +124,7 @@ def test_the_filter_runs_after_the_cache_so_a_cached_reply_is_filtered_anew(tmp_
     def us_only(symbols, config_key):
         return [s for s in symbols if "." not in s["symbol"]]
 
-    with patch.object(TapFMP, "_apply_country_currency_filtering", side_effect=us_only):
+    with patch.object(TapFMP, "_apply_profile_filtering", side_effect=us_only):
         kept = _universe(second, stream, filtered=True)
 
     assert [s["symbol"] for s in kept] == ["AAPL"]

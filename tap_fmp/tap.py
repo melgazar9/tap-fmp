@@ -482,7 +482,7 @@ class TapFMP(Tap):
     def _get_cached_data(self, config: dict) -> t.List[dict]:
         """A symbol universe, loaded once per process. The disk cache shares the
         raw API reply across a run's processes; a selection written in config is
-        built from config, and the country/currency filter runs after the cache."""
+        built from config, and the universe filter runs after the cache."""
         cache_attr = config["cache_attr"]
         lock = config["lock"]
         stream_getter = config["stream_getter"]
@@ -511,7 +511,7 @@ class TapFMP(Tap):
                             lambda: self._fetch_universe(stream, data_type),
                         )
                     if apply_filtering and filter_config_key:
-                        records = self._apply_country_currency_filtering(
+                        records = self._apply_profile_filtering(
                             records, filter_config_key
                         )
                     cached_data = sorted(records, key=lambda x: x.get(sort_key, ""))
@@ -656,8 +656,8 @@ class TapFMP(Tap):
             with self._filtered_company_symbols_lock:
                 if self._cached_company_symbols is None:
                     raw = self.get_cached_raw_company_symbols()
-                    self._cached_company_symbols = (
-                        self._apply_country_currency_filtering(raw, "company_symbols")
+                    self._cached_company_symbols = self._apply_profile_filtering(
+                        raw, "company_symbols"
                     )
         return self._cached_company_symbols
 
@@ -790,7 +790,7 @@ class TapFMP(Tap):
 
         Indices (^GSPC, ^DJI, ^N225, ...) are not listed on exchanges in the
         same way stocks/ETFs are, so they have no company profile and the
-        country/currency filter would drop 100% of them. Universe is
+        universe filter would drop 100% of them. Universe is
         restricted via `select_index_symbols` in meltano config instead.
         """
         return self._get_cached_data(
@@ -826,18 +826,23 @@ class TapFMP(Tap):
         caches so the 89k-entry dict is built once per tap run."""
         return self.get_company_profiles_manager().get_profiles_by_symbol()
 
-    def _apply_country_currency_filtering(
+    def _apply_profile_filtering(
         self, symbols: list[dict], config_key: str
     ) -> list[dict]:
-        """Helper to apply country/currency filtering to any cached data type."""
-        filter_countries = self.config.get("filter_countries")
-        filter_currencies = self.config.get("filter_currencies")
+        """Keep the symbols whose company profile matches every configured filter."""
+        profile_filters = {
+            field: allowed
+            for field, allowed in (
+                ("country", self.config.get("filter_countries")),
+                ("currency", self.config.get("filter_currencies")),
+                ("exchange", self.config.get("filter_exchanges")),
+            )
+            if allowed
+        }
 
-        self.logger.info(
-            f"Applying filtering for {config_key}: countries={filter_countries}, currencies={filter_currencies}"
-        )
+        self.logger.info(f"Applying filtering for {config_key}: {profile_filters}")
 
-        if not filter_countries and not filter_currencies:
+        if not profile_filters:
             self.logger.info(
                 f"No filtering configured for {config_key}, returning all {len(symbols)} symbols"
             )
@@ -850,9 +855,8 @@ class TapFMP(Tap):
             profiles_by_symbol = self.get_cached_company_profiles_by_symbol()
         except RuntimeError as e:
             raise RuntimeError(
-                f"Cannot filter {config_key} to countries={filter_countries}, "
-                f"currencies={filter_currencies}; refusing to run on the unfiltered "
-                f"{len(symbols)} symbols, which requests every listing worldwide. {e}"
+                f"Cannot filter {config_key} to {profile_filters}; refusing to run on the "
+                f"unfiltered {len(symbols)} symbols, which requests every listing worldwide. {e}"
             ) from e
         self.logger.info(f"Loaded {len(profiles_by_symbol)} company profiles")
         self._require_complete_profiles(profiles_by_symbol)
@@ -872,26 +876,15 @@ class TapFMP(Tap):
             if not profile:
                 continue
 
-            # Check if symbol matches filter criteria
-            country_match = (
-                not filter_countries or profile.get("country") in filter_countries
-            )
-            currency_match = (
-                not filter_currencies or profile.get("currency") in filter_currencies
-            )
-
-            # Symbol must match ALL specified filters (AND logic)
-
-            if country_match and currency_match:
-                filtered_symbols.append(s)
+            mismatches = {
+                field: profile.get(field)
+                for field, allowed in profile_filters.items()
+                if profile.get(field) not in allowed
+            }
+            if mismatches:
+                self.logger.debug(f"Symbol {s['symbol']} filtered out: {mismatches}")
             else:
-                country_val = profile.get("country")
-                currency_val = profile.get("currency")
-                self.logger.debug(
-                    f"Symbol {s['symbol']} filtered out: country={country_val} "
-                    f"(filter: {filter_countries}), currency={currency_val} "
-                    f"(filter: {filter_currencies})"
-                )
+                filtered_symbols.append(s)
 
         self.logger.info(
             f"Filtered {len(symbols)} to {len(filtered_symbols)} symbols for {config_key}"
