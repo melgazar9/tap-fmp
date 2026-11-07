@@ -3,6 +3,7 @@
 from abc import ABC
 import backoff
 from datetime import datetime, timedelta
+import json
 import re
 from singer_sdk.helpers.types import Context
 from singer_sdk.streams import RESTStream
@@ -93,6 +94,7 @@ class FmpRestStream(RESTStream, ABC):
     _no_data_reply_prefix = "No Data for this symbol"
 
     def __init__(self, tap: Tap) -> None:
+        self._partition_states: dict[str, dict] = {}
         super().__init__(tap)
         self.parse_config_params()
 
@@ -172,6 +174,20 @@ class FmpRestStream(RESTStream, ABC):
             f"other_params.names in meltano.yml. FMP doesn't expose a way to "
             f"enumerate valid name values for this stream."
         )
+
+    def get_context_state(self, context: Context | None) -> dict:
+        """The SDK's entry for a partition, found once: it scans every saved partition per record,
+        which outweighs all the stream's other work once a state holds tens of thousands.
+        """
+        partition_context = self._get_state_partition_context(context)
+        if not partition_context:
+            return super().get_context_state(context)
+        key = json.dumps(partition_context, sort_keys=True, default=str)
+        state = self._partition_states.get(key)
+        if state is None:
+            state = super().get_context_state(context)
+            self._partition_states[key] = state
+        return state
 
     def get_starting_timestamp(self, context: Context | None) -> str | None:
         """
@@ -582,8 +598,11 @@ class TimeSliceStream(FmpRestStream):
     replication_method = "INCREMENTAL"
 
     # Last-line defense against silent truncation: `fetch_window`'s halving
-    # only fires on `max_records_per_request` hits, not on silent caps or page ceilings.
+    # fires on `max_records_per_request` and page-ceiling hits, not on silent caps.
     _default_time_slice_days: int = 90
+
+    # True where a partition's first row can sit years past its window's start, so a late first row says nothing.
+    _sparse_history: bool = False
 
     # True where the endpoint omits records dated on `from`; the request then starts a day early.
     _exclusive_from: bool = False
@@ -721,7 +740,7 @@ class TimeSliceStream(FmpRestStream):
                 records.extend(page_records)
             page += 1
 
-        return records, self.configured_page is None
+        return records, self.configured_page is None and consecutive_empty == 0
 
     def _check_silent_truncation(
         self,
@@ -775,8 +794,8 @@ class TimeSliceStream(FmpRestStream):
         """Fetch all records for a window. Three modes:
 
         1. `_paginate=True`: iterate all pages within the window. If the
-           page ceiling is hit, log DATA_TRUNCATED (splitting wouldn't
-           help — each half would also hit the ceiling).
+           page ceiling is hit, split the window in half and recurse. If
+           already at 1-day granularity, log DATA_TRUNCATED.
         2. Non-paginated, `len(records) >= max_records`: split window in
            half and recurse. If already at 1-day granularity, log
            DATA_TRUNCATED.
@@ -797,6 +816,11 @@ class TimeSliceStream(FmpRestStream):
 
         if self._paginate:
             records, hit_page_ceiling = self._fetch_paginated_window(url, query_params)
+            if hit_page_ceiling and self._is_splittable(from_date, to_date):
+                yield from self._fetch_both_halves(
+                    url, query_params, from_date, to_date, max_records, context
+                )
+                return
             if hit_page_ceiling:
                 self._log_data_truncated(
                     from_date=from_date,
@@ -808,7 +832,7 @@ class TimeSliceStream(FmpRestStream):
                     action="set_smaller_time_slice_days_for_this_stream",
                     max_pages=self._max_pages,
                 )
-            else:
+            elif not self._sparse_history:
                 self._check_silent_truncation(
                     records, from_date, to_date, max_records, symbol
                 )
@@ -824,9 +848,7 @@ class TimeSliceStream(FmpRestStream):
             yield from self._yield_processed(records, context)
             return
 
-        from_dt = datetime.fromisoformat(from_date)
-        to_dt = datetime.fromisoformat(to_date)
-        if (to_dt - from_dt).days <= 1:
+        if not self._is_splittable(from_date, to_date):
             self._log_data_truncated(
                 from_date=from_date,
                 to_date=to_date,
@@ -839,6 +861,21 @@ class TimeSliceStream(FmpRestStream):
             yield from self._yield_processed(records, context)
             return
 
+        yield from self._fetch_both_halves(
+            url, query_params, from_date, to_date, max_records, context
+        )
+
+    @staticmethod
+    def _is_splittable(from_date: str, to_date: str) -> bool:
+        return (
+            datetime.fromisoformat(to_date) - datetime.fromisoformat(from_date)
+        ).days > 1
+
+    def _fetch_both_halves(
+        self, url, query_params, from_date, to_date, max_records, context
+    ):
+        from_dt = datetime.fromisoformat(from_date)
+        to_dt = datetime.fromisoformat(to_date)
         mid_dt = from_dt + (to_dt - from_dt) // 2
         mid_date = mid_dt.strftime("%Y-%m-%d")
         yield from self.fetch_window(

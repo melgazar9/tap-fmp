@@ -75,6 +75,8 @@ The tap allows you to specify lists of symbols for various streams. This is usef
 
 ### Country / Currency / Exchange Filtering — Required Prerequisite
 
+`filter_exclude_countries` drops the symbols whose company is in the listed countries, for a one-off backfill of what a wider universe added: a run with `["US"]` over the listed exchanges requests only the foreign companies.
+
 `filter_countries`, `filter_currencies` and `filter_exchanges` (e.g. `["US"]` / `["USD"]` / `["NASDAQ", "NYSE"]`) restrict the per-symbol universe every downstream stream iterates over. A US company's listing abroad carries its US country and currency, so only `filter_exchanges` drops it. The filter looks up each symbol's country/currency/exchange in the company profiles, sourced according to `exchange_variants_source`:
 
 - `use_database: true` (default) — read from the `company_profile_by_symbol` Postgres table populated by the `company_profile_by_symbol` stream

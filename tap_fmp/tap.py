@@ -853,10 +853,13 @@ class TapFMP(Tap):
             )
             if allowed
         }
+        excluded_countries = self.config.get("filter_exclude_countries") or []
 
-        self.logger.info(f"Applying filtering for {config_key}: {profile_filters}")
+        self.logger.info(
+            f"Applying filtering for {config_key}: {profile_filters}, excluding countries {excluded_countries}"
+        )
 
-        if not profile_filters:
+        if not profile_filters and not excluded_countries:
             self.logger.info(
                 f"No filtering configured for {config_key}, returning all {len(symbols)} symbols"
             )
@@ -895,6 +898,8 @@ class TapFMP(Tap):
                 for field, allowed in profile_filters.items()
                 if profile.get(field) not in allowed
             }
+            if profile.get("country") in excluded_countries:
+                mismatches["country"] = profile.get("country")
             if mismatches:
                 self.logger.debug(f"Symbol {s['symbol']} filtered out: {mismatches}")
             else:

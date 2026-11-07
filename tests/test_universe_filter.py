@@ -18,6 +18,17 @@ from tap_fmp.streams.company_streams import CompanyProfileBySymbolStream
 from tap_fmp.tap import TapFMP
 
 US_EXCHANGES = ["NASDAQ", "NYSE", "AMEX", "CBOE", "OTC"]
+LISTED_EXCHANGES = ["NASDAQ", "NYSE", "AMEX", "CBOE"]
+LISTED_UNIVERSE = {
+    "CDNS": ("US", "USD", "NASDAQ"),
+    "BABA": ("CN", "USD", "NYSE"),
+    "TSM": ("TW", "USD", "NYSE"),
+    "NOCOUNTRY": (None, "USD", "NYSE"),
+    "AABB": ("US", "USD", "OTC"),
+    "TCEHY": ("CN", "USD", "OTC"),
+    "0HS2.L": ("US", "USD", "LSE"),
+    "RY.TO": ("CA", "CAD", "TSX"),
+}
 
 
 def _tap(**config) -> TapFMP:
@@ -167,3 +178,32 @@ def test_the_csv_source_files_each_listing_under_its_short_exchange_name(tmp_pat
     rows = CompanyProfilesManager({"exchange_variants_source": source})._load_from_csv()
 
     assert rows[0]["exchange"] == "NASDAQ"
+
+
+def test_listed_exchanges_keep_foreign_companies_and_drop_otc_and_listings_abroad():
+    tap = _tap(filter_countries=None, filter_exchanges=LISTED_EXCHANGES)
+
+    kept = _filter(tap, list(LISTED_UNIVERSE), LISTED_UNIVERSE)
+
+    assert kept == ["CDNS", "BABA", "TSM", "NOCOUNTRY"]
+
+
+def test_excluded_countries_leave_only_the_other_listings_for_a_backfill():
+    tap = _tap(
+        filter_countries=None,
+        filter_exchanges=LISTED_EXCHANGES,
+        filter_exclude_countries=["US"],
+    )
+
+    kept = _filter(tap, list(LISTED_UNIVERSE), LISTED_UNIVERSE)
+
+    assert kept == ["BABA", "TSM", "NOCOUNTRY"]
+
+
+def test_an_exclusion_alone_is_still_a_filter():
+    tap = _tap(filter_countries=None, filter_exclude_countries=["US"])
+
+    kept = _filter(tap, list(LISTED_UNIVERSE), LISTED_UNIVERSE)
+
+    assert "CDNS" not in kept
+    assert "BABA" in kept

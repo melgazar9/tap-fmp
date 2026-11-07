@@ -18,13 +18,15 @@ If either invariant breaks, time-slice streams will silently lose data.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from collections import Counter
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 
 from tap_fmp.client import DATA_TRUNCATED_TOKEN, TimeSliceStream
 from tap_fmp.streams.chart_streams import (
+    CompanyChartFullStream,
     Company1minStream,
     Company5minStream,
     Company15minStream,
@@ -33,21 +35,25 @@ from tap_fmp.streams.chart_streams import (
     Company4HrStream,
 )
 from tap_fmp.streams.commodity_streams import (
+    CommoditiesFullChartStream,
     Commodities1minStream,
     Commodities5minStream,
     Commodities1HrStream,
 )
 from tap_fmp.streams.crypto_streams import (
+    HistoricalCryptoFullChartStream,
     Crypto1minStream,
     Crypto5minStream,
     Crypto1HrStream,
 )
 from tap_fmp.streams.forex_streams import (
+    ForexFullChartStream,
     Forex1minStream,
     Forex5minStream,
     Forex1HrStream,
 )
 from tap_fmp.streams.index_streams import (
+    HistoricalIndexFullChartStream,
     Index1MinuteIntervalStream,
     Index5MinuteIntervalStream,
     Index1HourIntervalStream,
@@ -211,8 +217,13 @@ def test_subclass_default_time_slice_days_overrides_base():
         (Latest8KFilingsStream, 30),
         (LatestSecFilingsStream, 30),
         (SecFilingsByFormTypeStream, 30),
-        (SecFilingsBySymbolStream, 90),
-        (SecFilingsByCikStream, 90),
+        (SecFilingsBySymbolStream, 36500),
+        (SecFilingsByCikStream, 36500),
+        (CompanyChartFullStream, 3650),
+        (HistoricalIndexFullChartStream, 3650),
+        (CommoditiesFullChartStream, 3650),
+        (HistoricalCryptoFullChartStream, 3650),
+        (ForexFullChartStream, 3650),
         (HistoricalMarketCapStream, 90),
     ],
 )
@@ -481,23 +492,153 @@ def test_paginated_window_aggregates_pages_and_stops_on_empty(caplog):
     assert [r["id"] for r in out] == [1, 2, 3, 4]
 
 
-def test_paginated_window_hits_page_ceiling_logs_truncation(caplog):
-    """Exhausting _max_pages while pages still return data signals FMP
-    has more than we can retrieve in this window — log with the
-    hit_page_ceiling reason so the operator can lower time_slice_days."""
-    full_page = [{"date": "2024-03-29 09:30", "id": i} for i in range(5)]
-    # _max_pages=3 → loop runs page 0..3 → 4 pages of data → ceiling hit.
-    _, drift = _run_paginated_fetch_window(
-        _make_paginated_stream(),
-        page_returns=[full_page] * 4,
-        from_date="2024-01-01",
-        to_date="2024-04-01",
-        caplog=caplog,
+def _windowed_pages(rows, page_size):
+    """FMP's paged reply: only the rows inside the requested window, one page at a time."""
+
+    def fake(url, query_params, page=None):
+        inside = [
+            row
+            for row in rows
+            if query_params["from"] <= row["date"][:10] <= query_params["to"]
+        ]
+        first = (page or 0) * page_size
+        return inside[first : first + page_size]
+
+    return fake
+
+
+def _fetch_windowed(stream, rows, from_date, to_date, caplog, page_size=5):
+    """`fetch_window` against FMP's windowed paging; returns (records, truncation logs, windows requested)."""
+    fake = _windowed_pages(rows, page_size)
+    windows = []
+
+    def recording(url, query_params, page=None):
+        windows.append((query_params["from"], query_params["to"]))
+        return fake(url, query_params, page)
+
+    with (
+        patch.object(stream, "_fetch_with_retry", side_effect=recording),
+        caplog.at_level(logging.ERROR, logger="tap-fmp.test_stream"),
+    ):
+        out = list(
+            stream.fetch_window(
+                url="http://example/test",
+                query_params={"symbol": "AAPL"},
+                from_date=from_date,
+                to_date=to_date,
+                max_records=10,
+                context=None,
+            )
+        )
+    drift = [r for r in caplog.records if DATA_TRUNCATED_TOKEN in r.message]
+    return out, drift, windows
+
+
+def _daily_rows(first_day, days):
+    start = datetime.fromisoformat(first_day)
+    return [
+        {"date": (start + timedelta(days=i)).strftime("%Y-%m-%d"), "id": i}
+        for i in range(days)
+    ]
+
+
+def test_paged_window_past_the_ceiling_splits_until_every_row_is_served(caplog):
+    """_max_pages=3 serves 4 pages of 5 rows at most, so 60 rows can't come back in one window."""
+    rows = _daily_rows("2024-01-01", 60)
+
+    out, drift, windows = _fetch_windowed(
+        _make_paginated_stream(), rows, "2024-01-01", "2024-03-01", caplog
     )
+
+    assert {r["id"] for r in out} == set(range(60))
+    assert drift == []
+    assert len(set(windows)) > 1
+
+
+def test_paged_window_under_the_ceiling_is_not_split(caplog):
+    rows = _daily_rows("2024-01-01", 12)
+
+    out, drift, windows = _fetch_windowed(
+        _make_paginated_stream(), rows, "2024-01-01", "2024-03-01", caplog
+    )
+
+    assert sorted(r["id"] for r in out) == list(range(12))
+    assert drift == []
+    assert set(windows) == {("2024-01-01", "2024-03-01")}
+
+
+def test_a_split_window_yields_no_row_from_the_abandoned_attempt_twice_over(caplog):
+    """The full window's pages are discarded; each row appears once, plus at most once more on a boundary day."""
+    rows = _daily_rows("2024-01-01", 60)
+
+    out, _, _ = _fetch_windowed(
+        _make_paginated_stream(), rows, "2024-01-01", "2024-03-01", caplog
+    )
+
+    assert max(Counter(r["id"] for r in out).values()) <= 2
+
+
+def test_one_day_past_the_ceiling_keeps_its_rows_and_logs_truncation(caplog):
+    """A single day can't be split further: what FMP served is kept and the shortfall is said, with the reason."""
+    rows = [{"date": "2024-03-29 09:30", "id": i} for i in range(30)]
+
+    out, drift, windows = _fetch_windowed(
+        _make_paginated_stream(), rows, "2024-03-29", "2024-03-30", caplog
+    )
+
+    assert len(out) == 20
     assert len(drift) == 1
-    msg = drift[0].message
-    assert "reason=hit_page_ceiling_with_data" in msg
-    assert "max_pages=3" in msg
+    assert "reason=hit_page_ceiling_with_data" in drift[0].message
+    assert "max_pages=3" in drift[0].message
+    assert set(windows) == {("2024-03-29", "2024-03-30")}
+
+
+def test_a_filer_whose_first_filing_comes_late_is_not_reported_as_truncated(caplog):
+    """A whole-history window starts long before most filers exist, so a late first row says nothing."""
+
+    class _SparseHistoryStream(_PaginatedStubTimeSliceStream):
+        _sparse_history = True
+
+    rows = _daily_rows("2020-01-01", 3)
+
+    out, drift, _ = _fetch_windowed(
+        _SparseHistoryStream(), rows, "1990-01-01", "2026-11-06", caplog
+    )
+
+    assert len(out) == 3
+    assert drift == []
+
+
+def test_a_narrow_paged_window_still_reports_a_late_first_row(caplog):
+    rows = _daily_rows("2024-03-20", 3)
+
+    _, drift, _ = _fetch_windowed(
+        _make_paginated_stream(), rows, "2024-01-01", "2024-04-01", caplog
+    )
+
+    assert len(drift) == 1
+    assert "reason=fmp_silent_cap_below_max_records" in drift[0].message
+
+
+@pytest.mark.parametrize(
+    "stream_cls", [SecFilingsBySymbolStream, SecFilingsByCikStream]
+)
+def test_whole_history_filing_streams_expect_late_first_rows(stream_cls):
+    assert stream_cls._sparse_history is True
+
+
+@pytest.mark.parametrize(
+    "stream_cls",
+    [
+        SecFilingsBySymbolStream,
+        SecFilingsByCikStream,
+        Latest8KFilingsStream,
+        LatestSecFilingsStream,
+        SecFilingsByFormTypeStream,
+    ],
+)
+def test_filing_streams_split_before_the_pages_fmp_answers_too_slowly(stream_cls):
+    assert stream_cls._max_pages == 20
 
 
 def test_paginated_window_natural_exhaustion_no_ceiling_alert(caplog):

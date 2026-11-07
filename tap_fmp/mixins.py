@@ -404,6 +404,9 @@ class ChartLightMixin(BasePriceSchemaMixin):
 class ChartFullMixin(BasePriceSchemaMixin):
     """Full chart (price + volume)."""
 
+    # calendar days per request; its bars must stay under max_records_per_request, or the window splits
+    _default_time_slice_days: int = 3650
+
     schema = th.PropertiesList(
         th.Property("symbol", th.StringType, required=True),
         th.Property("date", th.DateType),
@@ -460,6 +463,9 @@ class Prices30minMixin(BaseIntervalPriceSchemaMixin):
 
 
 class Prices1HrMixin(BaseIntervalPriceSchemaMixin):
+    # calendar days per request; FMP serves only the last months before `to`, whatever `from` says, with no error
+    _default_time_slice_days: int = 90
+
     def get_url(self, context: Context):
         return f"{self.url_base}/stable/historical-chart/1hour"
 

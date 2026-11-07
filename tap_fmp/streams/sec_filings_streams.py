@@ -22,9 +22,8 @@ class BaseSecFilingTimeSliceStream(TimeSliceStream):
     _add_surrogate_key = True
     _symbol_in_query_params = False
     _paginate = True
-    _max_pages = 100
-    # Firehose endpoints (latest_8k, latest_sec_filings, sec_filings_by_form_type)
-    # span all issuers; 25k page cap forces a narrow window.
+    _max_pages = 20  # maximum page index, inclusive; FMP answers deeper pages very slowly, and a window past this splits
+    # Firehose endpoints (latest_8k, latest_sec_filings, sec_filings_by_form_type) span all issuers, so they start narrow.
     _default_time_slice_days: int = 30
 
     schema = th.PropertiesList(
@@ -125,7 +124,11 @@ class SecFilingsBySymbolStream(CompanySymbolPartitionTimeSliceStream):
     replication_key = "filing_date"
     _add_surrogate_key = True
     _paginate = True
-    _max_pages = 100
+    _max_pages = 20  # maximum page index, inclusive; FMP answers deeper pages very slowly, and a window past this splits
+    _default_time_slice_days: int = (
+        36500  # calendar days per request; outlasts any filer's history, as most fit one window
+    )
+    _sparse_history = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -150,7 +153,11 @@ class SecFilingsByCikStream(TimeSliceStream):
     replication_key = "filing_date"
     _add_surrogate_key = True
     _paginate = True
-    _max_pages = 100
+    _max_pages = 20  # maximum page index, inclusive; FMP answers deeper pages very slowly, and a window past this splits
+    _default_time_slice_days: int = (
+        36500  # calendar days per request; outlasts any filer's history, as most fit one window
+    )
+    _sparse_history = True
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
