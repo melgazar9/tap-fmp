@@ -268,6 +268,15 @@ class EtfConfigMixin(BaseConfigMixin):
     _item_name_plural = "ETF symbols"
 
 
+class TranscriptSymbolConfigMixin(BaseConfigMixin):
+    """Mixin providing transcript symbol configuration properties."""
+
+    _selection_config_key = "transcript_symbols"
+    _selection_field_key = "select_transcript_symbols"
+    _item_name_singular = "transcript symbol"
+    _item_name_plural = "transcript symbols"
+
+
 class IndexConfigMixin(BaseConfigMixin):
     """Mixin providing Index configuration properties."""
 

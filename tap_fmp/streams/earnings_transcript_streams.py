@@ -3,7 +3,7 @@ from tap_fmp.client import (
     SymbolYearQuarterPartitionStream,
     BaseSymbolPartitionStream,
 )
-from tap_fmp.mixins import TranscriptSymbolPartitionMixin
+from tap_fmp.mixins import TranscriptSymbolConfigMixin, TranscriptSymbolPartitionMixin
 from singer_sdk.helpers.types import Context
 from singer_sdk import typing as th
 
@@ -80,7 +80,9 @@ class TranscriptsDatesBySymbolStream(
         return f"{self.url_base}/stable/earning-call-transcript-dates"
 
 
-class AvailableTranscriptSymbolsStream(FmpSurrogateKeyStream):
+class AvailableTranscriptSymbolsStream(
+    TranscriptSymbolConfigMixin, FmpSurrogateKeyStream
+):
     """Stream for pulling available transcript symbols."""
 
     name = "available_transcript_symbols"
