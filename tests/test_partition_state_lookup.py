@@ -83,18 +83,42 @@ def test_duplicate_saved_entries_still_fail_as_the_sdk_fails_them():
         stream.get_context_state({"symbol": "A"})
 
 
-def test_records_do_not_rescan_the_saved_partitions():
+def test_no_lookup_scans_the_saved_partitions():
+    """The SDK scans every saved partition per lookup, so a run over a list of hundreds of
+    thousands, adding one partition at a time, would scan a quadratic number of entries.
+    """
     _, stream = _tap_and_stream(_saved_state(*[f"S{i}" for i in range(50)]))
     scan = _state._find_in_partitions_list
 
     with patch.object(_state, "_find_in_partitions_list", wraps=scan) as scans:
-        for hour in range(500):
-            stream._increment_stream_state(
-                {"symbol": "S7", "date": f"2026-07-01 {hour % 24:02d}:30:00"},
-                context={"symbol": "S7"},
-            )
+        for i in range(80):
+            context = {"symbol": f"S{i}"}
+            stream._write_starting_replication_value(context)
+            for hour in range(24):
+                stream._increment_stream_state(
+                    {"symbol": f"S{i}", "date": f"2026-07-01 {hour:02d}:30:00"},
+                    context=context,
+                )
 
-    assert scans.call_count == 1
+    assert scans.call_count == 0
+
+
+def test_reading_a_partitions_saved_entry_never_adds_one():
+    tap, stream = _tap_and_stream(_saved_state("A"))
+
+    assert stream._saved_partition_state({"symbol": "A"}) is _partitions(tap)[0]
+    assert stream._saved_partition_state({"symbol": "NEW"}) is None
+    assert len(_partitions(tap)) == 1
+
+
+def test_a_partition_another_writer_added_is_found_not_duplicated():
+    tap, stream = _tap_and_stream(_saved_state("A"))
+    stream.get_context_state({"symbol": "A"})
+    added = {"context": {"symbol": "B"}, "replication_key_value": "2026-06-02 15:30:00"}
+    _partitions(tap).append(added)
+
+    assert stream.get_context_state({"symbol": "B"}) is added
+    assert len(_partitions(tap)) == 2
 
 
 def _replay(stream):

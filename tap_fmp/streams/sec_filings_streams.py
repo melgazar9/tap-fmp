@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from functools import cached_property
+
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 
 from tap_fmp.client import (
+    ConcurrentPartitionTimeSliceStream,
     FmpRestStream,
     TimeSliceStream,
     CompanySymbolPartitionStream,
@@ -145,7 +148,7 @@ class SecFilingsBySymbolStream(CompanySymbolPartitionTimeSliceStream):
         return f"{self.url_base}/stable/sec-filings-search/symbol"
 
 
-class SecFilingsByCikStream(TimeSliceStream):
+class SecFilingsByCikStream(ConcurrentPartitionTimeSliceStream):
     """Stream for SEC Filings By CIK API."""
 
     name = "sec_filings_by_cik"
@@ -154,6 +157,8 @@ class SecFilingsByCikStream(TimeSliceStream):
     _add_surrogate_key = True
     _paginate = True
     _max_pages = 20  # maximum page index, inclusive; FMP answers deeper pages very slowly, and a window past this splits
+    _probe_page_ceiling = True
+    _context_query_params = ("cik",)
     _default_time_slice_days: int = (
         36500  # calendar days per request; outlasts any filer's history, as most fit one window
     )
@@ -170,17 +175,15 @@ class SecFilingsByCikStream(TimeSliceStream):
         th.Property("final_link", th.StringType),
     ).to_dict()
 
-    @property
+    @cached_property
     def partitions(self) -> list[dict] | None:
-        return [{"cik": c.get("cik")} for c in self._tap.get_cached_ciks()]
+        """Built once: the SDK, its bookmarks and the prefetcher share one list of every CIK."""
+        # each CIK once: a repeat would refetch what its first pass loaded
+        ciks = dict.fromkeys(c.get("cik") for c in self._tap.get_cached_ciks())
+        return [{"cik": cik} for cik in ciks]
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/sec-filings-search/cik"
-
-    def get_records(self, context: Context | None):
-        if context:
-            self.query_params.update(context)
-        return super().get_records(context)
 
 
 class SecFilingsByNameStream(FmpRestStream):

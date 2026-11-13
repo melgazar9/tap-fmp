@@ -131,6 +131,14 @@ For example, you can configure the `company_screener` stream to only return stoc
 
 You can also configure date ranges, limits, and other parameters for most streams. Please refer to the `meltano.yml` file for a full list of available options for each stream.
 
+### `sec_filings_by_cik`
+
+The stream asks FMP about every CIK on its list, one partition each, over one whole-history window that halves whenever it holds more than the page ceiling serves.
+
+*   **Fetched ahead on threads.** Worker threads fetch the CIKs after the one being written, so requests overlap, while records, bookmarks and state messages keep CIK order. Every request still waits its turn behind `min_throttle_seconds`, which alone sets the stream's request rate. `other_params.partition_workers` sets the number of threads; `1` fetches each CIK only when its turn comes.
+*   **The ceiling page is asked early.** Once a window's page comes back full, or first for a half of a window that overflowed, the tap asks the ceiling page: rows there mean the window splits, so the pages in between are never downloaded only to be fetched again by its halves.
+*   **State messages go out between CIKs on a clock**, not every so many records, since each one carries every CIK's bookmark. A failed run resumes from the last one; CIKs finished after it are fetched again.
+
 ## Endpoint Limits & Pagination Reference
 
 Every FMP endpoint that accepts `limit` and/or `page` has two independent caps:

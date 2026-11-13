@@ -53,7 +53,8 @@ Key subclasses in `client.py`:
 | `BaseSymbolPartitionStream` | Partitions over a symbol list (`BaseSymbolPartitionMixin`) |
 | `CompanySymbolPartitionStream` | Partitions over cached company symbols |
 | `SymbolPeriodPartitionStream` | Symbol × period (annual/quarter) fan-out |
-| `TimeSliceStream` | `INCREMENTAL` on `date`; chunks the window via `create_time_slice_chunks`, detects silent API truncation (`TruncationReason`) |
+| `TimeSliceStream` | `INCREMENTAL` on `date`; chunks the window via `create_time_slice_chunks`, detects silent API truncation (`TruncationReason`); `_probe_page_ceiling` asks a paged window's ceiling page early so an overflowing window splits without its middle pages |
+| `ConcurrentPartitionTimeSliceStream` | Partitioned `TimeSliceStream` whose upcoming partitions are fetched on worker threads (`tap_fmp/prefetch.py`); records, bookmarks and state messages stay in partition order on the main thread |
 | `BaseSymbolPartitionTimeSliceStream` / `CompanySymbolPartitionTimeSliceStream` | Symbol partitioning + time slicing |
 | `IncrementalDateStream` | `INCREMENTAL` on `date`, day-by-day iteration |
 | `IncrementalYearStream` | `INCREMENTAL` on `year` |

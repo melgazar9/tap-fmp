@@ -13,11 +13,14 @@ from tap_fmp.mixins import (
     BaseSymbolPartitionMixin,
     CompanySymbolPartitionMixin,
 )
+from tap_fmp.prefetch import PartitionPlan, PartitionPrefetcher
 from tap_fmp.schema_drift import SchemaDriftMonitor
 import typing as t
 import logging
 import requests
+from requests.adapters import HTTPAdapter
 from singer_sdk.exceptions import ConfigValidationError
+import sys
 import threading
 import time
 import random
@@ -93,8 +96,14 @@ class FmpRestStream(RESTStream, ABC):
     # FMP's reply when the endpoint holds nothing for the request; every other error reply is a fault
     _no_data_reply_prefix = "No Data for this symbol"
 
+    # partition fields sent as request params; copied per request so query_params keeps only the config
+    _context_query_params: t.ClassVar[tuple[str, ...]] = ()
+
     def __init__(self, tap: Tap) -> None:
         self._partition_states: dict[str, dict] = {}
+        self._indexed_partitions: list[dict] | None = None
+        self._indexed_partition_count = 0
+        self._duplicate_partition_keys: set[str] = set()
         super().__init__(tap)
         self.parse_config_params()
 
@@ -176,18 +185,58 @@ class FmpRestStream(RESTStream, ABC):
         )
 
     def get_context_state(self, context: Context | None) -> dict:
-        """The SDK's entry for a partition, found once: it scans every saved partition per record,
-        which outweighs all the stream's other work once a state holds tens of thousands.
+        """The SDK's entry for a partition, from an index of the saved partitions: the SDK scans every
+        saved partition per lookup, which outweighs all the stream's other work once a state holds
+        tens of thousands.
         """
         partition_context = self._get_state_partition_context(context)
         if not partition_context:
             return super().get_context_state(context)
-        key = json.dumps(partition_context, sort_keys=True, default=str)
+        key = self._partition_key(partition_context)
         state = self._partition_states.get(key)
         if state is None:
-            state = super().get_context_state(context)
+            state = self._saved_partition_state(partition_context)
+        if state is None:
+            state = {"context": partition_context}
+            self._indexed_partitions.append(state)
+            self._indexed_partition_count += 1
             self._partition_states[key] = state
         return state
+
+    @staticmethod
+    def _partition_key(partition_context: Context) -> str:
+        return json.dumps(partition_context, sort_keys=True, default=str)
+
+    def _saved_partition_state(self, partition_context: Context) -> dict | None:
+        """A partition's entry in state, or None; never creates one."""
+        self._index_saved_partitions()
+        key = self._partition_key(partition_context)
+        if key in self._duplicate_partition_keys:
+            raise ValueError(
+                f"State file contains duplicate entries for partition: {partition_context}."
+            )
+        return self._partition_states.get(key)
+
+    def _index_saved_partitions(self) -> None:
+        """One pass over the partitions in state, again only if something other than this stream added one."""
+        partitions = self.stream_state.setdefault("partitions", [])
+        if (
+            partitions is self._indexed_partitions
+            and len(partitions) == self._indexed_partition_count
+        ):
+            return
+        self._partition_states.clear()
+        self._duplicate_partition_keys.clear()
+        for entry in partitions:
+            key = self._partition_key(entry["context"])
+            if key in self._partition_states:
+                self._duplicate_partition_keys.add(key)
+            self._partition_states[key] = entry
+        # the SDK refuses a partition saved twice whenever it is looked up
+        for key in self._duplicate_partition_keys:
+            del self._partition_states[key]
+        self._indexed_partitions = partitions
+        self._indexed_partition_count = len(partitions)
 
     def get_starting_timestamp(self, context: Context | None) -> str | None:
         """
@@ -203,8 +252,10 @@ class FmpRestStream(RESTStream, ABC):
         """
         if self.replication_method != "INCREMENTAL":
             return None
+        return self._starting_timestamp_from(self.get_context_state(context))
 
-        state = self.get_context_state(context)
+    def _starting_timestamp_from(self, state: dict) -> str | None:
+        """`get_starting_timestamp` for a partition whose state entry is `state`."""
         if state.get("replication_key_value"):
             return self._format_replication_key(state["replication_key_value"])
         elif state.get("starting_replication_value"):
@@ -467,6 +518,14 @@ class FmpRestStream(RESTStream, ABC):
     def _format_replication_key(replication_key_value):
         return replication_key_value
 
+    def _request_query_params(self, context: Context | None) -> dict:
+        query_params = self.query_params.copy()
+        if context:
+            query_params.update(
+                {field: context[field] for field in self._context_query_params}
+            )
+        return query_params
+
     def _yield_processed(
         self, records: list[dict], context: Context | None
     ) -> t.Iterable[dict]:
@@ -504,16 +563,11 @@ class BaseSymbolPartitionStream(BaseSymbolPartitionMixin, FmpRestStream):
 
     _symbol_in_path_params = False
     _symbol_in_query_params = True
-    # partition fields sent as request params; copied per request so query_params keeps only the config
-    _context_query_params: t.ClassVar[tuple[str, ...]] = ()
 
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
         assert self._symbol_in_path_params or self._symbol_in_query_params
 
-        query_params = self.query_params.copy()
-        query_params.update(
-            {field: context[field] for field in self._context_query_params}
-        )
+        query_params = self._request_query_params(context)
         path_params = self.path_params.copy()
 
         if self._symbol_in_query_params:
@@ -607,6 +661,10 @@ class TimeSliceStream(FmpRestStream):
     # True where the endpoint omits records dated on `from`; the request then starts a day early.
     _exclusive_from: bool = False
 
+    # True where a paged window asks its ceiling page as soon as it looks likely to overflow, so an
+    # overflowing window skips the pages in between, whose rows its halves fetch again anyway
+    _probe_page_ceiling: bool = False
+
     _LOG_FIXED_KEYS = frozenset(
         {
             "stream",
@@ -621,16 +679,21 @@ class TimeSliceStream(FmpRestStream):
 
     def create_time_slice_chunks(self, context: Context) -> list[tuple[str, str]]:
         """Generate (from, to) date ranges for the API, as list of (start, end) ISO strings."""
-        tap_cfg = self.config
+        start = (
+            self.get_starting_timestamp(context)
+            if self.replication_method == "INCREMENTAL"
+            else None
+        )
+        return self._time_slices_from(start)
 
-        if self.replication_method == "INCREMENTAL":
-            start = self.get_starting_timestamp(context)
-            if start:
-                start_dt = datetime.fromisoformat(start).date()
-            else:
-                start_dt = datetime(1970, 1, 1).date()
-        else:
-            start_dt = datetime(1970, 1, 1).date()
+    def _time_slices_from(self, start: str | None) -> list[tuple[str, str]]:
+        """The (from, to) windows of a partition whose starting timestamp is `start`."""
+        tap_cfg = self.config
+        start_dt = (
+            datetime.fromisoformat(start).date()
+            if start
+            else datetime(1970, 1, 1).date()
+        )
 
         window_days = int(
             self.other_params.get("time_slice_days", self._default_time_slice_days)
@@ -706,13 +769,24 @@ class TimeSliceStream(FmpRestStream):
         self.logger.error(" ".join(parts))
 
     def _fetch_paginated_window(
-        self, url: str, query_params: dict
+        self,
+        url: str,
+        query_params: dict,
+        *,
+        probe_ceiling: bool = False,
+        ceiling_first: bool = False,
     ) -> tuple[list[dict], bool]:
         """Aggregate raw records across all pages within a (from, to) window.
         Returns `(records, hit_page_ceiling)`. The ceiling flag is True only
         when the loop exited because we exhausted `_max_pages` with data
         still flowing — caller treats that as truncation. A configured
-        single-page fetch never reports ceiling-hit."""
+        single-page fetch never reports ceiling-hit.
+
+        With `probe_ceiling` the ceiling page is asked as soon as an overflow
+        is likely: before page 0 when `ceiling_first`, else once a page comes
+        back full. Rows there mean the window overflows, so it returns no
+        records at once; the caller must split it, as its halves fetch every
+        row again. The probed page is never asked twice."""
         self._set_configured_page()
         page = self.configured_page if self.configured_page is not None else 0
         max_page = (
@@ -720,17 +794,35 @@ class TimeSliceStream(FmpRestStream):
             if self.configured_page is not None
             else self._max_pages
         )
+        probe = probe_ceiling and self.configured_page is None and max_page > 0
+        ceiling_records: list[dict] | None = None
+        if probe and ceiling_first:
+            ceiling_records = self._fetch_with_retry(url, query_params, max_page)
+            if ceiling_records:
+                return [], True
         consecutive_empty = 0
         records: list[dict] = []
 
         while page <= max_page:
-            page_records = self._fetch_with_retry(url, query_params, page)
+            if page == max_page and ceiling_records is not None:
+                page_records = ceiling_records
+            else:
+                page_records = self._fetch_with_retry(url, query_params, page)
             if not isinstance(page_records, list):
                 self.logger.warning(
                     f"Expected list response on page {page}, got "
                     f"{type(page_records).__name__}; stopping pagination."
                 )
                 return records, False
+            if (
+                probe
+                and ceiling_records is None
+                and page < max_page
+                and self._is_full_page(page_records, query_params)
+            ):
+                ceiling_records = self._fetch_with_retry(url, query_params, max_page)
+                if ceiling_records:
+                    return [], True
             if not page_records:
                 consecutive_empty += 1
                 if consecutive_empty >= self._max_consecutive_empty_pages:
@@ -741,6 +833,12 @@ class TimeSliceStream(FmpRestStream):
             page += 1
 
         return records, self.configured_page is None and consecutive_empty == 0
+
+    @staticmethod
+    def _is_full_page(page_records: list[dict], query_params: dict) -> bool:
+        """Whether a page holds the `limit` asked for; without one, fullness is unknown."""
+        limit = query_params.get("limit")
+        return limit is not None and len(page_records) >= int(limit)
 
     def _check_silent_truncation(
         self,
@@ -803,6 +901,23 @@ class TimeSliceStream(FmpRestStream):
            the silent-truncation safety net for FMP's hidden per-request
            caps that sit below max_records.
         """
+        for records in self._window_batches(
+            url, query_params, from_date, to_date, max_records
+        ):
+            yield from self._yield_processed(records, context)
+
+    def _window_batches(
+        self,
+        url: str,
+        query_params: dict,
+        from_date: str,
+        to_date: str,
+        max_records: int,
+        *,
+        overflow_likely: bool = False,
+    ) -> t.Iterator[list[dict]]:
+        """`fetch_window`'s raw records, one list per window it settles on. Only requests and logs,
+        never state or record processing, so a worker thread can run it."""
         query_params = query_params.copy()
         query_params[self._replication_key_starting_name] = (
             (datetime.fromisoformat(from_date[:10]) - timedelta(days=1)).strftime(
@@ -813,12 +928,19 @@ class TimeSliceStream(FmpRestStream):
         )
         query_params[self._replication_key_ending_name] = to_date
         symbol = query_params.get("symbol")
+        splittable = self._is_splittable(from_date, to_date)
 
         if self._paginate:
-            records, hit_page_ceiling = self._fetch_paginated_window(url, query_params)
-            if hit_page_ceiling and self._is_splittable(from_date, to_date):
-                yield from self._fetch_both_halves(
-                    url, query_params, from_date, to_date, max_records, context
+            # an unsplittable window needs every page whatever the ceiling holds
+            records, hit_page_ceiling = self._fetch_paginated_window(
+                url,
+                query_params,
+                probe_ceiling=self._probe_page_ceiling and splittable,
+                ceiling_first=overflow_likely,
+            )
+            if hit_page_ceiling and splittable:
+                yield from self._both_halves(
+                    url, query_params, from_date, to_date, max_records
                 )
                 return
             if hit_page_ceiling:
@@ -836,7 +958,7 @@ class TimeSliceStream(FmpRestStream):
                 self._check_silent_truncation(
                     records, from_date, to_date, max_records, symbol
                 )
-            yield from self._yield_processed(records, context)
+            yield records
             return
 
         records = self._fetch_with_retry(url, query_params)
@@ -845,10 +967,10 @@ class TimeSliceStream(FmpRestStream):
             self._check_silent_truncation(
                 records, from_date, to_date, max_records, symbol
             )
-            yield from self._yield_processed(records, context)
+            yield records
             return
 
-        if not self._is_splittable(from_date, to_date):
+        if not splittable:
             self._log_data_truncated(
                 from_date=from_date,
                 to_date=to_date,
@@ -858,12 +980,10 @@ class TimeSliceStream(FmpRestStream):
                 reason=TruncationReason.SPLIT_FLOOR,
                 action="refetch_with_smaller_window_or_higher_limit",
             )
-            yield from self._yield_processed(records, context)
+            yield records
             return
 
-        yield from self._fetch_both_halves(
-            url, query_params, from_date, to_date, max_records, context
-        )
+        yield from self._both_halves(url, query_params, from_date, to_date, max_records)
 
     @staticmethod
     def _is_splittable(from_date: str, to_date: str) -> bool:
@@ -871,27 +991,32 @@ class TimeSliceStream(FmpRestStream):
             datetime.fromisoformat(to_date) - datetime.fromisoformat(from_date)
         ).days > 1
 
-    def _fetch_both_halves(
-        self, url, query_params, from_date, to_date, max_records, context
-    ):
+    def _both_halves(
+        self, url, query_params, from_date, to_date, max_records
+    ) -> t.Iterator[list[dict]]:
+        """A half of a window that overflowed is likely to overflow too."""
         from_dt = datetime.fromisoformat(from_date)
         to_dt = datetime.fromisoformat(to_date)
         mid_dt = from_dt + (to_dt - from_dt) // 2
         mid_date = mid_dt.strftime("%Y-%m-%d")
-        yield from self.fetch_window(
-            url, query_params, from_date, mid_date, max_records, context
+        yield from self._window_batches(
+            url, query_params, from_date, mid_date, max_records, overflow_likely=True
         )
-        yield from self.fetch_window(
-            url, query_params, mid_date, to_date, max_records, context
+        yield from self._window_batches(
+            url, query_params, mid_date, to_date, max_records, overflow_likely=True
         )
 
+    @property
+    def _max_records_per_request(self) -> int:
+        return self.other_params.get("max_records_per_request", 4000)
+
     def get_records(self, context: Context | None) -> t.Iterable[dict]:
-        query_params = self.query_params.copy()
+        query_params = self._request_query_params(context)
 
         url = self.get_url(context)
 
         time_slices = self.create_time_slice_chunks(context)
-        max_records = self.other_params.get("max_records_per_request", 4000)
+        max_records = self._max_records_per_request
 
         # No try/except around fetch_window: a transient API failure must
         # propagate so Singer leaves state at the last fully-completed window.
@@ -900,6 +1025,122 @@ class TimeSliceStream(FmpRestStream):
         for from_date, to_date in time_slices:
             yield from self.fetch_window(
                 url, query_params, from_date, to_date, max_records, context
+            )
+
+
+class ConcurrentPartitionTimeSliceStream(TimeSliceStream):
+    """A time-sliced stream over many partitions, fetched ahead on worker threads.
+
+    Workers fetch the partitions after the one the SDK is writing, so requests overlap, while
+    the SDK still writes every record, bookmark and state message on the main thread in
+    partition order. Every request still takes its turn in `_throttle`, which the workers
+    share, so the stream's request rate is the one `min_throttle_seconds` sets.
+    """
+
+    # threads fetching partitions; 1 fetches each partition only when the SDK reaches it
+    PARTITION_WORKERS: t.ClassVar[int] = 8
+    # rows held for partitions the SDK has not reached; caps memory, the partition being written may pass it
+    MAX_BUFFERED_RECORDS: t.ClassVar[int] = 200_000
+    # partitions planned ahead of the one being written, so workers keep busy behind a large partition
+    MAX_QUEUED_PARTITIONS: t.ClassVar[int] = 10_000
+    # seconds between state messages, sent at a partition's start: each one serializes every bookmark
+    STATE_MESSAGE_SECONDS: t.ClassVar[float] = 300.0
+    # the SDK's record-count trigger for state messages, off: STATE_MESSAGE_SECONDS paces them instead
+    STATE_MSG_FREQUENCY = sys.maxsize
+
+    def __init__(self, tap: Tap) -> None:
+        super().__init__(tap)
+        self._prefetcher: PartitionPrefetcher | None = None
+        self._last_state_message = time.monotonic()
+
+    @property
+    def partition_workers(self) -> int:
+        return int(self.other_params.get("partition_workers", self.PARTITION_WORKERS))
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        self._send_state_between_partitions()
+        prefetcher = self._prefetcher_for(context)
+        if prefetcher is None:
+            yield from super().get_records(context)
+            return
+        try:
+            for records in prefetcher.batches(
+                context, self.get_starting_timestamp(context)
+            ):
+                yield from self._yield_processed(records, context)
+        except BaseException:
+            prefetcher.close()
+            raise
+
+    def _send_state_between_partitions(self) -> None:
+        now = time.monotonic()
+        if now - self._last_state_message >= self.STATE_MESSAGE_SECONDS:
+            self._write_state_message()
+            self._last_state_message = now
+
+    def _prefetcher_for(self, context: Context | None) -> PartitionPrefetcher | None:
+        """The prefetcher that reads `context` next, started there if none does; None fetches it in place."""
+        if context is None or self.partition_workers <= 1:
+            return None
+        if self._prefetcher is not None and self._prefetcher.expects(context):
+            return self._prefetcher
+        if self._prefetcher is not None:
+            self._prefetcher.close()
+        contexts = self.partitions or []
+        first = next((i for i, c in enumerate(contexts) if c == context), None)
+        if first is None:
+            return None
+        self._set_configured_page()
+        self.requests_session.mount(
+            self.url_base, HTTPAdapter(pool_maxsize=self.partition_workers)
+        )
+        self._prefetcher = PartitionPrefetcher(
+            contexts[first:],
+            plan=self._plan_partition,
+            fetch=self._fetch_partition,
+            workers=self.partition_workers,
+            max_buffered_records=self.MAX_BUFFERED_RECORDS,
+            max_queued_partitions=self.MAX_QUEUED_PARTITIONS,
+            name=self.name,
+            logger=self.logger,
+        )
+        return self._prefetcher
+
+    def _plan_partition(self, context: Context) -> PartitionPlan:
+        start = self._queued_partition_start(context)
+        return PartitionPlan(
+            context=context,
+            start=start,
+            query_params=self._request_query_params(context),
+            windows=self._time_slices_from(start),
+        )
+
+    def _queued_partition_start(self, context: Context) -> str | None:
+        """What `get_starting_timestamp` returns once the SDK, right before reading the partition,
+        writes its starting value (start_date when there is no bookmark); worked out without writing state.
+        """
+        if self.replication_method != "INCREMENTAL":
+            return None
+        saved = (
+            self._saved_partition_state(self._get_state_partition_context(context))
+            or {}
+        )
+        return self._starting_timestamp_from(
+            {
+                "replication_key_value": saved.get("replication_key_value"),
+                "starting_replication_value": self.config.get("start_date"),
+            }
+        )
+
+    def _fetch_partition(self, plan: PartitionPlan) -> t.Iterator[list[dict]]:
+        url = self.get_url(plan.context)
+        for from_date, to_date in plan.windows:
+            yield from self._window_batches(
+                url,
+                plan.query_params,
+                from_date,
+                to_date,
+                self._max_records_per_request,
             )
 
 
@@ -923,7 +1164,7 @@ class BaseSymbolPartitionTimeSliceStream(BaseSymbolPartitionMixin, TimeSliceStre
 
         url = self.get_url(context)
         time_slices = self.create_time_slice_chunks(context)
-        max_records = self.other_params.get("max_records_per_request", 4000)
+        max_records = self._max_records_per_request
 
         # See note above: no try/except here. Failures must propagate so Singer
         # bookmark stays at last fully-completed window.
