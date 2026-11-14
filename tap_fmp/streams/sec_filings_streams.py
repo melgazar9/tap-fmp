@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import typing as t
 from functools import cached_property
 
 from singer_sdk import typing as th
@@ -338,11 +339,14 @@ class IndustryClassificationListStream(FmpRestStream):
 
 
 class IndustryClassificationSearchStream(FmpRestStream):
-    """Stream for Industry Classification Search API."""
+    """Stream for Industry Classification Search API. FMP refuses a search without a
+    value: a `symbol`, `cik` or `sicCode` in query_params is searched alone, else
+    every SIC code FMP lists is searched in turn."""
 
     name = "industry_classification_search"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
+    _search_params: t.ClassVar[tuple[str, ...]] = ("symbol", "cik", "sicCode")
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -358,13 +362,29 @@ class IndustryClassificationSearchStream(FmpRestStream):
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/industry-classification-search"
 
+    @property
+    def partitions(self) -> list[dict] | None:
+        if any(param in self.query_params for param in self._search_params):
+            return None
+        return [
+            {"sicCode": code["sic_code"]} for code in self._tap.get_cached_sic_codes()
+        ]
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        query_params = {**self.query_params, **(context or {})}
+        records = self._fetch_with_retry(self.get_url(context), query_params)
+        yield from self._yield_processed(records, context)
+
 
 class AllIndustryClassificationStream(FmpRestStream):
-    """Stream for All Industry Classification API."""
+    """The company→SIC directory. FMP pages it only at page 0: every later page
+    answers with the whole directory, whatever the limit."""
 
     name = "all_industry_classification"
     primary_keys = ["surrogate_key"]
     _add_surrogate_key = True
+    # the most rows FMP puts on a page; a larger limit is served this many
+    _rows_per_page: t.ClassVar[int] = 1000
 
     schema = th.PropertiesList(
         th.Property("surrogate_key", th.StringType, required=True),
@@ -379,3 +399,24 @@ class AllIndustryClassificationStream(FmpRestStream):
 
     def get_url(self, context: Context | None = None) -> str:
         return f"{self.url_base}/stable/all-industry-classification"
+
+    def get_records(self, context: Context | None) -> t.Iterable[dict]:
+        url = self.get_url(context)
+        query_params = {**self.query_params, "limit": self._rows_per_page}
+        pages: list[list[dict]] = []
+        for page in range(self._max_pages + 1):
+            records = self._fetch_with_retry(url, query_params, page)
+            if len(records) > self._rows_per_page:
+                # more than a page holds: FMP ignored the paging and served the whole directory
+                pages = [records]
+                break
+            pages.append(records)
+            if len(records) < self._rows_per_page:
+                break
+        else:
+            raise RuntimeError(
+                f"Stream {self.name}: every page through {self._max_pages} came back full; "
+                "the directory never ended"
+            )
+        for records in pages:
+            yield from self._yield_processed(records, context)

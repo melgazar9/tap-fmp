@@ -378,6 +378,10 @@ class TapFMP(Tap):
     _cik_stream_instance: CikListStream | None = None
     _ciks_lock = threading.Lock()
 
+    _cached_sic_codes: t.List[dict] | None = None
+    _sic_code_stream_instance: IndustryClassificationListStream | None = None
+    _sic_codes_lock = threading.Lock()
+
     _cached_13f_filer_ciks: t.List[str] | None = None
     _13f_filer_ciks_lock = threading.Lock()
 
@@ -709,6 +713,24 @@ class TapFMP(Tap):
             self.logger.info("Creating CikListStream instance...")
             self._cik_stream_instance = CikListStream(self)
         return self._cik_stream_instance
+
+    def get_cached_sic_codes(self) -> t.List[dict]:
+        """Thread-safe SIC code caching for parallel execution."""
+        return self._get_cached_data(
+            {
+                "cache_attr": "_cached_sic_codes",
+                "lock": self._sic_codes_lock,
+                "stream_getter": self.get_sic_code_stream,
+                "data_type": "SIC codes",
+                "sort_key": "sic_code",
+            }
+        )
+
+    def get_sic_code_stream(self) -> IndustryClassificationListStream:
+        if self._sic_code_stream_instance is None:
+            self.logger.info("Creating IndustryClassificationListStream instance...")
+            self._sic_code_stream_instance = IndustryClassificationListStream(self)
+        return self._sic_code_stream_instance
 
     def get_cached_13f_filer_ciks(self) -> t.List[str]:
         """The CIKs known to file 13Fs; a CIK selection written in config wins."""

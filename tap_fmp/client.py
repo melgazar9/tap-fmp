@@ -403,9 +403,11 @@ class FmpRestStream(RESTStream, ABC):
                 url, params=query_params, timeout=timeout
             )
 
-            if (
-                response.status_code == 400 and response.text == "[]"
-            ):  # bulk streams may return 400 and '[]' on the last 'part'
+            if self._is_past_last_page(response, page):
+                logging.info(
+                    f"Stream {self.name}: nothing past the last {self._paginate_key} at {log_url} "
+                    f"({self._paginate_key}={page})"
+                )
                 return []
 
             response.raise_for_status()
@@ -456,6 +458,11 @@ class FmpRestStream(RESTStream, ABC):
             f"Stream {self.name}: FMP answered {log_url} with an error in place of data: "
             f"{self.redact_api_key(message)[:self._error_body_max_chars]}"
         )
+
+    def _is_past_last_page(self, response: requests.Response, page: int | None) -> bool:
+        """A reply that means the request ran past the endpoint's data, not a fault."""
+        # a bulk file may answer the part past its last with a 400 holding an empty list
+        return response.status_code == 400 and response.text == "[]"
 
     def _set_configured_page(self):
         if getattr(self, "_configured_page_resolved", False):

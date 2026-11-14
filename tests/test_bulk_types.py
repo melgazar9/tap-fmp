@@ -1,7 +1,8 @@
 """Bulk CSVs carry every value as text, and the SDK reads any non-empty text,
 "false" included, as true; each column converts by its schema type instead.
 FMP may restrict a key that keeps calling a bulk file, so its 429s retry at a
-slow even pace while other failures back off as on any stream.
+slow even pace while other failures back off as on any stream. FMP refuses a
+part past a file's last one, which ends its parts; refusing the first is a fault.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+import requests
 
 from tap_fmp.client import FmpQuotaExhaustedError
 from tap_fmp.helpers import iso_date, whole_count
@@ -133,6 +135,41 @@ def test_configured_parts_are_each_requested(monkeypatch):
 
     assert requested == [0, 1]
     assert [r["_part"] for r in records] == [0, 1]
+
+
+PAST_LAST_PART_BODY = b"Query Error: Invalid or missing query parameter - part"
+
+
+def _profile_bulk_answering(monkeypatch, script) -> CompanyProfileBulkStream:
+    session = _ScriptedSession(script)
+    monkeypatch.setattr(
+        CompanyProfileBulkStream, "requests_session", property(lambda self: session)
+    )
+    return CompanyProfileBulkStream(_tap())
+
+
+def test_the_part_past_the_last_ends_the_file(monkeypatch):
+    stream = _profile_bulk_answering(
+        monkeypatch,
+        [(200, b"symbol\nA\nB\n"), (200, b"symbol\nC\n"), (400, PAST_LAST_PART_BODY)],
+    )
+
+    records = list(stream.get_records(None))
+
+    assert [(r["symbol"], r["_part"]) for r in records] == [
+        ("A", 0),
+        ("B", 0),
+        ("C", 1),
+    ]
+
+
+def test_a_refused_first_part_stops_the_stream(monkeypatch):
+    stream = _profile_bulk_answering(monkeypatch, [(400, PAST_LAST_PART_BODY)])
+
+    with pytest.raises(
+        requests.exceptions.HTTPError, match="Invalid or missing query parameter"
+    ):
+        list(stream.get_records(None))
 
 
 class _BulkStub(_StubStream):

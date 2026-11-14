@@ -34,6 +34,7 @@ class _ScriptedSession:
         response.status_code = status
         response.reason = {
             200: "OK",
+            400: "Bad Request",
             402: "Payment Required",
             429: "Too Many Requests",
             502: "Bad Gateway",

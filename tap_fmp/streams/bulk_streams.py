@@ -5,6 +5,7 @@ from __future__ import annotations
 import itertools
 import typing as t
 from functools import cached_property
+import requests
 from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context
 from tap_fmp.client import FmpSurrogateKeyStream, IncrementalDateStream
@@ -99,6 +100,19 @@ class PaginatedBulkStream(BaseBulkStream):
 
     _paginate = True
     _paginate_key = "part"
+    # FMP's reply to a part number past the file's last; on the first part it is a fault
+    _past_last_part_reply: t.ClassVar[str] = (
+        "Query Error: Invalid or missing query parameter - part"
+    )
+
+    def _is_past_last_page(self, response: requests.Response, page: int | None) -> bool:
+        if super()._is_past_last_page(response, page):
+            return True
+        return (
+            response.status_code == 400
+            and bool(page)
+            and response.text.strip() == self._past_last_part_reply
+        )
 
     def _configured_parts(self) -> list[int] | None:
         """`other_params.parts`; none or "*" means every part, and `query_params.part` reads that part alone."""
